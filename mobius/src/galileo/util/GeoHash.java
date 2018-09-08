@@ -2089,8 +2089,8 @@ public class GeoHash {
 				col_prev = col_prev*8 + c;
 				
 				//if(i != resolution-1) {
-					rowMultiplier *= 8;
-					colMultiplier *= 4;
+				rowMultiplier *= 8;
+				colMultiplier *= 4;
 				//}
 				
 			} else {
@@ -2104,14 +2104,13 @@ public class GeoHash {
 				col_prev = col_prev*4 + c;
 				
 				//if(i != resolution-1) {
-					rowMultiplier *= 4;
-					colMultiplier *= 8;
+				rowMultiplier *= 4;
+				colMultiplier *= 8;
 				//}
 				
 			}
 			
 		}
-		//int mult = rowMultiplier*colMultiplier;
 		int finalIndex = row_prev*rowMultiplier + col_prev;
 		
 		System.out.println(finalIndex);

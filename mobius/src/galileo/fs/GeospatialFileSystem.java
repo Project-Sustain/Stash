@@ -84,6 +84,7 @@ import galileo.dht.NodeInfo;
 import galileo.dht.PartitionException;
 import galileo.dht.Partitioner;
 import galileo.dht.SelfJoinThread;
+import galileo.dht.SpatialHierarchyPartitioner;
 import galileo.dht.StorageNode;
 import galileo.dht.TemporalHierarchyPartitioner;
 import galileo.dht.hash.HashException;
@@ -233,7 +234,9 @@ public class GeospatialFileSystem extends FileSystem {
 		if (nodesPerGroup <= 0) 
 			nodesPerGroup = networkInfo.getGroups().get(0).getSize();
 		
-		this.network = new NetworkInfo();
+		this.network = networkInfo;
+		
+		/*this.network = new NetworkInfo();
 		GroupInfo groupInfo = null;
 		List<NodeInfo> allNodes = networkInfo.getAllNodes();
 		Collections.sort(allNodes);
@@ -249,13 +252,15 @@ public class GeospatialFileSystem extends FileSystem {
 					groupInfo.addNode(allNodes.get(i));
 				}
 			}
-		}
+		}*/
 
 		/*
 		 * TODO: Ask end user about the partitioning scheme. chronospatial or
 		 * spatiotemporal. Accordingly, use TemporalHierarchyPartitioner or
 		 * SpatialHierarchyPartitioner
 		 **/
+		
+		this.partitioner = new SpatialHierarchyPartitioner(sn, this.network, null);
 		this.partitioner = new TemporalHierarchyPartitioner(sn, this.network, this.temporalType.getType(), spatialPartitioningType);
 
 		this.timeFormat = System.getProperty("galileo.fs.GeospatialFileSystem.timeFormat", DEFAULT_TIME_FORMAT);
