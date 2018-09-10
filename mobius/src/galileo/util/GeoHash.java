@@ -2113,7 +2113,7 @@ public class GeoHash {
 		}
 		int finalIndex = row_prev*rowMultiplier + col_prev;
 		
-		System.out.println(finalIndex);
+		//System.out.println(finalIndex);
 		return finalIndex;
 		
 	}
@@ -2124,7 +2124,7 @@ public class GeoHash {
 	}
 	
 	public static void main(String arg[]) {
-		getGeohashID("8pbp");
+		System.out.println(getGeohashID("8pbp"));
 	}
 	
 }
