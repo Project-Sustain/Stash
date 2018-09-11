@@ -37,6 +37,7 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -2273,10 +2274,82 @@ public class GeoHash {
 	public static int getTemporalID(String time, int temporalResolution) {
 		
 		String[] components = time.split("-");
+		int yr = Integer.valueOf(components[0]);
+		int mm = Integer.valueOf(components[1]);
+		int dd = Integer.valueOf(components[2]);
+		int hh = Integer.valueOf(components[3]);
+		// year
+		if(temporalResolution == 1) {
+			
+			return yr;
+			
+		} else if(temporalResolution == 2) {
+			//month
+			
+			int id = yr*12+mm;
+			return id;
+			
+		} else if(temporalResolution == 3) {
+			//day
+			return daysBetweenDates(yr, mm, dd);
+			
+		} else if(temporalResolution == 4) {
+			
+			int daysBw = daysBetweenDates(yr, mm, dd);
+			return daysBw*24 + hh;
+			
+		} else {
+			return -1;
+		}
 		
-		if(temporal)
+	}
+	
+	public static int daysBetweenDates(int yr, int mm, int dd) {
+        Calendar cal1 = new GregorianCalendar();
+        Calendar cal2 = new GregorianCalendar();
+
+        cal1.set(1970, 1, 1); 
+        cal2.set(yr, mm, dd);
+        
+        return daysBetween(cal1.getTime(),cal2.getTime());
+    }
+	
+	public static int daysBetween(Date d1, Date d2) {
+        return (int)( (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+	public static int[] getTemporalNeighbors(String dateString, int temporalResolution) {
 		
-		return 0;
+		String[] components = dateString.split("-");
+		int yr = Integer.valueOf(components[0]);
+		int mm = Integer.valueOf(components[1]);
+		int dd = Integer.valueOf(components[2]);
+		int hh = Integer.valueOf(components[3]);
+		// year
+		if(temporalResolution == 1) {
+			
+			return yr;
+			
+		} else if(temporalResolution == 2) {
+			//month
+			
+			int id = yr*12+mm;
+			return id;
+			
+		} else if(temporalResolution == 3) {
+			//day
+			return daysBetweenDates(yr, mm, dd);
+			
+		} else if(temporalResolution == 4) {
+			
+			int daysBw = daysBetweenDates(yr, mm, dd);
+			return daysBw*24 + hh;
+			
+		} else {
+			return -1;
+		}
+		return -1;
+		
 	}
 	
 	public static void main(String arg[]) {
@@ -2284,9 +2357,11 @@ public class GeoHash {
 		
 		//System.out.println(borderingGeohashesForDirection);
 		
-		SpatialBorder spatialNeighbours = getSpatialNeighbours("s", 3);
+		//SpatialBorder spatialNeighbours = getSpatialNeighbours("s", 3);
 		
-		System.out.println(spatialNeighbours);
+		//System.out.println(spatialNeighbours);
+		
+		daysBetweenDates(1990, 7, 7);
 	}
 	
 	
