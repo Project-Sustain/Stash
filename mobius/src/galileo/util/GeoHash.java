@@ -561,6 +561,218 @@ public class GeoHash {
 				boundingBox.getUpperBoundForLongitude() + widthDiff, precision);
 		return neighbors;
 	}
+	
+	
+	/**
+	 * For Neighbors of the same size of the actual geohash
+	 * Neighbors are returned in the order nw,n,ne,w,e,sw,s,se
+	 * @param geoHash
+	 * @return
+	 */
+	
+	public static SpatialBorder getSpatialNeighbours(String geoHash, int reqPrecision) {
+		
+		SpatialBorder bp = new SpatialBorder();
+		
+		if (geoHash == null || geoHash.trim().length() == 0)
+			throw new IllegalArgumentException("Invalid Geohash");
+		geoHash = geoHash.trim();
+		
+		int precision = geoHash.length();
+		SpatialRange boundingBox = decodeHash(geoHash);
+		Coordinates centroid = boundingBox.getCenterPoint();
+		float widthDiff = boundingBox.getUpperBoundForLongitude() - centroid.getLongitude();
+		float heightDiff = boundingBox.getUpperBoundForLatitude() - centroid.getLatitude();
+		
+		if(reqPrecision == precision) {
+			
+			bp.setNw(encode(boundingBox.getUpperBoundForLatitude() + heightDiff, boundingBox.getLowerBoundForLongitude() - widthDiff, precision));
+			
+			bp.addN(encode(boundingBox.getUpperBoundForLatitude() + heightDiff, centroid.getLongitude(), precision));
+			
+			bp.setNe(encode(boundingBox.getUpperBoundForLatitude() + heightDiff, boundingBox.getUpperBoundForLongitude() + widthDiff, precision));
+			
+			bp.addW(encode(centroid.getLatitude(), boundingBox.getLowerBoundForLongitude() - widthDiff, precision));
+			
+			bp.addE(encode(centroid.getLatitude(), boundingBox.getUpperBoundForLongitude() + widthDiff, precision));
+			
+			bp.setSw(encode(boundingBox.getLowerBoundForLatitude() - heightDiff, boundingBox.getLowerBoundForLongitude() - widthDiff, precision));
+			
+			bp.addS(encode(boundingBox.getLowerBoundForLatitude() - heightDiff, centroid.getLongitude(), precision));
+			
+			bp.setSe(encode(boundingBox.getLowerBoundForLatitude() - heightDiff, boundingBox.getUpperBoundForLongitude() + widthDiff, precision));
+			
+			return bp;
+			
+		} else {
+			
+			String nw = encode(boundingBox.getUpperBoundForLatitude() + heightDiff, boundingBox.getLowerBoundForLongitude() - widthDiff, precision);
+			String n = encode(boundingBox.getUpperBoundForLatitude() + heightDiff, centroid.getLongitude(), precision);
+			String ne = encode(boundingBox.getUpperBoundForLatitude() + heightDiff, boundingBox.getUpperBoundForLongitude() + widthDiff, precision);
+			String w = encode(centroid.getLatitude(), boundingBox.getLowerBoundForLongitude() - widthDiff, precision);
+			String e = encode(centroid.getLatitude(), boundingBox.getUpperBoundForLongitude() + widthDiff, precision);
+			String sw = encode(boundingBox.getLowerBoundForLatitude() - heightDiff, boundingBox.getLowerBoundForLongitude() - widthDiff, precision);
+			String s = encode(boundingBox.getLowerBoundForLatitude() - heightDiff, centroid.getLongitude(), precision);
+			String se = encode(boundingBox.getLowerBoundForLatitude() - heightDiff, boundingBox.getUpperBoundForLongitude() + widthDiff, precision);
+			
+			// nw bordering geohash
+			List<String> nwS = getBorderingGeohashesGivenDirection(nw,reqPrecision, "s");
+			bp.setNw(nwS.get(nwS.size() - 1));
+			
+			// ne bordering geohash
+			List<String> neS = getBorderingGeohashesGivenDirection(ne,reqPrecision, "s");
+			bp.setNe(neS.get(0));
+			
+			// sw bordering geohash
+			List<String> swS = getBorderingGeohashesGivenDirection(sw,reqPrecision, "n");
+			bp.setSw(swS.get(swS.size() - 1));
+			
+			// se bordering geohash
+			List<String> seS = getBorderingGeohashesGivenDirection(se,reqPrecision, "n");
+			bp.setSe(seS.get(0));
+			
+			bp.setN(getBorderingGeohashesGivenDirection(n, reqPrecision, "s"));
+			bp.setS(getBorderingGeohashesGivenDirection(s, reqPrecision, "n"));
+			bp.setE(getBorderingGeohashesGivenDirection(e, reqPrecision, "w"));
+			bp.setW(getBorderingGeohashesGivenDirection(w, reqPrecision, "e"));
+			
+			return bp;
+			
+		}
+		
+	}
+	
+	
+	public static List<String> getBorderingGeohashesGivenDirection(String geoHash, int precision, String direction) {
+		
+		String[] northAddFat = {"b","c","f","g","u","v","y","z"};
+		String[] southAddFat = {"0","1","4","5","h","j","n","p"};
+		String[] westAddFat = {"b","8","2","0"};
+		String[] eastAddFat = {"z","x","r","p"};
+		
+		
+		String[] northAddSlim = {"p","r","x","z"};
+		String[] southAddSlim = {"0","2","8","b"};
+		String[] westAddSlim = {"p","n","j","h","5","4","1","0"};
+		String[] eastAddSlim = {"z","y","v","u","g","f","c","b"};
+		
+		List<String> north = Arrays.asList(geoHash);
+		List<String> south = Arrays.asList(geoHash);
+		List<String> east = Arrays.asList(geoHash);
+		List<String> west = Arrays.asList(geoHash);
+		
+		
+		int currentLength = 0;
+		int orientation = 0;
+		
+		if(geoHash != null && geoHash.length() > 0) {
+			orientation = geoHash.length()%2;
+			currentLength = geoHash.length() + 1;
+			
+		} else {
+			return null;
+		}
+		
+		while(currentLength <= precision) {
+			
+			if(orientation == 0) {
+				List<String> northLocal = new ArrayList<String>();
+				List<String> southLocal = new ArrayList<String>();
+				List<String> eastLocal = new ArrayList<String>();
+				List<String> westLocal = new ArrayList<String>();
+				
+				if(direction == "n") {
+					for(String s : north) {
+						for(String sapp: northAddFat) {
+							northLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "s") {
+				
+					for(String s : south) {
+						for(String sapp: southAddFat) {
+							southLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "e") {
+				
+					for(String s : east) {
+						for(String sapp: eastAddFat) {
+							eastLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "w") {	
+					for(String s : west) {
+						for(String sapp: westAddFat) {
+							westLocal.add(s+sapp);
+						}
+					}
+				}
+				north = northLocal;
+				south = southLocal;
+				east = eastLocal;
+				west = westLocal;
+				orientation++;
+				
+			} else {
+				List<String> northLocal = new ArrayList<String>();
+				List<String> southLocal = new ArrayList<String>();
+				List<String> eastLocal = new ArrayList<String>();
+				List<String> westLocal = new ArrayList<String>();
+				
+				if(direction == "n") {
+					for(String s : north) {
+						for(String sapp: northAddSlim) {
+							northLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "s") {
+					for(String s : south) {
+						for(String sapp: southAddSlim) {
+							southLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "e") {
+					for(String s : east) {
+						for(String sapp: eastAddSlim) {
+							eastLocal.add(s+sapp);
+						}
+					}
+				} else if(direction == "w") {	
+					for(String s : west) {
+						for(String sapp: westAddSlim) {
+							westLocal.add(s+sapp);
+						}
+					}
+				}
+				north = northLocal;
+				south = southLocal;
+				east = eastLocal;
+				west = westLocal;
+				orientation++;
+				
+				
+			}
+			orientation = currentLength % 2;
+			currentLength++;
+		}
+		
+		if(direction == "n")
+			return north;
+		else if (direction == "s")
+			return south;
+		else if (direction =="e")
+			return east;
+		else if (direction == "w")
+			return west;
+		else
+			return null;
+	}
+	
+	
+	
+	
+	
 
 	/**
 	 * @param coordinates
@@ -1393,84 +1605,7 @@ public class GeoHash {
 	}
 	
 	
-	public static void main11(String arg[]) {
-		
-		/*Date d = new Date();
-		TemporalProperties tp = new TemporalProperties(d.getTime());
-		BorderingProperties borderingGeohashHeuristic = getBorderingGeohashHeuristic("9", 3, 10, tp);
-		System.out.println("Hi");*/
-		
-		Coordinates c1 = new Coordinates(45.79f, -114.16f);
-		Coordinates c2 = new Coordinates(45.79f, -99.31f);
-		Coordinates c3 = new Coordinates(38.03f, -99.31f);
-		Coordinates c4 = new Coordinates(38.03f, -114.16f);
-		//Coordinates c5 = new Coordinates(36.78f, -107.64f);
-		
-		
-		List<Coordinates> cl = new ArrayList<Coordinates>();
-		cl.add(c1);
-		cl.add(c2);
-		cl.add(c3);
-		cl.add(c4);
-		//cl.add(c5);
-		
-		String[] ss = GeoHash.checkForNeighborValidity(cl, 4, "9x", null, null);
-		
-		for(String s: ss) {
-			System.out.println(s);
-		}
-		
-		System.out.println(GeoHash.checkIntersection("c2", "c26"));
-		
-		String[] hashes = {"c2","c8","9r","9x","9q","9w","cb","9z","9y","c9"};
-		String[] valids = {"c2","c8","9r","9x","9q","9w"};
-		
-		System.out.println("Filtered");
-		String[] filterUnwantedGeohashes = GeoHash.filterUnwantedGeohashes(hashes, valids);
-		
-		for(String s: filterUnwantedGeohashes) {
-			System.out.println(s);
-		}
-		
-		
-	}
 	
-	public static void mainx(String arg[]) throws ParseException {
-		
-		/*Coordinates c1 = new Coordinates(39.55f, -111.82f);
-		Coordinates c2 = new Coordinates(38.87f, -112.74f);
-		Coordinates c3 = new Coordinates(38.61f, -111.50f);
-		
-		List<Coordinates> cl = new ArrayList<Coordinates>();
-		cl.add(c1);
-		cl.add(c2);
-		cl.add(c3);
-		
-		GeoHash.generateOuterPolygon(cl, 6);*/
-		/*BorderingProperties bp = GeoHash.getBorderingGeohashHeuristic("9x", 3, 0, null);
-		System.out.println(bp.getN());
-		System.out.println(bp.getS());
-		System.out.println(bp.getE());
-		System.out.println(bp.getW());*/
-		
-		
-		/*List<List<Coordinates>> allInnerFlanks = GeoHash.getAllInnerFlanks("9x", 3);
-		List<List<Coordinates>> allOuterFlanks = GeoHash.getAllOuterFlanks("9x", 3);
-		
-		System.out.println(allInnerFlanks);
-		System.out.println(allOuterFlanks);*/
-		//System.out.println(Arrays.toString(GeoHash.getNeighbours("9xe")));
-		//System.out.println(checkEnclosure("9xu", "9xu"));
-		System.out.println(Integer.parseInt("00"));
-		TemporalProperties tp = new TemporalProperties(1417463510813l);
-		System.out.println(getStartTimeStamp("2014","12","2","xx",TemporalType.DAY_OF_MONTH));
-		System.out.println(getEndTimeStamp("2014","12","1","xx",TemporalType.DAY_OF_MONTH));
-		
-		
-		SpatialRange decodeHash = GeoHash.decodeHash("9x");
-		System.out.println(decodeHash.getBounds());
-		
-	}
 	
 	private static long getEndTimeStamp(TemporalProperties tp, TemporalType temporalType) {
 		if(tp == null) {
@@ -2056,6 +2191,16 @@ public class GeoHash {
 		return "ignore";
 	}
 	
+	public static void getSpatialNeighborIDS(String geohash) {
+		
+		String[] neighbours = getNeighbours(geohash);
+		
+		int[] neighborIDs = new int[neighbours.length];
+		
+		for(int i=0; i < neighbours.length; i++) 
+			neighborIDs[i] = getGeohashID(neighbours[i]);
+	}
+	
 	
 	private static int getGeohashID(String geohash) {
 		
@@ -2118,14 +2263,34 @@ public class GeoHash {
 		
 	}
 	
+	/**
+	 * takes the yyyy-mm-dd-hh string as input
+	 * @author sapmitra
+	 * @param time
+	 * @param temporalResolution
+	 * @return
+	 */
 	public static int getTemporalID(String time, int temporalResolution) {
+		
+		String[] components = time.split("-");
+		
+		if(temporal)
 		
 		return 0;
 	}
 	
 	public static void main(String arg[]) {
-		System.out.println(getGeohashID("8pbp"));
+		//List<String> borderingGeohashesForDirection = getBorderingGeohashesGivenDirection("u9", 4, "s");
+		
+		//System.out.println(borderingGeohashesForDirection);
+		
+		SpatialBorder spatialNeighbours = getSpatialNeighbours("s", 3);
+		
+		System.out.println(spatialNeighbours);
 	}
+	
+	
+	
 	
 }
 
