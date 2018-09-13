@@ -196,7 +196,7 @@ public class GeospatialFileSystem extends FileSystem {
 		super(storageDirectory, name, ignoreIfPresent);
 		
 		this.spatialPartitioningType = spatialPartitioningType;
-		int nodesPerGroup = 0;
+		
 		this.geohashIndex = new HashSet<>();
 		
 		/* featurelist is a comma separated list of feature names: type(int) */
@@ -230,38 +230,11 @@ public class GeospatialFileSystem extends FileSystem {
 		this.storageRoot = storageDirectory;
 		this.temporalType = TemporalType.fromType(temporalType);
 		this.numCores = Runtime.getRuntime().availableProcessors();
-
-		if (nodesPerGroup <= 0) 
-			nodesPerGroup = networkInfo.getGroups().get(0).getSize();
 		
 		this.network = networkInfo;
 		
-		/*this.network = new NetworkInfo();
-		GroupInfo groupInfo = null;
-		List<NodeInfo> allNodes = networkInfo.getAllNodes();
-		Collections.sort(allNodes);
-		TemporalHash th = new TemporalHash(this.temporalType);
-		int maxGroups = th.maxValue().intValue();
-		for (int i = 0; i < allNodes.size(); i++) {
-			if (this.network.getGroups().size() < maxGroups) {
-				if (i % nodesPerGroup == 0) {
-					groupInfo = new GroupInfo(String.valueOf(i / nodesPerGroup));
-					groupInfo.addNode(allNodes.get(i));
-					this.network.addGroup(groupInfo);
-				} else {
-					groupInfo.addNode(allNodes.get(i));
-				}
-			}
-		}*/
-
-		/*
-		 * TODO: Ask end user about the partitioning scheme. chronospatial or
-		 * spatiotemporal. Accordingly, use TemporalHierarchyPartitioner or
-		 * SpatialHierarchyPartitioner
-		 **/
-		
-		this.partitioner = new SpatialHierarchyPartitioner(sn, this.network, null);
-		this.partitioner = new TemporalHierarchyPartitioner(sn, this.network, this.temporalType.getType(), spatialPartitioningType);
+		this.partitioner = new SpatialHierarchyPartitioner(sn, this.network, spatialPartitioningType);
+		//this.partitioner = new TemporalHierarchyPartitioner(sn, this.network, this.temporalType.getType(), spatialPartitioningType);
 
 		this.timeFormat = System.getProperty("galileo.fs.GeospatialFileSystem.timeFormat", DEFAULT_TIME_FORMAT);
 		int maxPrecision = GeoHash.MAX_PRECISION / 5;

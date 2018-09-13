@@ -224,7 +224,7 @@ public class StorageNode implements RequestListener {
 		nodeStatus.set("Reading network configuration");
 		network = NetworkConfig.readNetworkDescription(SystemConfig.getNetworkConfDir());
 
-		// identifying the group of this storage node
+		// Verifying if this node is a part of this cluster.
 		boolean nodeFound = false;
 		for (NodeInfo node : network.getAllNodes()) {
 			String nodeName = node.getHostname();
