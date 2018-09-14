@@ -2028,7 +2028,7 @@ public class GeoHash {
 		ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
 		cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
 		
-		String[] internalGeohashes = GeoHash.getIntersectingGeohashesForConvexBoundingPolygon(cs1, level);
+		String[] internalGeohashes = GeoHash.getIntersectingGeohashesForConvexBoundingPolygon(cs1, geoHash.length()+level);
 		
 		
 		return internalGeohashes;

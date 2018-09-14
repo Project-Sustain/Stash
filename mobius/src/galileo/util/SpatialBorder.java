@@ -13,7 +13,6 @@ public class SpatialBorder {
 	private String se;
 	private String nw;
 	private String sw;
-	private boolean sameSize;
 	
 	public SpatialBorder() {
 		n = new ArrayList<String>();
@@ -81,14 +80,6 @@ public class SpatialBorder {
 	}
 	public void setSw(String sw) {
 		this.sw = sw;
-	}
-
-	public boolean isSameSize() {
-		return sameSize;
-	}
-
-	public void setSameSize(boolean sameSize) {
-		this.sameSize = sameSize;
 	}
 
 }
