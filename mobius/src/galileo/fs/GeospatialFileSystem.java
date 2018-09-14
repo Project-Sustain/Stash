@@ -516,8 +516,11 @@ public class GeospatialFileSystem extends FileSystem {
 		newfs.put(new Feature(TEMPORAL_HOUR_FEATURE, temporalFeature[3]));
 		newfs.put(new Feature(SPATIAL_FEATURE, geohash));
 
+		/*
 		for (Feature feature : meta.getAttributes())
 			newfs.put(feature);
+		*/
+		
 		meta.setAttributes(newfs);
 
 		Serializer.persist(block.getMetadata(), metadataPath);
