@@ -94,6 +94,7 @@ import galileo.comm.SurveyResponse;
 import galileo.comm.TemporalType;
 import galileo.comm.TrainingDataEvent;
 import galileo.comm.TrainingDataResponse;
+import galileo.comm.VisualizationRequest;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
@@ -696,6 +697,108 @@ public class StorageNode implements RequestListener {
 				logger.log(Level.SEVERE, "Failed to send response back to original client", e);
 			}
 		}
+		
+	}
+	
+	@EventHandler
+	public void handleVisualizationRequest(VisualizationRequest request, EventContext context) {
+		
+		String featureQueryString = request.getFeatureQueryString();
+		logger.log(Level.INFO, "Feature query request: {0}", featureQueryString);
+		
+		String queryId = String.valueOf(System.currentTimeMillis());
+		GeospatialFileSystem gfs = this.fsMap.get(request.getFilesystemName());
+		
+		/* POPULATING THE METADATA FOR THE QUERY */
+		if (gfs != null) {
+			QueryResponse response = new QueryResponse(queryId, gfs.getFeaturesRepresentation(), new JSONObject());
+			
+			/* This metadata is simply used to find nodes. 
+			 * It only contains temnporal and spatial features */
+			Metadata data = new Metadata();
+			
+			if (request.isTemporal()) {
+				
+				/* Time in request if a - separated string */
+				String[] timeSplit = request.getTime().split("-");
+				int timeIndex = Arrays.asList(TemporalType.values()).indexOf(gfs.getTemporalType());
+				if (!timeSplit[timeIndex].contains("x")) {
+					logger.log(Level.INFO, "Temporal query: {0}", request.getTime());
+					Calendar c = Calendar.getInstance();
+					c.setTimeZone(TemporalHash.TIMEZONE);
+					int year = timeSplit[0].charAt(0) == 'x' ? c.get(Calendar.YEAR) : Integer.parseInt(timeSplit[0]);
+					int month = timeSplit[1].charAt(0) == 'x' ? c.get(Calendar.MONTH)
+							: Integer.parseInt(timeSplit[1]) - 1;
+					int day = timeSplit[2].charAt(0) == 'x' ? c.get(Calendar.DAY_OF_MONTH)
+							: Integer.parseInt(timeSplit[2]);
+					int hour = timeSplit[3].charAt(0) == 'x' ? c.get(Calendar.HOUR_OF_DAY)
+							: Integer.parseInt(timeSplit[3]);
+					c.set(year, month, day, hour, 0);
+					data.setTemporalProperties(new TemporalProperties(c.getTimeInMillis()));
+				}
+			}
+			if (request.isSpatial()) {
+				logger.log(Level.INFO, "Spatial query: {0}", request.getPolygon());
+				data.setSpatialProperties(new SpatialProperties(new SpatialRange(request.getPolygon())));
+			}
+			Partitioner<Metadata> partitioner = gfs.getPartitioner();
+			List<NodeInfo> nodes;
+			try {
+				/* TemporalHierarchyPartitioner */
+				/* ===================Finding the nodes that satisfy the query================== */
+				nodes = partitioner.findDestinations(data);
+				logger.info("destinations: " + nodes);
+				QueryEvent qEvent = (request.hasFeatureQuery() || request.hasMetadataQuery())
+						? new QueryEvent(queryId, request.getFilesystemName(), request.getFeatureQuery(),
+								request.getMetadataQuery())
+						: (request.isSpatial())
+								? new QueryEvent(queryId, request.getFilesystemName(), request.getPolygon())
+								: new QueryEvent(queryId, request.getFilesystemName(), request.getTime());
+
+				if (request.isDryRun()) {
+					qEvent.enableDryRun();
+					response.setDryRun(true);
+				}
+				if (request.isSpatial())
+					qEvent.setPolygon(request.getPolygon());
+				if (request.isTemporal())
+					qEvent.setTime(request.getTime());
+
+				try {
+					ClientRequestHandler reqHandler = new ClientRequestHandler(new ArrayList<NetworkDestination>(nodes),
+							context, this);
+					
+					/* Sending out query to all nodes */
+					reqHandler.handleRequest(qEvent, response);
+					this.requestHandlers.add(reqHandler);
+				} catch (IOException ioe) {
+					logger.log(Level.SEVERE,
+							"Failed to initialize a ClientRequestHandler. Sending unfinished response back to client",
+							ioe);
+					try {
+						context.sendReply(response);
+					} catch (IOException e) {
+						logger.log(Level.SEVERE, "Failed to send response back to original client", e);
+					}
+				}
+			} catch (HashException | PartitionException hepe) {
+				logger.log(Level.SEVERE,
+						"Failed to identify the destination nodes. Sending unfinished response back to client", hepe);
+				try {
+					context.sendReply(response);
+				} catch (IOException e) {
+					logger.log(Level.SEVERE, "Failed to send response back to original client", e);
+				}
+			}
+		} else {
+			try {
+				QueryResponse response = new QueryResponse(queryId, new JSONArray(), new JSONObject());
+				context.sendReply(response);
+			} catch (IOException ioe) {
+				logger.log(Level.SEVERE, "Failed to send response back to original client", ioe);
+			}
+		}
+		
 		
 	}
 

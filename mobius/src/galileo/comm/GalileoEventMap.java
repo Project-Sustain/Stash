@@ -63,5 +63,12 @@ public class GalileoEventMap extends EventMap {
         addMapping(804, SurveyEventResponse.class);
         addMapping(805, TrainingDataEvent.class);
         addMapping(806, TrainingDataResponse.class);
+        
+        addMapping(901, VisualizationRequest.class);
+        addMapping(902, VisualizationResponse.class);
+        
+        addMapping(1001, VisualizationEvent.class);
+        addMapping(1002, VisualizationEventResponse.class);
+        
     }
 }

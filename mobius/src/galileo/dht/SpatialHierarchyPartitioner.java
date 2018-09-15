@@ -73,10 +73,8 @@ public class SpatialHierarchyPartitioner extends Partitioner<Metadata> {
 		super(storageNode, network);
 
 		String[] geohashes = null;
-		String[] geohashes_2char = {"b","c","f","g","u","v","y","z",
-				"8","9","d","e","s","t","w","x",
-				"2","3","6","7","k","m","q","r",
-				"0","1","4","5","h","j","n","p"};
+		String[] geohashes_2char = {"b","c","f","g","u","v","y","z","8","9","d","e","s","t","w","x",
+				"2","3","6","7","k","m","q","r","0","1","4","5","h","j","n","p"};
 
 		Arrays.sort(geohashes_2char);
 		
