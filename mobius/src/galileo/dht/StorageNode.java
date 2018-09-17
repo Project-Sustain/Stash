@@ -738,7 +738,7 @@ public class StorageNode implements RequestListener {
 				}
 			}
 			if (request.isSpatial()) {
-				logger.log(Level.INFO, "Spatial query: {0}", request.getPolygon());
+				logger.log(Level.INFO, "Spatial query: {0}", request.getGeohashes());
 				data.setSpatialProperties(new SpatialProperties(new SpatialRange(request.getPolygon())));
 			}
 			Partitioner<Metadata> partitioner = gfs.getPartitioner();
