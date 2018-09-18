@@ -69,9 +69,11 @@ public class FilesystemRequest implements Event {
 	/**
 	 *  The uncertainty in join */
 	
-	private int spatialUncertaintyPrecision;
-	private int temporalUncertaintyPrecision;
+	private int spatialResolution;
+	private int temporalResolution;
 	private int spatialPartitioningType = 0;
+	
+	
 	
 	
 	
@@ -131,7 +133,7 @@ public class FilesystemRequest implements Event {
 	
 	
 	public FilesystemRequest(String name, FilesystemAction action, List<Pair<String, FeatureType>> featureList,
-			SpatialHint spatialHint, int spatialUncertainty, int temporalUncertainty, boolean isRasterized, String temporalHint) {
+			SpatialHint spatialHint, int spatialResolution, int temporalResolution, boolean isRasterized, String temporalHint) {
 		if (name == null || name.trim().length() == 0 || !name.matches("[a-z0-9-]{5,50}"))
 			throw new IllegalArgumentException(
 					"name is required and must be lowercase having length at least 5 and at most 50 characters. "
@@ -165,8 +167,8 @@ public class FilesystemRequest implements Event {
 		this.featureList = featureList;
 		this.spatialHint = spatialHint;
 		this.temporalHint = temporalHint;
-		this.spatialUncertaintyPrecision = spatialUncertainty;
-		this.temporalUncertaintyPrecision = temporalUncertainty;
+		this.spatialResolution = spatialResolution;
+		this.temporalResolution = temporalResolution;
 		this.isRasterized = isRasterized;
 	}
 
@@ -266,8 +268,8 @@ public class FilesystemRequest implements Event {
 		if (in.readBoolean())
 			this.spatialHint = new SpatialHint(in);
 		this.temporalHint = in.readString();
-		this.spatialUncertaintyPrecision = in.readInt();
-		this.temporalUncertaintyPrecision = in.readInt();
+		this.spatialResolution = in.readInt();
+		this.temporalResolution = in.readInt();
 		this.spatialPartitioningType = in.readInt();
 		this.isRasterized = in.readBoolean();
 		
@@ -287,19 +289,19 @@ public class FilesystemRequest implements Event {
 		if (hasSpatialHint())
 			this.spatialHint.serialize(out);
 		out.writeString(this.temporalHint);
-		out.writeInt(this.spatialUncertaintyPrecision);
-		out.writeInt(this.temporalUncertaintyPrecision);
+		out.writeInt(this.spatialResolution);
+		out.writeInt(this.temporalResolution);
 		out.writeInt(this.spatialPartitioningType);
 		out.writeBoolean(this.isRasterized);
 
 	}
 
-	public int getUncertaintyPrecision() {
-		return spatialUncertaintyPrecision;
+	public int getSpatialResolution() {
+		return spatialResolution;
 	}
 
-	public void setUncertaintyPrecision(int uncertaintyPrecision) {
-		this.spatialUncertaintyPrecision = uncertaintyPrecision;
+	public void setSpatialResolution(int uncertaintyPrecision) {
+		this.spatialResolution = uncertaintyPrecision;
 	}
 
 	public boolean isRasterized() {
@@ -311,23 +313,13 @@ public class FilesystemRequest implements Event {
 	}
 
 
-	public int getSpatialUncertaintyPrecision() {
-		return spatialUncertaintyPrecision;
+	public int getTemporalResolution() {
+		return temporalResolution;
 	}
 
 
-	public void setSpatialUncertaintyPrecision(int spatialUncertaintyPrecision) {
-		this.spatialUncertaintyPrecision = spatialUncertaintyPrecision;
-	}
-
-
-	public int getTemporalUncertaintyPrecision() {
-		return temporalUncertaintyPrecision;
-	}
-
-
-	public void setTemporalUncertaintyPrecision(int temporalUncertaintyPrecision) {
-		this.temporalUncertaintyPrecision = temporalUncertaintyPrecision;
+	public void setTemporalResolution(int temporalResolution) {
+		this.temporalResolution = temporalResolution;
 	}
 
 

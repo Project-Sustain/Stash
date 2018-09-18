@@ -85,6 +85,7 @@ import galileo.dht.PartitionException;
 import galileo.dht.Partitioner;
 import galileo.dht.SelfJoinThread;
 import galileo.dht.SpatialHierarchyPartitioner;
+import galileo.dht.StandardDHTPartitioner;
 import galileo.dht.StorageNode;
 import galileo.dht.TemporalHierarchyPartitioner;
 import galileo.dht.hash.HashException;
@@ -93,6 +94,8 @@ import galileo.dht.hash.TemporalHash;
 import galileo.graph.FeaturePath;
 import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
+import galileo.graph.SparseSpatiotemporalMatrix;
+import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.query.Expression;
 import galileo.query.Operation;
 import galileo.query.Operator;
@@ -157,6 +160,8 @@ public class GeospatialFileSystem extends FileSystem {
 	private int spatialPosn1;
 	private int spatialPosn2;
 	private int spatialPartitioningType;
+	
+	private SpatiotemporalHierarchicalCache stCache;
 
 	private static final String TEMPORAL_YEAR_FEATURE = "x__year__x";
 	private static final String TEMPORAL_MONTH_FEATURE = "x__month__x";
@@ -190,7 +195,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public GeospatialFileSystem(StorageNode sn, String storageDirectory, String name, int precision,
 			int temporalType, NetworkInfo networkInfo, String featureList, SpatialHint sHint, String temporalHint, 
-			boolean ignoreIfPresent, int spatialPartitioningType)
+			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution)
 			throws FileSystemException, IOException, SerializationException, PartitionException, HashException,
 			HashTopologyException {
 		super(storageDirectory, name, ignoreIfPresent);
@@ -233,7 +238,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.network = networkInfo;
 		
-		this.partitioner = new SpatialHierarchyPartitioner(sn, this.network, spatialPartitioningType);
+		this.partitioner = new StandardDHTPartitioner(sn, this.network, spatialPartitioningType);
 		//this.partitioner = new TemporalHierarchyPartitioner(sn, this.network, this.temporalType.getType(), spatialPartitioningType);
 
 		this.timeFormat = System.getProperty("galileo.fs.GeospatialFileSystem.timeFormat", DEFAULT_TIME_FORMAT);
@@ -245,6 +250,9 @@ public class GeospatialFileSystem extends FileSystem {
 		this.timeFormatter.setTimeZone(TimeZone.getTimeZone("GMT"));
 		this.timeFormatter.applyPattern(timeFormat);
 		this.pathJournal = new PathJournal(this.storageDirectory + File.separator + pathStore);
+		
+		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
+		
 
 		createMetadataGraph();
 	}
@@ -329,6 +337,8 @@ public class GeospatialFileSystem extends FileSystem {
 			spHint.put("latHint", this.spatialHint.getLatitudeHint());
 			spHint.put("lngHint", this.spatialHint.getLongitudeHint());
 		}
+		state.put("spatialResolution", stCache.getTotalSpatialLevels());
+		state.put("temporalResolution", stCache.getTotalTemporalLevels());
 		state.put("spatialHint", spHint == null ? JSONObject.NULL : spHint);
 		state.put("temporalHint", this.temporalHint);
 		state.put("temporalType", this.temporalType.getType());
@@ -367,8 +377,12 @@ public class GeospatialFileSystem extends FileSystem {
 		int spPartitioningType = state.getInt("spatialPartitioningType");
 		String tHint = state.getString("temporalHint");
 		
+		int spatialResolution = state.getInt("spatialResolution");
+		int temporalResolution = state.getInt("temporalResolution");
+		
 		GeospatialFileSystem gfs = new GeospatialFileSystem(storageNode, storageRoot, name, geohashPrecision,
-				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType);
+				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType, spatialResolution, temporalResolution);
+		
 		gfs.earliestTime = (state.get("earliestTime") != JSONObject.NULL)
 				? new TemporalProperties(state.getLong("earliestTime")) : null;
 		gfs.earliestSpace = (state.get("earliestSpace") != JSONObject.NULL) ? state.getString("earliestSpace") : null;
@@ -915,6 +929,7 @@ public class GeospatialFileSystem extends FileSystem {
 			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
 			
 			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			
 			for (String geohash : hashLocations) {
 				Set<GeoHash> intersections = new HashSet<>();
 				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";

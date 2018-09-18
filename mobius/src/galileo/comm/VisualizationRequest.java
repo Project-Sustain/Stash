@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import galileo.dataset.Coordinates;
 import galileo.event.Event;
 import galileo.query.Expression;
 import galileo.query.Operation;
@@ -17,7 +18,7 @@ public class VisualizationRequest implements Event {
 	
 	private String fsName;
 	private Query featureQuery;
-	private List<String> geohashes;
+	private List<Coordinates> polygon;
 	private String timeString;
 
 	private void validate(String fsName) {
@@ -75,7 +76,7 @@ public class VisualizationRequest implements Event {
 	}
 
 	public boolean isSpatial() {
-		return geohashes != null;
+		return polygon != null;
 	}
 
 	public boolean isTemporal() {
@@ -100,9 +101,9 @@ public class VisualizationRequest implements Event {
 			timeString = in.readString();
 		boolean isSpatial = in.readBoolean();
 		if (isSpatial) {
-			List<String> poly = new ArrayList<String>();
-			in.readStringCollection(poly);
-			geohashes = poly;
+			List<Coordinates> poly = new ArrayList<Coordinates>();
+			in.readSerializableCollection(Coordinates.class, poly);
+			polygon = poly;
 		}
 		boolean hasFeatureQuery = in.readBoolean();
 		if (hasFeatureQuery)
@@ -118,7 +119,7 @@ public class VisualizationRequest implements Event {
 			out.writeString(timeString);
 		out.writeBoolean(isSpatial());
 		if (isSpatial())
-			out.writeStringCollection(geohashes);
+			out.writeSerializableCollection(polygon);
 		out.writeBoolean(hasFeatureQuery());
 		if (hasFeatureQuery())
 			out.writeSerializable(this.featureQuery);
@@ -133,12 +134,12 @@ public class VisualizationRequest implements Event {
 		this.fsName = fsName;
 	}
 
-	public List<String> getGeohashes() {
-		return geohashes;
+	public List<Coordinates> getPolygon() {
+		return polygon;
 	}
 
-	public void setGeohashes(List<String> geohashes) {
-		this.geohashes = geohashes;
+	public void setGeohashes(List<Coordinates> polygon) {
+		this.polygon = polygon;
 	}
 
 	public String getTimeString() {

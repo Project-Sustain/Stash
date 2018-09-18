@@ -57,4 +57,9 @@ public class SHA1 implements HashFunction<byte[]> {
         random.nextBytes(randomBytes);
         return hash(randomBytes);
     }
+    
+    public static void main(String arg[]) {
+    	SHA1 s = new SHA1();
+    	System.out.println(s.maxValue());
+    }
 }

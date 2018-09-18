@@ -7,8 +7,22 @@ public class SpatiotemporalHierarchicalCache {
 	
 	// spatial level 1 means geohash of length 1
 	// temporal levels are year, month, day, hr
-	public static int totalSpatialLevels = 7;
-	public static int totalTemporalLevels = 4;
+	private int totalSpatialLevels = 7;
+	private int totalTemporalLevels = 4;
+	
+	public SpatiotemporalHierarchicalCache(int totalSpatialLevels, int totalTemporalLevels) {
+		
+		this.totalSpatialLevels = totalSpatialLevels;
+		this.totalTemporalLevels = totalTemporalLevels;
+		
+		cacheLevels = new SparseSpatiotemporalMatrix[totalSpatialLevels*totalTemporalLevels];
+		
+		for(int i=0; i < totalSpatialLevels; i++) {
+			for(int j=0; j < totalTemporalLevels; i++) {
+				cacheLevels[i] = new SparseSpatiotemporalMatrix(j+1, i+1, this);
+			}
+		}
+	}
 	
 	public SpatiotemporalHierarchicalCache() {
 		
@@ -69,6 +83,22 @@ public class SpatiotemporalHierarchicalCache {
 		
 		System.out.println(s.getCacheLevel(2, 3));
 		
+	}
+
+	public int getTotalSpatialLevels() {
+		return totalSpatialLevels;
+	}
+
+	public void setTotalSpatialLevels(int totalSpatialLevels) {
+		this.totalSpatialLevels = totalSpatialLevels;
+	}
+
+	public int getTotalTemporalLevels() {
+		return totalTemporalLevels;
+	}
+
+	public void setTotalTemporalLevels(int totalTemporalLevels) {
+		this.totalTemporalLevels = totalTemporalLevels;
 	}
 
 }

@@ -34,8 +34,8 @@ public class FilesystemEvent implements Event{
 	/**
 	 *  The uncertainty in join */
 	
-	private int spatialUncertaintyPrecision;
-	private int temporalUncertaintyPrecision;
+	private int spatialResolution;
+	private int temporalResolution;
 	
 	private boolean isRasterized;
 	
@@ -171,8 +171,8 @@ public class FilesystemEvent implements Event{
 			this.featureList = getFeatureList(in.readString());
 		if(in.readBoolean())
 			this.spatialHint = new SpatialHint(in);
-		this.spatialUncertaintyPrecision = in.readInt();
-		this.temporalUncertaintyPrecision = in.readInt();
+		this.spatialResolution = in.readInt();
+		this.temporalResolution = in.readInt();
 		this.isRasterized = in.readBoolean();
 		this.temporalHint = in.readString();
 		this.spatialPartitioningType = in.readInt();
@@ -191,8 +191,8 @@ public class FilesystemEvent implements Event{
 		out.writeBoolean(hasSpatialHint());
 		if(hasSpatialHint())
 			this.spatialHint.serialize(out);
-		out.writeInt(this.spatialUncertaintyPrecision);
-		out.writeInt(this.temporalUncertaintyPrecision);
+		out.writeInt(this.spatialResolution);
+		out.writeInt(this.temporalResolution);
 		out.writeBoolean(this.isRasterized);
 		out.writeString(this.temporalHint);
 		out.writeInt(spatialPartitioningType);
@@ -208,25 +208,24 @@ public class FilesystemEvent implements Event{
 	}
 
 
-	public int getSpatialUncertaintyPrecision() {
-		return spatialUncertaintyPrecision;
+	public int getTemporalResolution() {
+		return temporalResolution;
 	}
 
 
-	public void setSpatialUncertaintyPrecision(int spatialUncertaintyPrecision) {
-		this.spatialUncertaintyPrecision = spatialUncertaintyPrecision;
+	public void setTemporalResolution(int temporalResolution) {
+		this.temporalResolution = temporalResolution;
+	}
+	
+	
+	public int getSpatialResolution() {
+		return spatialResolution;
 	}
 
-
-	public int getTemporalUncertaintyPrecision() {
-		return temporalUncertaintyPrecision;
+	public void setSpatialResolution(int uncertaintyPrecision) {
+		this.spatialResolution = uncertaintyPrecision;
 	}
-
-
-	public void setTemporalUncertaintyPrecision(int temporalUncertaintyPrecision) {
-		this.temporalUncertaintyPrecision = temporalUncertaintyPrecision;
-	}
-
+	
 	public String getTemporalHint() {
 		return temporalHint;
 	}
