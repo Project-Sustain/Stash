@@ -701,6 +701,12 @@ public class StorageNode implements RequestListener {
 		
 	}
 	
+	/**
+	 * The request will contain a query area in terms of a polygon and a timestring
+	 * @author sapmitra
+	 * @param request
+	 * @param context
+	 */
 	@EventHandler
 	public void handleVisualizationRequest(VisualizationRequest request, EventContext context) {
 		
@@ -775,12 +781,14 @@ public class StorageNode implements RequestListener {
 	
 	/**
 	 * Handles Visualization event at each node
+	 * The request contains a polygon and a timestring, which for now can request for upto a day
 	 * @author sapmitra
 	 * @param event
 	 * @param context
 	 */
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
+		
 		long hostFileSize = 0;
 		long totalProcessingTime = 0;
 		long blocksProcessed = 0;
@@ -796,36 +804,16 @@ public class StorageNode implements RequestListener {
 			if (fs != null) {
 				header = fs.getFeaturesRepresentation();
 				/* Feature Query is not needed to list blocks */
-				Map<String, List<String>> blockMap = fs.listBlocks(event.getTime(), event.getPolygon(),
-						event.getMetadataQuery(), event.isDryRun());
-				if (event.isDryRun()) {
-					/*
-					 * TODO: Make result of dryRun resemble the format of that
-					 * of non-dry-run so that the end user can retrieve the
-					 * blocks from the block paths
-					 **/
-					JSONObject responseJSON = new JSONObject();
-					responseJSON.put("filesystem", event.getFilesystemName());
-					responseJSON.put("queryId", event.getQueryId());
-					for (String blockKey : blockMap.keySet()) {
-						blocksJSON.put(blockKey, new JSONArray(blockMap.get(blockKey)));
-					}
-					responseJSON.put("result", blocksJSON);
-					QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
-					response.setDryRun(true);
-					context.sendReply(response);
-					return;
-				}
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon());
+				
 				JSONArray filePaths = new JSONArray();
 				int totalBlocks = 0;
+				
 				for (String blockKey : blockMap.keySet()) {
 					List<String> blocks = blockMap.get(blockKey);
 					totalBlocks += blocks.size();
-					for(String block : blocks){
-						filePaths.put(block);
-						hostFileSize += new File(block).length();
-					}
 				}
+				
 				if (totalBlocks > 0) {
 					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
 						hostFileSize = 0;
@@ -909,6 +897,7 @@ public class StorageNode implements RequestListener {
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
 		}
+	}
 	
 	
 	/**
