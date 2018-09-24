@@ -806,7 +806,9 @@ public class StorageNode implements RequestListener {
 				
 				/* Feature Query is not needed to list blocks */
 				// KEY Format : year-month-day-hour$$geohash
-				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(), event.getSpatialResolution(), event.getTemporalResolution());
+				
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+						event.getSpatialResolution(), event.getTemporalResolution());
 				
 				JSONArray filePaths = new JSONArray();
 				
@@ -841,6 +843,9 @@ public class StorageNode implements RequestListener {
 							if (geoQuery.getPolygon() != null)
 								queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
 							List<String> blocks = blockMap.get(blockKey);
+							
+							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, geoQuery, blockGrid, queryBitmap, blocks);
+							
 							for (String blockPath : blocks) {
 								QueryProcessor qp = new QueryProcessor(fs, blockPath, geoQuery, blockGrid, queryBitmap,
 										getResultFilePrefix(event.getQueryId(), fsName, blockKey + blocksProcessed));
