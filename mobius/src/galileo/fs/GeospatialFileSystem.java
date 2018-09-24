@@ -804,7 +804,7 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	
-	private String getCellKey(Path<Feature, String> path, String space) {
+	private String getCellKey(Path<Feature, String> path, String space, int spatialResolution, int temporalResolution) {
 		if (null != path && path.hasPayload()) {
 			List<Feature> labels = path.getLabels();
 			String year = "xxxx", month = "xx", day = "xx", hour = "xx";
@@ -837,7 +837,17 @@ public class GeospatialFileSystem extends FileSystem {
 				if (allset == 5)
 					break;
 			}
-			return String.format("%s-%s-%s-%s$$%s", year, month, day, hour, space);
+			
+			space = space.substring(0,spatialResolution);
+			
+			String[] tags = {year,month,day,hour};
+			
+			String temporalTag = tags[0];
+			for(int i=1; i < temporalResolution; i++) {
+				temporalTag += "-"+tags[i];
+			}
+			
+			return temporalTag+"$$"+space;
 		}
 		return null;
 	}
@@ -941,7 +951,8 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 */
 	
-	public Map<String, List<String>> listBlocksForVisualization(String temporalProperties, List<Coordinates> spatialProperties) throws InterruptedException {
+	public Map<String, List<String>> listBlocksForVisualization(String temporalProperties, List<Coordinates> spatialProperties, 
+			int reqSpatialResolution, int reqTemporalResolution) throws InterruptedException {
 		 Map<String, List<String>> blockMap = new HashMap<String, List<String>>();
 		String space = null;
 		List<Path<Feature, String>> paths = null;
@@ -1046,8 +1057,27 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// Paths look like Path((root,f1,f2,f3,...),payload). Each path represents each DFS traversal of a tree
 		
+		TemporalType temporalType = getTemporalType();
+		int fsSpatialResolution = getGeohashPrecision();
+		int fsTemporalResolution = temporalType.getType();
+		
+		if(temporalType == TemporalType.DAY_OF_MONTH)
+			fsTemporalResolution = 3;
+		else if(temporalType == TemporalType.HOUR_OF_DAY)
+			fsTemporalResolution = 4;
+		
+		int spR = fsSpatialResolution;
+		int tmR = fsTemporalResolution;
+		
+		if(fsSpatialResolution > reqSpatialResolution && fsTemporalResolution > reqTemporalResolution) {
+			spR = reqSpatialResolution;
+			tmR = reqTemporalResolution;
+					
+		}
+		
+		
 		for (Path<Feature, String> path : paths) {
-			String groupKey = getCellKey(path, space);
+			String groupKey = getCellKey(path, space, spR, tmR);
 			blocks = blockMap.get(groupKey);
 			if (blocks == null) {
 				blocks = new ArrayList<String>();

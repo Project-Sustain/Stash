@@ -20,6 +20,8 @@ public class VisualizationRequest implements Event {
 	private Query featureQuery;
 	private List<Coordinates> polygon;
 	private String timeString;
+	private int spatialResolution;
+	private int temporalResolution;
 
 	private void validate(String fsName) {
 		if (fsName == null || fsName.trim().length() == 0 || !fsName.matches("[a-z0-9-]{5,50}"))
@@ -108,6 +110,8 @@ public class VisualizationRequest implements Event {
 		boolean hasFeatureQuery = in.readBoolean();
 		if (hasFeatureQuery)
 			this.featureQuery = new Query(in);
+		this.spatialResolution = in.readInt();
+		this.temporalResolution = in.readInt();
 		
 	}
 
@@ -123,6 +127,8 @@ public class VisualizationRequest implements Event {
 		out.writeBoolean(hasFeatureQuery());
 		if (hasFeatureQuery())
 			out.writeSerializable(this.featureQuery);
+		out.writeInt(spatialResolution);
+		out.writeInt(temporalResolution);
 		
 	}
 
@@ -148,6 +154,26 @@ public class VisualizationRequest implements Event {
 
 	public void setTimeString(String timeString) {
 		this.timeString = timeString;
+	}
+
+	public int getSpatialResolution() {
+		return spatialResolution;
+	}
+
+	public void setSpatialResolution(int spatialResolution) {
+		this.spatialResolution = spatialResolution;
+	}
+
+	public int getTemporalResolution() {
+		return temporalResolution;
+	}
+
+	public void setTemporalResolution(int temporalResolution) {
+		this.temporalResolution = temporalResolution;
+	}
+
+	public void setPolygon(List<Coordinates> polygon) {
+		this.polygon = polygon;
 	}
 
 }

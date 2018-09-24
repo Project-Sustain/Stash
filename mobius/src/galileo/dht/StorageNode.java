@@ -803,24 +803,33 @@ public class StorageNode implements RequestListener {
 			GeospatialFileSystem fs = fsMap.get(fsName);
 			if (fs != null) {
 				header = fs.getFeaturesRepresentation();
+				
 				/* Feature Query is not needed to list blocks */
-				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon());
+				// KEY Format : year-month-day-hour$$geohash
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(), event.getSpatialResolution(), event.getTemporalResolution());
 				
 				JSONArray filePaths = new JSONArray();
-				int totalBlocks = 0;
 				
-				for (String blockKey : blockMap.keySet()) {
-					List<String> blocks = blockMap.get(blockKey);
-					totalBlocks += blocks.size();
-				}
 				
-				if (totalBlocks > 0) {
+				TemporalType temporalType = fs.getTemporalType();
+				
+				int fsSpatialResolution = fs.getGeohashPrecision();
+				int fsTemporalResolution = temporalType.getType();
+				
+				if(temporalType == TemporalType.DAY_OF_MONTH)
+					fsTemporalResolution = 3;
+				else if(temporalType == TemporalType.HOUR_OF_DAY)
+					fsTemporalResolution = 4;
+				
+				
+				if (blockMap.keySet().size() > 0) {
 					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
 						hostFileSize = 0;
 						filePaths = new JSONArray();
 						// maximum parallelism = 64
-						ExecutorService executor = Executors.newFixedThreadPool(Math.min(totalBlocks, 2 * numCores));
+						ExecutorService executor = Executors.newFixedThreadPool(Math.min(blockMap.keySet().size(), 2 * numCores));
 						List<QueryProcessor> queryProcessors = new ArrayList<>();
+						
 						GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(),
 								event.getPolygon());
 						for (String blockKey : blockMap.keySet()) {

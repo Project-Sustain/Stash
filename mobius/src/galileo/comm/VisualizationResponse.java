@@ -12,5 +12,12 @@ public class VisualizationResponse implements Event {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public static void main(String arg[]) {
+		
+		System.out.println(TemporalType.YEAR.getType());
+		System.out.println(TemporalType.MONTH.getType());
+		System.out.println(TemporalType.HOUR_OF_DAY.getType());
+	}
 
 }
