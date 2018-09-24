@@ -319,6 +319,7 @@ public class StorageNode implements RequestListener {
 		event.setTemporalResolution(request.getTemporalResolution());
 		event.setTemporalHint(request.getTemporalHint());
 		event.setSpatialPartitioningType(request.getSpatialPartitioningType());
+		event.setSummaryHints(request.getSummaryHints());
 		for (NodeInfo node : nodes) {
 			logger.info("Requesting " + node + " to perform a file system action");
 			sendEvent(node, event);
@@ -337,7 +338,8 @@ public class StorageNode implements RequestListener {
 					
 					fs = new GeospatialFileSystem(this, this.rootDir, event.getName(), event.getPrecision(),
 							event.getTemporalValue(), this.network, event.getFeatures(),
-							event.getSpatialHint(),event.getTemporalHint(), false, event.getSpatialPartitioningType(), event.getSpatialResolution(), event.getTemporalResolution());
+							event.getSpatialHint(),event.getTemporalHint(), false, event.getSpatialPartitioningType(), 
+							event.getSpatialResolution(), event.getTemporalResolution(), event.getSummaryHints());
 					
 					if(event.getSpatialPartitioningType() <= 0)
 						fs.setSpatialPartitioningType(2);
@@ -812,7 +814,6 @@ public class StorageNode implements RequestListener {
 				
 				JSONArray filePaths = new JSONArray();
 				
-				
 				TemporalType temporalType = fs.getTemporalType();
 				
 				int fsSpatialResolution = fs.getGeohashPrecision();
@@ -825,40 +826,45 @@ public class StorageNode implements RequestListener {
 				
 				
 				if (blockMap.keySet().size() > 0) {
+					
 					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
+						
 						hostFileSize = 0;
 						filePaths = new JSONArray();
 						// maximum parallelism = 64
 						ExecutorService executor = Executors.newFixedThreadPool(Math.min(blockMap.keySet().size(), 2 * numCores));
-						List<QueryProcessor> queryProcessors = new ArrayList<>();
 						
-						GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(),
-								event.getPolygon());
+						List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
+						
+						GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(), event.getPolygon());
+						
 						for (String blockKey : blockMap.keySet()) {
 							
 							/* Converts the bounds of geohash into a 1024x1024 region */
-							GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(blockKey,
-									GeoHash.MAX_PRECISION * 2 / 3);
+							String[] tokens = blockKey.split("\\$\\$");
+							GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
+							
 							Bitmap queryBitmap = null;
+							
 							if (geoQuery.getPolygon() != null)
 								queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
+							
 							List<String> blocks = blockMap.get(blockKey);
 							
-							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, geoQuery, blockGrid, queryBitmap, blocks);
+							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
+									event.getSpatialResolution(), event.getTemporalResolution(), event.getReqFeatures());
 							
-							for (String blockPath : blocks) {
-								QueryProcessor qp = new QueryProcessor(fs, blockPath, geoQuery, blockGrid, queryBitmap,
-										getResultFilePrefix(event.getQueryId(), fsName, blockKey + blocksProcessed));
-								blocksProcessed++;
-								queryProcessors.add(qp);
-								executor.execute(qp);
-							}
+							queryProcessors.add(qp);
+							executor.execute(qp);
+							
 						}
 						executor.shutdown();
 						boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
 						if (!status)
 							logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
-						for (QueryProcessor qp : queryProcessors) {
+						
+						// Sum up the output from query processors
+						for (VisualizationQueryProcessor qp : queryProcessors) {
 							if (qp.getFileSize() > 0) {
 								hostFileSize += qp.getFileSize();
 								for (String resultPath : qp.getResultPaths())

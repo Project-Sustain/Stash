@@ -24,6 +24,7 @@ import galileo.fs.GeospatialFileSystem;
 import galileo.graph.FeaturePath;
 import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
+import galileo.graph.SummaryStatistics;
 import galileo.query.Query;
 import galileo.util.Pair;
 import galileo.util.PathFragments;
@@ -36,201 +37,127 @@ import galileo.util.PathFragments;
 /* This handles one fragment of a path */
 public class VisualizationQueryProcessor implements Runnable{
 	
-	private static final Logger logger = Logger.getLogger("galileo");
+private static final Logger logger = Logger.getLogger("galileo");
 	
-	/* Represents the path that will be queried. Records from all blocks in this path has been loaded here. */
-	
+	/* Represents the path that will be queried. Allblocks in this path will be looked into. */
+	//private Path<Feature, String> path;
+	private List<String> blocks;
 	private GeoavailabilityQuery geoQuery;
 	private GeoavailabilityGrid grid;
+	private GeospatialFileSystem fs1;
 	private Bitmap queryBitmap;
-	private GeospatialFileSystem gfs;
-	private List<String> blocks;
+	private int spatialResolution;
+	private int temporalResolution;
+	private List<String> reqFeatures;
 	
-	/* The final records from this fragment will not be in a string array format, rather a full string */
-	private String recordsStringRepresentation;
+	private Map<String,SummaryStatistics[]> resultSummaries;
 	
-	/**
-	 * 
-	 * @param gfs
-	 * @param featurePaths: all necessary records
-	 * @param query
-	 * @param grid
-	 * @param queryBitmap
-	 */
-	public VisualizationQueryProcessor(GeospatialFileSystem gfs, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid, Bitmap queryBitmap, List<String> blocks) {
+	
+	public VisualizationQueryProcessor(GeospatialFileSystem fs1, List<String> blocks, GeoavailabilityQuery gQuery,
+			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<String> reqFeatures) {
 		
-		this.geoQuery = geoQuery;
+		this.fs1 = fs1;
+		this.geoQuery = gQuery;
 		this.grid = grid;
 		this.queryBitmap = queryBitmap;
-		this.gfs = gfs;
 		this.blocks = blocks;
+		this.spatialResolution = spatialResolution;
+		this.temporalResolution = temporalResolution;
+		this.reqFeatures = reqFeatures;
+		
 	}
-	
-	/**
-	 * Using the Feature attributes found in the provided Metadata, a path is
-	 * created for insertion into the Metadata Graph.
-	 */
-	protected FeaturePath<String> createPath(String physicalPath, Metadata meta) {
-		FeaturePath<String> path = new FeaturePath<String>(physicalPath, meta.getAttributes().toArray());
-		return path;
-	}
-	
-	/**
-	 * This handles one fragment
-	 */
+
 	@Override
 	public void run() {
 		
-		try{
-			logger.info("RIKI: FEATUREPATHS IN SUBSET "+featurePaths.size() +" "+blocks);
-			boolean fullRequired = false;
+		try {
 			
-			if (queryBitmap != null) {
-				fullRequired = true;
-				logger.info("RIKI: QUERY BITMAP FOUND "+blocks);
-				int latOrder = -1, lngOrder = -1, index = 0;
-				for (Pair<String, FeatureType> columnPair : gfs.getFeatureList()) {
-					if (columnPair.a.equalsIgnoreCase(gfs.getSpatialHint().getLatitudeHint()))
-						latOrder = index++;
-					else if (columnPair.a
-							.equalsIgnoreCase(gfs.getSpatialHint().getLongitudeHint()))
-						lngOrder = index++;
-					else
-						index++;
-				}
-
-				GeoavailabilityMap<String[]> geoMap = new GeoavailabilityMap<String[]>(grid);
-				Iterator<String[]> pathIterator = this.featurePaths.iterator();
-				while (pathIterator.hasNext()) {
-					String[] features = pathIterator.next();
-					float lat = Float.valueOf(features[latOrder]);
-					float lon = Float.valueOf(features[lngOrder]);
-					if (!Float.isNaN(lat) && !Float.isNaN(lon))
-						geoMap.addPoint(new Coordinates(lat, lon), features);
-					pathIterator.remove();
-				}
-				recordsStringRepresentation = "";
-				StringBuilder sb = new StringBuilder();
-				/*each string[] is a line of record*/
-				for (List<String[]> paths : geoMap.query(queryBitmap).values()) {
-					/* No need to update featurePaths if the remaining section will not be evaluated */
-					if (query != null && this.featurePaths.size() > 0) {
-						this.featurePaths.addAll(paths);
-						continue;
-					} else if(paths != null && paths.size() > 0){
-						for(String[] record : paths) {
-							if(record != null) {
-								String recStr = Arrays.toString(record);
-								//recordsStringRepresentation += recStr.substring(1,recStr.length() - 1) + "\n";
-								sb.append(recStr.substring(1,recStr.length() - 1) + "\n");
-							}
-						}
-						recordsStringRepresentation = sb.toString();
-					}
-						
-					
-				}
-			}
-			if (query != null && this.featurePaths.size() > 0) {
-				logger.info("RIKI: SHOULD NOT ENTER "+blocks);
-				fullRequired = true;
-				MetadataGraph temporaryGraph = new MetadataGraph();
-				Iterator<String[]> pathIterator = this.featurePaths.iterator();
-				while (pathIterator.hasNext()) {
-					String[] features = pathIterator.next();
-					try {
-						Metadata metadata = new Metadata();
-						FeatureSet featureset = new FeatureSet();
-						for (int i = 0; i < features.length; i++) {
-							Pair<String, FeatureType> pair = gfs.getFeatureList().get(i);
-							if (pair.b == FeatureType.FLOAT)
-								featureset.put(new Feature(pair.a, Float.valueOf(features[i])));
-							if (pair.b == FeatureType.INT)
-								featureset.put(new Feature(pair.a, Integer.valueOf(features[i])));
-							if (pair.b == FeatureType.LONG)
-								featureset.put(new Feature(pair.a, Long.valueOf(features[i])));
-							if (pair.b == FeatureType.DOUBLE)
-								featureset.put(new Feature(pair.a, Double.valueOf(features[i])));
-							if (pair.b == FeatureType.STRING)
-								featureset.put(new Feature(pair.a, features[i]));
-						}
-						metadata.setAttributes(featureset);
-						Path<Feature, String> featurePath = createPath("/nopath", metadata);
-						temporaryGraph.addPath(featurePath);
-					} catch (Exception e) {
-						logger.warning(e.getMessage());
-					}
-					pathIterator.remove();
-				}
-				recordsStringRepresentation = "";
-				StringBuilder sb = new StringBuilder();
-				List<Path<Feature, String>> evaluatedPaths = temporaryGraph.evaluateQuery(query);
-				for (Path<Feature, String> path : evaluatedPaths) {
-					String[] featureValues = new String[path.size()];
-					int index = 0;
-					for (Feature feature : path.getLabels())
-						featureValues[index++] = feature.getString();
-					String recStr = Arrays.toString(featureValues);
-					//recordsStringRepresentation += recStr.substring(1,recStr.length() - 1) + "\n";
-					sb.append(recStr.substring(1,recStr.length() - 1) + "\n");
-					//this.featurePaths.add(featureValues);
-				}
-				recordsStringRepresentation = sb.toString();
-			} 
-			//logger.info("RIKI: SHOULD ENTER "+blocks + fullRequired + " "+ this.featurePaths.size() + ">>"+recordsStringRepresentation+"<<");
+			/* This thread is created one for each path */
+			this.resultSummaries = this.fs1.queryLocalSummary(this.blocks, this.geoQuery, this.grid, this.queryBitmap,
+					spatialResolution, temporalResolution, reqFeatures);
 			
-			if(!fullRequired && this.featurePaths.size() > 0 && (recordsStringRepresentation == null || recordsStringRepresentation.isEmpty())) {
-				
-				recordsStringRepresentation = "";
-				StringBuilder sb = new StringBuilder();
-				for(String[] record : featurePaths) {
-					if(record != null) {
-						String recStr = Arrays.toString(record);
-						//recordsStringRepresentation += recStr.substring(1,recStr.length() - 1) + "\n";
-						sb.append(recStr.substring(1,recStr.length() - 1) + "\n");
-					}
-				}
-				recordsStringRepresentation = sb.toString();
-				
-				//logger.info("RIKI: SHOULD ENTER AFTER "+ recordsStringRepresentation + " "+blocks);
-			}
-
-			/*if (featurePaths.size() > 0) {
-				try (FileOutputStream fos = new FileOutputStream(this.storagePath)) {
-					Iterator<String[]> pathIterator = featurePaths.iterator();
-					while (pathIterator.hasNext()) {
-						String[] path = pathIterator.next();
-						StringBuffer pathSB = new StringBuffer();
-						for (int j = 0; j < path.length; j++) {
-							pathSB.append(path[j]);
-							if (j + 1 != path.length)
-								pathSB.append(",");
-						}
-						fos.write(pathSB.toString().getBytes("UTF-8"));
-						pathIterator.remove();
-						if (pathIterator.hasNext())
-							fos.write("\n".getBytes("UTF-8"));
-					}
-				}
-			} else {
-				this.storagePath = null;
-			}*/
-		} catch (BitmapException e) {
-			logger.log(Level.SEVERE, "Something went wrong while querying the filesystem.", e);
+		} catch (IOException | InterruptedException e) {
+			// TODO Auto-generated catch block
+			logger.log(Level.SEVERE, "Something went wrong while querying FS2 for neighbor block. No results obtained.\n" + e.getMessage());
 		}
-	
 		
 		
 	}
 
-	public String getRecordsStringRepresentation() {
-		return recordsStringRepresentation;
+	public Map<String,SummaryStatistics[]> getResultSummaries() {
+		return resultSummaries;
 	}
 
-	public void setRecordsStringRepresentation(String recordsStringRepresentation) {
-		this.recordsStringRepresentation = recordsStringRepresentation;
+	public void setResultSummaries(Map<String,SummaryStatistics[]> resultSummaries) {
+		this.resultSummaries = resultSummaries;
 	}
-	
-	
+
+	public List<String> getBlocks() {
+		return blocks;
+	}
+
+	public void setBlocks(List<String> blocks) {
+		this.blocks = blocks;
+	}
+
+	public GeoavailabilityQuery getGeoQuery() {
+		return geoQuery;
+	}
+
+	public void setGeoQuery(GeoavailabilityQuery geoQuery) {
+		this.geoQuery = geoQuery;
+	}
+
+	public GeoavailabilityGrid getGrid() {
+		return grid;
+	}
+
+	public void setGrid(GeoavailabilityGrid grid) {
+		this.grid = grid;
+	}
+
+	public GeospatialFileSystem getFs1() {
+		return fs1;
+	}
+
+	public void setFs1(GeospatialFileSystem fs1) {
+		this.fs1 = fs1;
+	}
+
+	public Bitmap getQueryBitmap() {
+		return queryBitmap;
+	}
+
+	public void setQueryBitmap(Bitmap queryBitmap) {
+		this.queryBitmap = queryBitmap;
+	}
+
+	public int getSpatialResolution() {
+		return spatialResolution;
+	}
+
+	public void setSpatialResolution(int spatialResolution) {
+		this.spatialResolution = spatialResolution;
+	}
+
+	public int getTemporalResolution() {
+		return temporalResolution;
+	}
+
+	public void setTemporalResolution(int temporalResolution) {
+		this.temporalResolution = temporalResolution;
+	}
+
+	public static Logger getLogger() {
+		return logger;
+	}
+
+	public List<String> getReqFeatures() {
+		return reqFeatures;
+	}
+
+	public void setReqFeatures(List<String> reqFeatures) {
+		this.reqFeatures = reqFeatures;
+	}
 
 }

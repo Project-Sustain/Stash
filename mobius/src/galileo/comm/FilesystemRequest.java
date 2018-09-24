@@ -72,6 +72,7 @@ public class FilesystemRequest implements Event {
 	private int spatialResolution;
 	private int temporalResolution;
 	private int spatialPartitioningType = 0;
+	private List<String> summaryHints;
 	
 	
 	
@@ -273,6 +274,11 @@ public class FilesystemRequest implements Event {
 		this.spatialPartitioningType = in.readInt();
 		this.isRasterized = in.readBoolean();
 		
+		boolean hasSummaryHints = in.readBoolean();
+		
+		if(hasSummaryHints)
+			in.readStringCollection(this.summaryHints);
+		
 	}
 
 	@Override
@@ -293,6 +299,13 @@ public class FilesystemRequest implements Event {
 		out.writeInt(this.temporalResolution);
 		out.writeInt(this.spatialPartitioningType);
 		out.writeBoolean(this.isRasterized);
+		
+		boolean hasSummaryHints = false;
+		if(summaryHints != null && summaryHints.size() > 0)
+			hasSummaryHints = true;
+		out.writeBoolean(hasSummaryHints);
+		if(hasSummaryHints)
+			out.writeStringCollection(summaryHints);
 
 	}
 
@@ -340,6 +353,31 @@ public class FilesystemRequest implements Event {
 
 	public void setSpatialPartitioningType(int spatialPartitioningType) {
 		this.spatialPartitioningType = spatialPartitioningType;
+	}
+
+
+	public List<String> getSummaryHints() {
+		return summaryHints;
+	}
+
+
+	public void setSummaryHints(List<String> summaryHints) {
+		this.summaryHints = summaryHints;
+	}
+
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+
+	public void setFeatureList(List<Pair<String, FeatureType>> featureList) {
+		this.featureList = featureList;
+	}
+
+
+	public void setSpatialHint(SpatialHint spatialHint) {
+		this.spatialHint = spatialHint;
 	}
 
 }

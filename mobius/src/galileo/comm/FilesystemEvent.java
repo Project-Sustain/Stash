@@ -30,6 +30,7 @@ public class FilesystemEvent implements Event{
 	private SpatialHint spatialHint;
 	private String temporalHint;
 	private int spatialPartitioningType = 0;
+	private List<String> summaryHints;
 	
 	/**
 	 *  The uncertainty in join */
@@ -176,6 +177,10 @@ public class FilesystemEvent implements Event{
 		this.isRasterized = in.readBoolean();
 		this.temporalHint = in.readString();
 		this.spatialPartitioningType = in.readInt();
+		
+		boolean hasSummaryHints = in.readBoolean();
+		if(hasSummaryHints)
+			in.readStringCollection(this.summaryHints);
 	}
 
 	@Override
@@ -196,6 +201,12 @@ public class FilesystemEvent implements Event{
 		out.writeBoolean(this.isRasterized);
 		out.writeString(this.temporalHint);
 		out.writeInt(spatialPartitioningType);
+		boolean hasSummaryHints = false;
+		if(summaryHints != null && summaryHints.size() > 0)
+			hasSummaryHints = true;
+		out.writeBoolean(hasSummaryHints);
+		if(hasSummaryHints)
+			out.writeStringCollection(summaryHints);
 	}
 
 	public boolean isRasterized() {
@@ -260,5 +271,13 @@ public class FilesystemEvent implements Event{
 
 	public void setSpatialHint(SpatialHint spatialHint) {
 		this.spatialHint = spatialHint;
+	}
+
+	public List<String> getSummaryHints() {
+		return summaryHints;
+	}
+
+	public void setSummaryHints(List<String> summaryHints) {
+		this.summaryHints = summaryHints;
 	}
 }

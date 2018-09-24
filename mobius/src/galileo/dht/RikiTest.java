@@ -9,7 +9,7 @@ public class RikiTest {
 	
 	public static void main(String arg[]) throws FileNotFoundException, IOException {
 		
-		String[] abc = new String[2];
+		/*String[] abc = new String[2];
 		abc[0] = "a";
 		abc[1] = "b";
 		
@@ -20,7 +20,12 @@ public class RikiTest {
 		
 		String home = "/s/chopin/b/grad/sapmitra/workspace/mobius/config/network_singlering/";
 
-		NetworkConfig.readNetworkDescription(home);
+		NetworkConfig.readNetworkDescription(home);*/
+		
+		String[] ss = "hello$$world".split("\\$\\$");
+		
+		System.out.println(ss[0]);
+		System.out.println(ss[1]);
 		
 	}
 

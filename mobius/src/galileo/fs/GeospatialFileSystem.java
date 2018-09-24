@@ -96,6 +96,7 @@ import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
+import galileo.graph.SummaryStatistics;
 import galileo.query.Expression;
 import galileo.query.Operation;
 import galileo.query.Operator;
@@ -142,6 +143,9 @@ public class GeospatialFileSystem extends FileSystem {
 	private List<Pair<String, FeatureType>> featureList;
 	private SpatialHint spatialHint;
 	private String temporalHint;
+	
+	private String[] summaryHints;
+	private int[] summaryPosns;
 	private String storageRoot;
 
 	private MetadataGraph metadataGraph;
@@ -195,7 +199,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public GeospatialFileSystem(StorageNode sn, String storageDirectory, String name, int precision,
 			int temporalType, NetworkInfo networkInfo, String featureList, SpatialHint sHint, String temporalHint, 
-			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution)
+			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution, List<String> summaryHints)
 			throws FileSystemException, IOException, SerializationException, PartitionException, HashException,
 			HashTopologyException {
 		super(storageDirectory, name, ignoreIfPresent);
@@ -203,6 +207,11 @@ public class GeospatialFileSystem extends FileSystem {
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
+		
+		String[] tmp = new String[summaryHints.size()];
+		this.summaryPosns = new int[summaryHints.size()];
+		this.summaryHints = summaryHints.toArray(tmp);
+		
 		
 		/* featurelist is a comma separated list of feature names: type(int) */
 		if (featureList != null) {
@@ -218,6 +227,9 @@ public class GeospatialFileSystem extends FileSystem {
 					spatialPosn1 = count;
 				} else if(featureName.equals(sHint.getLongitudeHint())) {
 					spatialPosn2 = count;
+				} else if(summaryHints.contains(featureName)) {
+					int ind = summaryHints.indexOf(featureName);
+					summaryPosns[ind] = count;
 				}
 				count++;
 				
@@ -323,7 +335,8 @@ public class GeospatialFileSystem extends FileSystem {
 		JSONObject state = new JSONObject();
 		state.put("name", this.name);
 		state.put("storageRoot", this.storageRoot);
-		state.put("precision", this.geohashPrecision);		state.put("geohashIndex", this.geohashIndex);
+		state.put("precision", this.geohashPrecision);		
+		state.put("geohashIndex", this.geohashIndex);
 		StringBuffer features = new StringBuffer();
 		if (this.featureList != null) {
 			for (Pair<String, FeatureType> pair : this.featureList)
@@ -353,6 +366,7 @@ public class GeospatialFileSystem extends FileSystem {
 		state.put("spatialPosn1", this.spatialPosn1);
 		state.put("spatialPosn2", this.spatialPosn2);
 		state.put("spatialPartitioningType", this.spatialPartitioningType);
+		state.put("summaryHints", this.summaryHints);
 		
 		return state;
 	}
@@ -380,8 +394,13 @@ public class GeospatialFileSystem extends FileSystem {
 		int spatialResolution = state.getInt("spatialResolution");
 		int temporalResolution = state.getInt("temporalResolution");
 		
+		JSONArray sHints = state.getJSONArray("summaryHints");
+		List<String> summaryHints = new ArrayList<String>();
+		for (int i = 0; i < geohashIndices.length(); i++)
+			summaryHints.add(sHints.getString(i));
+		
 		GeospatialFileSystem gfs = new GeospatialFileSystem(storageNode, storageRoot, name, geohashPrecision,
-				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType, spatialResolution, temporalResolution);
+				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType, spatialResolution, temporalResolution, summaryHints);
 		
 		gfs.earliestTime = (state.get("earliestTime") != JSONObject.NULL)
 				? new TemporalProperties(state.getLong("earliestTime")) : null;
@@ -1987,6 +2006,112 @@ public class GeospatialFileSystem extends FileSystem {
 		return returnPaths;
 	}
 	
+	
+	/**
+	 * HANDLES VISUALIZATION OF EACH BLOCK KEY. THIS BLOCK KEY IS AT THE FILESYSTEM'S SPATIOTEMPORAL PRECISION 
+	 * 
+	 * @author sapmitra
+	 * @param blocks
+	 * @param geoQuery
+	 * @param grid
+	 * @param queryBitmap
+	 * @param spatialResolution
+	 * @param temporalResolution
+	 * @param reqFeatures
+	 * @return
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	
+	public Map<String,SummaryStatistics[]> queryLocalSummary(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
+			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<String> reqFeatures) 
+			throws IOException, InterruptedException {
+		
+		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
+		
+		List<String[]> featurePaths = new ArrayList<String[]>();
+		
+		// THIS READS THE ACTUAL BLOCKS
+		
+		boolean skipGridProcessing = false;
+		if (geoQuery.getPolygon() != null && geoQuery.getQuery() != null) {
+			/* If polygon complete encompasses geohash */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			
+			featurePaths = getFeaturePathsLocal(blocks);
+		} else if (geoQuery.getPolygon() != null) {
+			/* If grid lies completely inside polygon */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			featurePaths = getFeaturePathsLocal(blocks);
+		} else if (geoQuery.getQuery() != null) {
+			featurePaths = getFeaturePathsLocal(blocks);
+		} 
+		
+		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
+		int size = featurePaths.size();
+		int partition = java.lang.Math.max(size / numCores, MIN_GRID_POINTS);
+		int parallelism = java.lang.Math.min(size / partition, numCores);
+		
+		/* ALL THE RECORDS TO BE QUERIED ARE NOW INSIDE featurePaths */
+		
+		// FURTHER FILTERING OF FEATUREPATHS
+		
+		queryBitmap = skipGridProcessing ? null : queryBitmap;
+		if(parallelism <=0 ) {
+			//logger.log(Level.INFO, "RIKI: THIS HAPPENED");
+			parallelism = 1;
+		}
+		
+		if (parallelism > 0) {
+			
+			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+			
+			List<LocalParallelQueryProcessor> queryProcessors = new ArrayList<>();
+			
+			for (int i = 0; i < parallelism; i++) {
+				int from = i * partition;
+				int to = (i + 1 != parallelism) ? (i + 1) * partition : size;
+				List<String[]> subset = new ArrayList<>(featurePaths.subList(from, to));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND2: "+Arrays.asList(featurePaths));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND3: "+Arrays.asList(subset));
+				if(subset != null) {
+					
+					LocalParallelQueryProcessor pqp = new LocalParallelQueryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap);
+					
+					queryProcessors.add(pqp);
+					executor.execute(pqp);
+				}
+			}
+			
+			executor.shutdown();
+			boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+			if (!status)
+				logger.log(Level.WARNING, "queryFragments: Executor terminated because of the specified timeout=10minutes");
+			
+			for(LocalParallelQueryProcessor nqp : queryProcessors) {
+				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS6"+nqp.getFeaturePaths());
+				if(nqp.getFeaturePaths().size() > 0) {
+					
+					List<String[]> partialPaths = nqp.getFeaturePaths();
+					
+					
+					
+				}
+				
+			}
+			
+		} 
+
+		return allSummaries;
+	}
+	
+	
+	
+	private void summarisePaths(List<String[]> partialPaths, Map<String, SummaryStatistics[]> allSummaries) {
+		
+		
+		
+	}
 	
 
 	public List<Pair<String, FeatureType>> getFeatureList() {

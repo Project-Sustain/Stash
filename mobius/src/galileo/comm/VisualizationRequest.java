@@ -22,6 +22,8 @@ public class VisualizationRequest implements Event {
 	private String timeString;
 	private int spatialResolution;
 	private int temporalResolution;
+	
+	private List<String> reqFeatures;
 
 	private void validate(String fsName) {
 		if (fsName == null || fsName.trim().length() == 0 || !fsName.matches("[a-z0-9-]{5,50}"))
@@ -113,6 +115,9 @@ public class VisualizationRequest implements Event {
 		this.spatialResolution = in.readInt();
 		this.temporalResolution = in.readInt();
 		
+		// this cannot be null
+		in.readStringCollection(reqFeatures);
+		
 	}
 
 	@Override
@@ -129,6 +134,9 @@ public class VisualizationRequest implements Event {
 			out.writeSerializable(this.featureQuery);
 		out.writeInt(spatialResolution);
 		out.writeInt(temporalResolution);
+		
+		//this cannot be null
+		out.writeStringCollection(reqFeatures);
 		
 	}
 
@@ -174,6 +182,14 @@ public class VisualizationRequest implements Event {
 
 	public void setPolygon(List<Coordinates> polygon) {
 		this.polygon = polygon;
+	}
+
+	public List<String> getReqFeatures() {
+		return reqFeatures;
+	}
+
+	public void setReqFeatures(List<String> reqFeatures) {
+		this.reqFeatures = reqFeatures;
 	}
 
 }
