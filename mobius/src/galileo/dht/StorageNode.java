@@ -851,8 +851,9 @@ public class StorageNode implements RequestListener {
 							
 							List<String> blocks = blockMap.get(blockKey);
 							
+							// 
 							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
-									event.getSpatialResolution(), event.getTemporalResolution(), event.getReqFeatures());
+									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns());
 							
 							queryProcessors.add(qp);
 							executor.execute(qp);

@@ -88,6 +88,7 @@ import galileo.dht.SpatialHierarchyPartitioner;
 import galileo.dht.StandardDHTPartitioner;
 import galileo.dht.StorageNode;
 import galileo.dht.TemporalHierarchyPartitioner;
+import galileo.dht.VisualizationSummaryProcessor;
 import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
 import galileo.dht.hash.TemporalHash;
@@ -144,8 +145,8 @@ public class GeospatialFileSystem extends FileSystem {
 	private SpatialHint spatialHint;
 	private String temporalHint;
 	
-	private String[] summaryHints;
-	private int[] summaryPosns;
+	private List<String> summaryHints;
+	private List<Integer> summaryPosns;
 	private String storageRoot;
 
 	private MetadataGraph metadataGraph;
@@ -208,9 +209,8 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.geohashIndex = new HashSet<>();
 		
-		String[] tmp = new String[summaryHints.size()];
-		this.summaryPosns = new int[summaryHints.size()];
-		this.summaryHints = summaryHints.toArray(tmp);
+		this.summaryPosns = new ArrayList<Integer>();
+		this.summaryHints = summaryHints;
 		
 		
 		/* featurelist is a comma separated list of feature names: type(int) */
@@ -229,7 +229,7 @@ public class GeospatialFileSystem extends FileSystem {
 					spatialPosn2 = count;
 				} else if(summaryHints.contains(featureName)) {
 					int ind = summaryHints.indexOf(featureName);
-					summaryPosns[ind] = count;
+					summaryPosns.add(ind, count);
 				}
 				count++;
 				
@@ -2017,14 +2017,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param queryBitmap
 	 * @param spatialResolution
 	 * @param temporalResolution
-	 * @param reqFeatures
+	 * @param summaryPosns
 	 * @return
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
 	
 	public Map<String,SummaryStatistics[]> queryLocalSummary(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
-			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<String> reqFeatures) 
+			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns) 
 			throws IOException, InterruptedException {
 		
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
@@ -2066,7 +2066,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
 			
-			List<LocalParallelQueryProcessor> queryProcessors = new ArrayList<>();
+			List<VisualizationSummaryProcessor> queryProcessors = new ArrayList<VisualizationSummaryProcessor>();
 			
 			for (int i = 0; i < parallelism; i++) {
 				int from = i * partition;
@@ -2076,7 +2076,8 @@ public class GeospatialFileSystem extends FileSystem {
 				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND3: "+Arrays.asList(subset));
 				if(subset != null) {
 					
-					LocalParallelQueryProcessor pqp = new LocalParallelQueryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap);
+					VisualizationSummaryProcessor pqp = new VisualizationSummaryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap, summaryPosns,
+							spatialResolution, temporalResolution);
 					
 					queryProcessors.add(pqp);
 					executor.execute(pqp);
@@ -2231,17 +2232,22 @@ public class GeospatialFileSystem extends FileSystem {
 	public void setSpatialPartitioningType(int spatialPartitioningType) {
 		this.spatialPartitioningType = spatialPartitioningType;
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+	public List<String> getSummaryHints() {
+		return summaryHints;
+	}
+
+	public void setSummaryHints(List<String> summaryHints) {
+		this.summaryHints = summaryHints;
+	}
+
+	public List<Integer> getSummaryPosns() {
+		return summaryPosns;
+	}
+
+	public void setSummaryPosns(List<Integer> summaryPosns) {
+		this.summaryPosns = summaryPosns;
+	}
+
 	
 }

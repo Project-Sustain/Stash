@@ -2699,6 +2699,13 @@ public class GeoHash {
 		
 	}
 	
+	
+	public static String getSummaryKey(float lat, float lng, float time, int spatialResolution, int temporalResolution) {
+		
+		return null;
+		
+	}
+	
 	public static void main(String arg[]) {
 		//List<String> borderingGeohashesForDirection = getBorderingGeohashesGivenDirection("u9", 4, "s");
 		

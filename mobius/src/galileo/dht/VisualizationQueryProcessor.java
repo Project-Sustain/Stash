@@ -1,45 +1,30 @@
 package galileo.dht;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import galileo.bmp.Bitmap;
-import galileo.bmp.BitmapException;
 import galileo.bmp.GeoavailabilityGrid;
-import galileo.bmp.GeoavailabilityMap;
 import galileo.bmp.GeoavailabilityQuery;
-import galileo.dataset.Coordinates;
-import galileo.dataset.Metadata;
-import galileo.dataset.feature.Feature;
-import galileo.dataset.feature.FeatureSet;
-import galileo.dataset.feature.FeatureType;
 import galileo.fs.GeospatialFileSystem;
-import galileo.graph.FeaturePath;
-import galileo.graph.MetadataGraph;
-import galileo.graph.Path;
 import galileo.graph.SummaryStatistics;
-import galileo.query.Query;
-import galileo.util.Pair;
-import galileo.util.PathFragments;
 
 /**
  * 
  * @author sapmitra
  *
+ *	HANDLES ALL BLOCKS WITH THE SAME BLOCK KEY : TIME$$SPACE
  */
-/* This handles one fragment of a path */
+
 public class VisualizationQueryProcessor implements Runnable{
 	
 private static final Logger logger = Logger.getLogger("galileo");
 	
-	/* Represents the path that will be queried. Allblocks in this path will be looked into. */
+	/* Represents the path that will be queried. All blocks in this path will be looked into. */
+
 	//private Path<Feature, String> path;
 	private List<String> blocks;
 	private GeoavailabilityQuery geoQuery;
@@ -48,13 +33,14 @@ private static final Logger logger = Logger.getLogger("galileo");
 	private Bitmap queryBitmap;
 	private int spatialResolution;
 	private int temporalResolution;
-	private List<String> reqFeatures;
+	private List<Integer> summaryPosns;
 	
+	// BLOCK KEY WITH A LIST OF SUMMARIES - ONE FOR EACH REQUESTED FEATURES
 	private Map<String,SummaryStatistics[]> resultSummaries;
 	
 	
 	public VisualizationQueryProcessor(GeospatialFileSystem fs1, List<String> blocks, GeoavailabilityQuery gQuery,
-			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<String> reqFeatures) {
+			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns) {
 		
 		this.fs1 = fs1;
 		this.geoQuery = gQuery;
@@ -63,7 +49,7 @@ private static final Logger logger = Logger.getLogger("galileo");
 		this.blocks = blocks;
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
-		this.reqFeatures = reqFeatures;
+		this.summaryPosns = summaryPosns;
 		
 	}
 
@@ -74,7 +60,7 @@ private static final Logger logger = Logger.getLogger("galileo");
 			
 			/* This thread is created one for each path */
 			this.resultSummaries = this.fs1.queryLocalSummary(this.blocks, this.geoQuery, this.grid, this.queryBitmap,
-					spatialResolution, temporalResolution, reqFeatures);
+					spatialResolution, temporalResolution, summaryPosns);
 			
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block
@@ -152,12 +138,12 @@ private static final Logger logger = Logger.getLogger("galileo");
 		return logger;
 	}
 
-	public List<String> getReqFeatures() {
-		return reqFeatures;
+	public List<Integer> getSummaryPosns() {
+		return summaryPosns;
 	}
 
-	public void setReqFeatures(List<String> reqFeatures) {
-		this.reqFeatures = reqFeatures;
+	public void setSummaryPosns(List<Integer> summaryPosns) {
+		this.summaryPosns = summaryPosns;
 	}
 
 }
