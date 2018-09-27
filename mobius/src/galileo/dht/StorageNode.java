@@ -115,6 +115,7 @@ import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.Path;
+import galileo.graph.SummaryStatistics;
 import galileo.net.ClientConnectionPool;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
@@ -795,6 +796,9 @@ public class StorageNode implements RequestListener {
 		long totalProcessingTime = 0;
 		long blocksProcessed = 0;
 		int totalNumPaths = 0;
+		
+		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
+		
 		JSONArray header = new JSONArray();
 		JSONObject blocksJSON = new JSONObject();
 		JSONArray resultsJSON = new JSONArray();
@@ -860,7 +864,6 @@ public class StorageNode implements RequestListener {
 							
 							List<String> blocks = blockMap.get(blockKey);
 							
-							// 
 							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
 									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), needMoreGrouping, blockKey);
 							
@@ -875,14 +878,31 @@ public class StorageNode implements RequestListener {
 						
 						// Sum up the output from query processors
 						for (VisualizationQueryProcessor qp : queryProcessors) {
-							if (qp.getFileSize() > 0) {
-								hostFileSize += qp.getFileSize();
-								for (String resultPath : qp.getResultPaths())
-									filePaths.put(resultPath);
+							
+							if (qp.getResultSummaries().size() > 0) {
+								Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
+								
+								for(String key: localSummary.keySet()) {
+									
+									if(!allSummaries.containsKey(key)) {
+										allSummaries.put(key, localSummary.get(key));
+									} else {
+										SummaryStatistics[] oldStats = allSummaries.get(key);
+										SummaryStatistics[] statsUpdate = localSummary.get(key);
+										
+										SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+										allSummaries.put(key, mergedSummaries);
+									}
+									
+								}
 							}
 						}
 					} 
 				}
+				
+				// POPULATE THE CACHE TREE
+				fs.populateCacheTree(allSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+				
 				totalProcessingTime = System.currentTimeMillis() - processingTime;
 				totalNumPaths = filePaths.length();
 				JSONObject resultJSON = new JSONObject();

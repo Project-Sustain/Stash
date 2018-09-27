@@ -278,7 +278,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 		
 	}
 
-	public void getSummariesNoGroupingNeeded(List<Path<Feature, String>> evaluatedPaths) {
+	private void getSummariesNoGroupingNeeded(List<Path<Feature, String>> evaluatedPaths) {
 		
 		// EACH OF THE EVALUATED PATHS ARE TO BE USED TO SUMMARISE
 		// CREATE KEY FROM THE SPATIOTEMPORAL FEATURES
@@ -344,7 +344,6 @@ public class VisualizationSummaryProcessor implements Runnable{
 			ss.setCount(counts);
 			ss.setTmpSum(sums[i]);
 			
-			
 		}
 		
 		localSummary.put(blocksKey, summaries);
@@ -399,6 +398,14 @@ public class VisualizationSummaryProcessor implements Runnable{
 
 	public void setSummaryPosns(List<Integer> summaryPosns) {
 		this.summaryPosns = summaryPosns;
+	}
+
+	public Map<String, SummaryStatistics[]> getLocalSummary() {
+		return localSummary;
+	}
+
+	public void setLocalSummary(Map<String, SummaryStatistics[]> localSummary) {
+		this.localSummary = localSummary;
 	}
 
 }

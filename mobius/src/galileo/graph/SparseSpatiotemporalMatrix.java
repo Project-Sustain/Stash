@@ -64,7 +64,7 @@ public class SparseSpatiotemporalMatrix {
 	 * @param temporalResolution2 
 	 * @param spatialResolution2 
 	 */
-	public void addCell(SummaryStatistics summ, String key) {
+	public void addCell(SummaryStatistics[] summ, String key) {
 		
 		CacheCell c = cells.get(key);
 		if(c == null) {

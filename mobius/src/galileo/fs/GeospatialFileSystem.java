@@ -2094,13 +2094,25 @@ public class GeospatialFileSystem extends FileSystem {
 			if (!status)
 				logger.log(Level.WARNING, "queryFragments: Executor terminated because of the specified timeout=10minutes");
 			
-			for(LocalParallelQueryProcessor nqp : queryProcessors) {
+			for(VisualizationSummaryProcessor vqp : queryProcessors) {
 				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS6"+nqp.getFeaturePaths());
-				if(nqp.getFeaturePaths().size() > 0) {
+				if(vqp.getLocalSummary().size() > 0) {
 					
-					List<String[]> partialPaths = nqp.getFeaturePaths();
+					Map<String, SummaryStatistics[]> localSummary = vqp.getLocalSummary();
 					
-					
+					for(String key: localSummary.keySet()) {
+						
+						if(!allSummaries.containsKey(key)) {
+							allSummaries.put(key, localSummary.get(key));
+						} else {
+							SummaryStatistics[] oldStats = allSummaries.get(key);
+							SummaryStatistics[] statsUpdate = localSummary.get(key);
+							
+							SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+							allSummaries.put(key, mergedSummaries);
+						}
+						
+					}
 					
 				}
 				
@@ -2110,15 +2122,6 @@ public class GeospatialFileSystem extends FileSystem {
 
 		return allSummaries;
 	}
-	
-	
-	
-	private void summarisePaths(List<String[]> partialPaths, Map<String, SummaryStatistics[]> allSummaries) {
-		
-		
-		
-	}
-	
 
 	public List<Pair<String, FeatureType>> getFeatureList() {
 		return featureList;
@@ -2252,6 +2255,35 @@ public class GeospatialFileSystem extends FileSystem {
 
 	public void setSummaryPosns(List<Integer> summaryPosns) {
 		this.summaryPosns = summaryPosns;
+	}
+
+	/**
+	 * NEWLY EXTRACTED SUMMARIES BEING PUT INTO THE TREE
+	 * @author sapmitra
+	 * @param allSummaries
+	 * @param j 
+	 * @param i 
+	 */
+	public void populateCacheTree(Map<String, SummaryStatistics[]> allSummaries, int spatialResolution, int temporalResolution) {
+		
+		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
+		
+		
+		for(String key: allSummaries.keySet()) {
+			
+			stCache.addCell(allSummaries.get(key), key, cacheResolution);
+			
+		}
+		
+		
+	}
+
+	public SpatiotemporalHierarchicalCache getStCache() {
+		return stCache;
+	}
+
+	public void setStCache(SpatiotemporalHierarchicalCache stCache) {
+		this.stCache = stCache;
 	}
 
 	

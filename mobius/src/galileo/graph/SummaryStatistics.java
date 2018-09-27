@@ -29,6 +29,10 @@ public class SummaryStatistics {
 	public void increaseCount() {
 		this.count++;
 	}
+	
+	public void increaseCount(int cnt) {
+		this.count+= cnt;
+	}
 	public float getMax() {
 		return max;
 	}
@@ -64,5 +68,55 @@ public class SummaryStatistics {
 	public void setResolved(boolean resolved) {
 		this.resolved = resolved;
 	}
+
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param oldStats
+	 * @param statsUpdate
+	 * @return
+	 */
+	public static SummaryStatistics[] mergeSummaries(SummaryStatistics[] oldStats, SummaryStatistics[] statsUpdate) {
+		
+		SummaryStatistics[] newStats = new SummaryStatistics[oldStats.length];
+		for(int i=0; i< oldStats.length; i++) {
+			
+			SummaryStatistics old = oldStats[i];
+			SummaryStatistics upd = statsUpdate[i];
+			
+			SummaryStatistics newstat = mergeSummary(old, upd);
+			newStats[i] = newstat;
+		}
+		return newStats;
+	}
+	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param old
+	 * @param upd
+	 * @return
+	 */
+	public static SummaryStatistics mergeSummary(SummaryStatistics old, SummaryStatistics upd) {
+		
+		if(old.getMax() < upd.getMax()) {
+			old.setMax(upd.getMax());
+		}
+		if(old.getMin() < upd.getMin()) {
+			old.setMin(upd.getMin());
+		}
+		old.addToTmpSum(upd.getTmpSum());
+		old.increaseCount(upd.getCount());
+		
+		return old;
+		
+	}
+	
+	
+	
+	
+	
+	
+	
 
 }

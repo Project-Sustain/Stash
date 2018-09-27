@@ -11,7 +11,7 @@ public class CacheCell {
 	private int spatialResolution;
 	private int temporalResolution;
 	
-	private SummaryStatistics stats;
+	private SummaryStatistics[] stats;
 	
 	private String spatialParent;
 	private String temporalParent;
@@ -40,7 +40,7 @@ public class CacheCell {
 	 * @param temporalResolution
 	 */
 	
-	public CacheCell(SummaryStatistics stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
+	public CacheCell(SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
 			int spatialResolution, int temporalResolution) {
 		
 		this.stats = stats;
@@ -123,11 +123,11 @@ public class CacheCell {
 		this.temporalResolution = temporalResolution;
 	}
 
-	public SummaryStatistics getStats() {
+	public SummaryStatistics[] getStats() {
 		return stats;
 	}
 
-	public void setStats(SummaryStatistics stats) {
+	public void setStats(SummaryStatistics[] stats) {
 		this.stats = stats;
 	}
 
