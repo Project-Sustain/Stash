@@ -34,13 +34,16 @@ private static final Logger logger = Logger.getLogger("galileo");
 	private int spatialResolution;
 	private int temporalResolution;
 	private List<Integer> summaryPosns;
+	private boolean needMoreGrouping;
+	private String blocksKey;
 	
 	// BLOCK KEY WITH A LIST OF SUMMARIES - ONE FOR EACH REQUESTED FEATURES
 	private Map<String,SummaryStatistics[]> resultSummaries;
 	
 	
 	public VisualizationQueryProcessor(GeospatialFileSystem fs1, List<String> blocks, GeoavailabilityQuery gQuery,
-			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns) {
+			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, 
+			boolean needMoreGrouping, String blockKey) {
 		
 		this.fs1 = fs1;
 		this.geoQuery = gQuery;
@@ -50,6 +53,8 @@ private static final Logger logger = Logger.getLogger("galileo");
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
 		this.summaryPosns = summaryPosns;
+		this.needMoreGrouping = needMoreGrouping;
+		this.blocksKey = blockKey;
 		
 	}
 
@@ -60,7 +65,7 @@ private static final Logger logger = Logger.getLogger("galileo");
 			
 			/* This thread is created one for each path */
 			this.resultSummaries = this.fs1.queryLocalSummary(this.blocks, this.geoQuery, this.grid, this.queryBitmap,
-					spatialResolution, temporalResolution, summaryPosns);
+					spatialResolution, temporalResolution, summaryPosns, needMoreGrouping, blocksKey);
 			
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block

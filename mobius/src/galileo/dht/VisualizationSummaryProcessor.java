@@ -50,9 +50,10 @@ public class VisualizationSummaryProcessor implements Runnable{
 	private List<Integer> summaryPosns;
 	private int spatialResolution;
 	private int temporalResolution;
+	private boolean needMoreGrouping;
+	private String blocksKey;
 	
 	private Map<String, SummaryStatistics[]> localSummary;
-	
 	
 	/**
 	 * 
@@ -63,9 +64,11 @@ public class VisualizationSummaryProcessor implements Runnable{
 	 * @param queryBitmap
 	 * @param temporalResolution 
 	 * @param spatialResolution 
+	 * @param blocksKey 
+	 * @param needMoreGrouping 
 	 */
 	public VisualizationSummaryProcessor(GeospatialFileSystem gfs, List<String[]> featurePaths, Query query, GeoavailabilityGrid grid, 
-			Bitmap queryBitmap, List<Integer> summaryPosns, int spatialResolution, int temporalResolution) {
+			Bitmap queryBitmap, List<Integer> summaryPosns, int spatialResolution, int temporalResolution, boolean needMoreGrouping, String blocksKey) {
 		
 		this.featurePaths = featurePaths;
 		this.query = query;
@@ -78,6 +81,9 @@ public class VisualizationSummaryProcessor implements Runnable{
 		
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
+		
+		this.needMoreGrouping = needMoreGrouping;
+		this.blocksKey = blocksKey;
 	}
 	
 	/**
@@ -175,44 +181,13 @@ public class VisualizationSummaryProcessor implements Runnable{
 				// EACH OF THE EVALUATED PATHS ARE TO BE USED TO SUMMARISE
 				// CREATE KEY FROM THE SPATIOTEMPORAL FEATURES
 				// CREATE A MAP OF KEY TO SUMMARY[]
-				
-				for (Path<Feature, String> path : evaluatedPaths) {
+				if(evaluatedPaths.size() > 0) {
 					
-					String[] featureValues = new String[summaryPosns.size()];
-					int indx = 0;
-					
-					float sp1 = 0;
-					float sp2 = 0;
-					float tmp = 0;
-					
-					for (Feature feature : path.getLabels()) {
-						
-						if(latOrder == indx) {
-							sp1 = feature.getFloat();
-						}
-						
-						if(lngOrder == indx) {
-							sp2 = feature.getFloat();
-						}
-						
-						if(temporalOrder == indx) {
-							tmp = feature.getFloat();
-						}
-						
-						if(summaryPosns.contains(indx)) {
-							int ind = summaryPosns.indexOf(indx);
-							featureValues[ind] = feature.getString();
-							
-						}
-						indx++;
+					if(!needMoreGrouping) {
+						getSummariesNoGroupingNeeded(evaluatedPaths);
+					} else {
+						getSummariesGroupingNeeded(evaluatedPaths, latOrder, lngOrder, temporalOrder);
 					}
-					
-					// evaluate key using the resolutions
-					String summaryKey = GeoHash.getSummaryKey(sp1, sp2, tmp, spatialResolution, temporalResolution);
-					
-					
-					
-					this.featurePaths.add(featureValues);
 				}
 				
 			}
@@ -223,8 +198,160 @@ public class VisualizationSummaryProcessor implements Runnable{
 		}
 	
 		
+	}
+	
+	private void getSummariesGroupingNeeded(List<Path<Feature, String>> evaluatedPaths, int latOrder, int lngOrder, int temporalOrder) {
+		
+		for (Path<Feature, String> path : evaluatedPaths) {
+			
+			float[] featureValues = new float[summaryPosns.size()];
+			int indx = 0;
+			
+			float sp1 = 0;
+			float sp2 = 0;
+			float tmp = 0;
+			
+			for (Feature feature : path.getLabels()) {
+				
+				if(latOrder == indx) {
+					sp1 = feature.getFloat();
+				}
+				
+				if(lngOrder == indx) {
+					sp2 = feature.getFloat();
+				}
+				
+				if(temporalOrder == indx) {
+					tmp = feature.getFloat();
+				}
+				
+				if(summaryPosns.contains(indx)) {
+					int ind = summaryPosns.indexOf(indx);
+					featureValues[ind] = feature.getFloat();
+					
+				}
+				
+				indx++;
+			}
+			
+			// evaluate key using the resolutions
+			String summaryKey = GeoHash.getSummaryKey(sp1, sp2, tmp, spatialResolution, temporalResolution);
+			
+			SummaryStatistics[] summaries = localSummary.get(summaryKey);
+			boolean firstInsertion = false;
+			
+			if(summaries == null) {
+				firstInsertion = true;
+				summaries = new SummaryStatistics[summaryPosns.size()];
+				localSummary.put(summaryKey, summaries);
+			}
+			
+			for(int i=0; i < summaryPosns.size(); i++) {
+				
+				if(firstInsertion) {
+					SummaryStatistics ss = new SummaryStatistics();
+					summaries[i] = ss;
+					
+					ss.setMax(featureValues[i]);
+					ss.setMin(featureValues[i]);
+					ss.setCount(1);
+					ss.setTmpSum(featureValues[i]);
+					
+					continue;
+				} else {
+					SummaryStatistics ss = summaries[i];
+					if(ss.getMax() < featureValues[i]) {
+						ss.setMax(featureValues[i]);
+					}
+					if(ss.getMin() > featureValues[i]) {
+						ss.setMin(featureValues[i]);
+					}
+					ss.addToTmpSum(featureValues[i]);
+					ss.increaseCount();
+				}
+				
+				
+			}
+			
+			
+		}
 		
 	}
+
+	public void getSummariesNoGroupingNeeded(List<Path<Feature, String>> evaluatedPaths) {
+		
+		// EACH OF THE EVALUATED PATHS ARE TO BE USED TO SUMMARISE
+		// CREATE KEY FROM THE SPATIOTEMPORAL FEATURES
+		// CREATE A MAP OF KEY TO SUMMARY[]
+		
+		SummaryStatistics[] summaries = new SummaryStatistics[summaryPosns.size()];
+		
+		int numFeatures = summaryPosns.size();
+		
+		float[] maxs = new float[numFeatures];
+		float[] mins = new float[numFeatures];
+		float[] sums = new float[numFeatures];
+		int counts = 0;
+		
+		for (Path<Feature, String> path : evaluatedPaths) {
+			
+			float[] featureValues = new float[numFeatures];
+			
+			int indx = 0;
+			
+			for (Feature feature : path.getLabels()) {
+				
+				if(summaryPosns.contains(indx)) {
+					// indx is the position within the featureslist that a current feature lies
+					// id is the position of that feature in the summary list
+					int id = summaryPosns.indexOf(indx);
+					featureValues[id] = feature.getFloat();
+					
+					
+				}
+				indx++;
+			}
+			
+			for(int i=0; i < numFeatures; i++) {
+				
+				if(counts == 0) {
+					maxs[i] = featureValues[i];
+					mins[i] = featureValues[i];
+					sums[i] += featureValues[i];
+					counts++;
+					continue;
+				}
+				if(maxs[i] < featureValues[i]) {
+					maxs[i] = featureValues[i];
+				}
+				if(mins[i] > featureValues[i]) {
+					mins[i] = featureValues[i];
+				}
+				sums[i] += featureValues[i];
+				counts++;
+				
+			}
+			
+		}
+		
+		for(int i = 0; i < numFeatures; i++) {
+			
+			SummaryStatistics ss = new SummaryStatistics();
+			summaries[i] = ss;
+			
+			ss.setMax(maxs[i]);
+			ss.setMin(mins[i]);
+			ss.setCount(counts);
+			ss.setTmpSum(sums[i]);
+			
+			
+		}
+		
+		localSummary.put(blocksKey, summaries);
+	}
+	
+	
+	
 
 	public List<String[]> getFeaturePaths() {
 		return featurePaths;
@@ -266,11 +393,11 @@ public class VisualizationSummaryProcessor implements Runnable{
 		this.gfs = gfs;
 	}
 
-	public int[] getSummaryPosns() {
+	public List<Integer> getSummaryPosns() {
 		return summaryPosns;
 	}
 
-	public void setSummaryPosns(int[] summaryPosns) {
+	public void setSummaryPosns(List<Integer> summaryPosns) {
 		this.summaryPosns = summaryPosns;
 	}
 

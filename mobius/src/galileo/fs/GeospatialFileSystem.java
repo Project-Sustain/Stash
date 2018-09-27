@@ -1076,6 +1076,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// Paths look like Path((root,f1,f2,f3,...),payload). Each path represents each DFS traversal of a tree
 		
+		// If the requested resolution is less than or equal to the file system's 
+		// resolution, the summary key will not need to be checked against each record for a block. 
+		// Rather the block key can be used.
 		TemporalType temporalType = getTemporalType();
 		int fsSpatialResolution = getGeohashPrecision();
 		int fsTemporalResolution = temporalType.getType();
@@ -1085,15 +1088,16 @@ public class GeospatialFileSystem extends FileSystem {
 		else if(temporalType == TemporalType.HOUR_OF_DAY)
 			fsTemporalResolution = 4;
 		
+		// CHECKING IF REQUEST RESOLUTION IS LOWER THAN THE FS RESOLUTION
+		// spR and tmR are the resolutions at which blocks will be grouped
+		// if the filesystems's resolution are higher, then grouping will be at the request's resolution
 		int spR = fsSpatialResolution;
 		int tmR = fsTemporalResolution;
 		
-		if(fsSpatialResolution > reqSpatialResolution && fsTemporalResolution > reqTemporalResolution) {
+		if(fsSpatialResolution >= reqSpatialResolution && fsTemporalResolution >= reqTemporalResolution) {
 			spR = reqSpatialResolution;
 			tmR = reqTemporalResolution;
-					
 		}
-		
 		
 		for (Path<Feature, String> path : paths) {
 			String groupKey = getCellKey(path, space, spR, tmR);
@@ -1104,6 +1108,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			blocks.addAll(path.getPayload());
 		}
+		
 		return blockMap;
 	}
 	
@@ -2009,7 +2014,6 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	/**
 	 * HANDLES VISUALIZATION OF EACH BLOCK KEY. THIS BLOCK KEY IS AT THE FILESYSTEM'S SPATIOTEMPORAL PRECISION 
-	 * 
 	 * @author sapmitra
 	 * @param blocks
 	 * @param geoQuery
@@ -2018,13 +2022,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 * @param summaryPosns
+	 * @param needMoreGrouping all records will be under the single blocksKey if this is false
+	 * @param blocksKey
 	 * @return
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	
 	public Map<String,SummaryStatistics[]> queryLocalSummary(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
-			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns) 
+			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
 			throws IOException, InterruptedException {
 		
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
@@ -2077,7 +2082,7 @@ public class GeospatialFileSystem extends FileSystem {
 				if(subset != null) {
 					
 					VisualizationSummaryProcessor pqp = new VisualizationSummaryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap, summaryPosns,
-							spatialResolution, temporalResolution);
+							spatialResolution, temporalResolution, needMoreGrouping, blocksKey);
 					
 					queryProcessors.add(pqp);
 					executor.execute(pqp);

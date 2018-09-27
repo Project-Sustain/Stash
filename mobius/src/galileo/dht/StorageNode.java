@@ -806,14 +806,6 @@ public class StorageNode implements RequestListener {
 			if (fs != null) {
 				header = fs.getFeaturesRepresentation();
 				
-				/* Feature Query is not needed to list blocks */
-				// KEY Format : year-month-day-hour$$geohash
-				
-				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
-						event.getSpatialResolution(), event.getTemporalResolution());
-				
-				JSONArray filePaths = new JSONArray();
-				
 				TemporalType temporalType = fs.getTemporalType();
 				
 				int fsSpatialResolution = fs.getGeohashPrecision();
@@ -824,6 +816,23 @@ public class StorageNode implements RequestListener {
 				else if(temporalType == TemporalType.HOUR_OF_DAY)
 					fsTemporalResolution = 4;
 				
+				boolean needMoreGrouping = true;
+				
+				// In this case, we do not need to get summarykey for each of the records
+				// as they are processed from a block. 
+				// The summarykey in this case will be generated from the block key instead
+				// THE SUMMARYKEY IN THIS CASE WILL NEED TO BE GENERATED ONCE PER PATH AND NOT FOR EACH RECORD
+				if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
+					needMoreGrouping = false;
+				}
+				
+				/* Feature Query is not needed to list blocks */
+				// KEY Format : year-month-day-hour$$geohash
+				
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+						event.getSpatialResolution(), event.getTemporalResolution());
+				
+				JSONArray filePaths = new JSONArray();
 				
 				if (blockMap.keySet().size() > 0) {
 					
@@ -853,7 +862,7 @@ public class StorageNode implements RequestListener {
 							
 							// 
 							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
-									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns());
+									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), needMoreGrouping, blockKey);
 							
 							queryProcessors.add(qp);
 							executor.execute(qp);
