@@ -112,6 +112,12 @@ public class SummaryStatistics {
 		
 	}
 	
+	@Override
+	public String toString() {
+		String retStr = "{"+min+","+max+","+avg+","+count+"}";
+		return retStr;
+	}
+	
 	
 	
 	

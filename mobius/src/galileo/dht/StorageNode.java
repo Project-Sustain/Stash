@@ -796,19 +796,16 @@ public class StorageNode implements RequestListener {
 		long totalProcessingTime = 0;
 		long blocksProcessed = 0;
 		int totalNumPaths = 0;
-		
+		JSONObject resultJSON = new JSONObject();
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
 		
-		JSONArray header = new JSONArray();
-		JSONObject blocksJSON = new JSONObject();
-		JSONArray resultsJSON = new JSONArray();
+		
 		long processingTime = System.currentTimeMillis();
 		try {
 			logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
 			GeospatialFileSystem fs = fsMap.get(fsName);
 			if (fs != null) {
-				header = fs.getFeaturesRepresentation();
 				
 				TemporalType temporalType = fs.getTemporalType();
 				
@@ -903,16 +900,36 @@ public class StorageNode implements RequestListener {
 				// POPULATE THE CACHE TREE
 				fs.populateCacheTree(allSummaries,event.getSpatialResolution(), event.getTemporalResolution());
 				
+				JSONArray summaryJSONs = new JSONArray();
+				
+				for(String key: allSummaries.keySet()) {
+					
+					JSONObject obj = new JSONObject();
+					obj.put("key", key);
+					String summaryString = "";
+					
+					JSONArray summarystats = new JSONArray();
+					
+					int i=0;
+					
+					for(SummaryStatistics ss : allSummaries.get(key)) {
+						if(i==0)
+							summaryString = ss.toString();
+						else 
+							summaryString += ","+ss.toString();
+					}
+					
+					obj.put("summary", summaryString);
+					
+					summaryJSONs.put(obj);
+				}
+				
 				totalProcessingTime = System.currentTimeMillis() - processingTime;
 				totalNumPaths = filePaths.length();
-				JSONObject resultJSON = new JSONObject();
-				resultJSON.put("filePath", filePaths);
-				resultJSON.put("numPaths", totalNumPaths);
-				resultJSON.put("fileSize", hostFileSize);
+				
 				resultJSON.put("hostName", this.canonicalHostname);
 				resultJSON.put("hostPort", this.port);
-				resultJSON.put("processingTime", totalProcessingTime);
-				resultsJSON.put(resultJSON);
+				resultJSON.put("summaries", summaryJSONs);
 			} else {
 				logger.log(Level.SEVERE, "Requested file system(" + fsName
 						+ ") not found. Ignoring the query and returning empty results.");
@@ -925,22 +942,11 @@ public class StorageNode implements RequestListener {
 
 		JSONObject responseJSON = new JSONObject();
 		responseJSON.put("filesystem", event.getFilesystemName());
-		responseJSON.put("queryId", event.getQueryId());
-		if (hostFileSize == 0) {
-			responseJSON.put("result", new JSONArray());
-			responseJSON.put("hostFileSize", new JSONObject());
-			responseJSON.put("totalFileSize", 0);
-			responseJSON.put("totalNumPaths", 0);
-			responseJSON.put("hostProcessingTime", new JSONObject());
-		} else {
-			responseJSON.put("result", resultsJSON);
-			responseJSON.put("hostFileSize", new JSONObject().put(this.canonicalHostname, hostFileSize));
-			responseJSON.put("totalFileSize", hostFileSize);
-			responseJSON.put("totalNumPaths", totalNumPaths);
-			responseJSON.put("hostProcessingTime", new JSONObject().put(this.canonicalHostname, totalProcessingTime));
-		}
+		
+		responseJSON.put("result", resultJSON);
 		responseJSON.put("totalProcessingTime", totalProcessingTime);
-		responseJSON.put("totalBlocksProcessed", blocksProcessed);
+		
+		
 		QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
 		try {
 			context.sendReply(response);

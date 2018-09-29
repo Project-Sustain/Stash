@@ -203,5 +203,9 @@ public class CacheCell {
 		this.temporalNeighbors = temporalNeighbors;
 	}
 	
+	public void incrementFreshness(float val) {
+		this.freshCount += val;
+	}
+	
 
 }
