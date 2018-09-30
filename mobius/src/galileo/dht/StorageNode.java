@@ -797,8 +797,8 @@ public class StorageNode implements RequestListener {
 		long blocksProcessed = 0;
 		int totalNumPaths = 0;
 		JSONObject resultJSON = new JSONObject();
-		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
-		
+		Map<String,SummaryStatistics[]> extractedSummaries = new HashMap<String,SummaryStatistics[]>();
+		Map<String,SummaryStatistics[]> savedSummaries = new HashMap<String,SummaryStatistics[]>();
 		
 		long processingTime = System.currentTimeMillis();
 		try {
@@ -827,11 +827,16 @@ public class StorageNode implements RequestListener {
 					needMoreGrouping = false;
 				}
 				
+				
+				List<String> blocksToReject = fs.listMatchingCells(event.getTime(), event.getPolygon(), event.getSpatialResolution(), 
+						event.getTemporalResolution(), savedSummaries);
 				/* Feature Query is not needed to list blocks */
 				// KEY Format : year-month-day-hour$$geohash
 				
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 						event.getSpatialResolution(), event.getTemporalResolution());
+				
+				
 				
 				JSONArray filePaths = new JSONArray();
 				
@@ -881,14 +886,14 @@ public class StorageNode implements RequestListener {
 								
 								for(String key: localSummary.keySet()) {
 									
-									if(!allSummaries.containsKey(key)) {
-										allSummaries.put(key, localSummary.get(key));
+									if(!extractedSummaries.containsKey(key)) {
+										extractedSummaries.put(key, localSummary.get(key));
 									} else {
-										SummaryStatistics[] oldStats = allSummaries.get(key);
+										SummaryStatistics[] oldStats = extractedSummaries.get(key);
 										SummaryStatistics[] statsUpdate = localSummary.get(key);
 										
 										SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
-										allSummaries.put(key, mergedSummaries);
+										extractedSummaries.put(key, mergedSummaries);
 									}
 									
 								}
@@ -898,11 +903,11 @@ public class StorageNode implements RequestListener {
 				}
 				
 				// POPULATE THE CACHE TREE
-				fs.populateCacheTree(allSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+				fs.populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
 				
 				JSONArray summaryJSONs = new JSONArray();
 				
-				for(String key: allSummaries.keySet()) {
+				for(String key: extractedSummaries.keySet()) {
 					
 					JSONObject obj = new JSONObject();
 					obj.put("key", key);
@@ -912,7 +917,7 @@ public class StorageNode implements RequestListener {
 					
 					int i=0;
 					
-					for(SummaryStatistics ss : allSummaries.get(key)) {
+					for(SummaryStatistics ss : extractedSummaries.get(key)) {
 						if(i==0)
 							summaryString = ss.toString();
 						else 

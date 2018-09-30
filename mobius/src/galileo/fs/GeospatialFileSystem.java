@@ -960,6 +960,8 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	/**
+	 * LOOK AT THE MATCHING BLOCK LISTS AND ELIMINATE THE ONES THAT ALREADY HAVE ENTRIES IN THE CACHE
+	 * 
 	 * LOOKS AT THE CACHE AND RETURNS THE MATCHING CELLS I.E. BLOCKS ALREADY CACHED
 	 * ALSO RETURNS THE MATCHING SUMMARIES
 	 * 
@@ -971,12 +973,15 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws InterruptedException
 	 */
-	public Map<String, List<String>> listMatchingCells(String temporalProperties, List<Coordinates> spatialProperties, 
-			int reqSpatialResolution, int reqTemporalResolution) throws InterruptedException {
+	public List<String> listMatchingCells(String temporalProperties, List<Coordinates> spatialProperties, 
+			int reqSpatialResolution, int reqTemporalResolution, Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
 		
 		String space = null;
 		List<Path<Feature, String>> paths = null;
 		List<String> blocks = new ArrayList<String>();
+		
+		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		
 		/* temporal and spatial properties from the query event */
 		if (temporalProperties != null && spatialProperties != null) {
 			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
