@@ -828,15 +828,14 @@ public class StorageNode implements RequestListener {
 				}
 				
 				
-				List<String> blocksToReject = fs.listMatchingCells(event.getTime(), event.getPolygon(), event.getSpatialResolution(), 
-						event.getTemporalResolution(), savedSummaries);
+				
 				/* Feature Query is not needed to list blocks */
 				// KEY Format : year-month-day-hour$$geohash
 				
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 						event.getSpatialResolution(), event.getTemporalResolution());
 				
-				
+				List<String> blocksToReject = fs.listMatchingCells(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
 				
 				JSONArray filePaths = new JSONArray();
 				
@@ -903,6 +902,7 @@ public class StorageNode implements RequestListener {
 				}
 				
 				// POPULATE THE CACHE TREE
+				// ALSO POPULATE FILE BITMAPS
 				fs.populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
 				
 				JSONArray summaryJSONs = new JSONArray();

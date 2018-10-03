@@ -2794,9 +2794,9 @@ public class GeoHash {
 		//int[] spatialChildren = getSpatialChildren("u9", 4);
 		//daysBetweenDates(1990, 7, 7);
 		
-		System.out.println(getSummaryKey(40.58f, -105.08f, 1537990007000f, 7, 4));
+		//System.out.println(getSummaryKey(40.58f, -105.08f, 1537990007000f, 7, 4));
 		
-		
+		System.out.println(GeoHash.hashToLong("00p0"));
 	}
 	
 	

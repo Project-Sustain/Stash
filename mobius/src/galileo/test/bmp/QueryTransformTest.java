@@ -26,7 +26,7 @@ public class QueryTransformTest {
 		GeoavailabilityGrid grid = new GeoavailabilityGrid("9xjq8", 20);
 		Random rand = new Random();
 		int skipped = 0;
-		for(int i = 0; i < 100000; i++)
+		for(int i = 0; i < 10; i++)
 			if(!grid.addPoint(rand.nextInt(1024), rand.nextInt(1024)))
 				skipped++;
 		System.out.println("skipped=" + skipped);
@@ -34,9 +34,9 @@ public class QueryTransformTest {
 		b = BitmapVisualization.drawBitmap(
 				QueryTransform.queryToGridBitmap(query, grid),
 		        grid.getWidth(), grid.getHeight(), Color.RED);
-		BitmapVisualization.imageToFile(b, "GridBitmap.png");
+		BitmapVisualization.imageToFile(b, "/s/chopin/b/grad/sapmitra/GridBitmap.png");
 		b = BitmapVisualization.drawGeoavailabilityGrid(grid, Color.BLUE);
-		BitmapVisualization.imageToFile(b, "GridQuery.png");
+		BitmapVisualization.imageToFile(b, "/s/chopin/b/grad/sapmitra/GridQuery.png");
 	}
 
 }

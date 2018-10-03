@@ -102,7 +102,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 	public void run() {
 		
 		try{
-			
+			// getting the lat, long and time index numbers
 			int latOrder = -1, lngOrder = -1, index = 0, temporalOrder = -1;
 			for (Pair<String, FeatureType> columnPair : gfs.getFeatureList()) {
 				if (columnPair.a.equalsIgnoreCase(gfs.getSpatialHint().getLatitudeHint()))

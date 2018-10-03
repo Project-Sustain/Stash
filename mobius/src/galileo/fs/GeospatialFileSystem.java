@@ -57,6 +57,8 @@ import java.util.logging.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.googlecode.javaewah.EWAHCompressedBitmap;
+
 import galileo.bmp.Bitmap;
 import galileo.bmp.BitmapException;
 import galileo.bmp.GeoavailabilityGrid;
@@ -97,6 +99,7 @@ import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
+import galileo.graph.SubBlockLevelBitmaps;
 import galileo.graph.SummaryStatistics;
 import galileo.query.Expression;
 import galileo.query.Operation;
@@ -165,8 +168,13 @@ public class GeospatialFileSystem extends FileSystem {
 	private int spatialPosn1;
 	private int spatialPosn2;
 	private int spatialPartitioningType;
+	private int spatialSubLevels;
+	private int temporalSubLevels;
 	
 	private SpatiotemporalHierarchicalCache stCache;
+	private Map<String, SubBlockLevelBitmaps> blockBitmaps;
+
+	private boolean needSublevelBitmaps;
 
 	private static final String TEMPORAL_YEAR_FEATURE = "x__year__x";
 	private static final String TEMPORAL_MONTH_FEATURE = "x__month__x";
@@ -265,7 +273,28 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
 		
-
+		this.spatialSubLevels = stCache.getTotalSpatialLevels()-geohashPrecision;
+		
+		int temporalLevel = 1;
+		switch (this.temporalType) {
+		case HOUR_OF_DAY:
+			temporalLevel = 4;
+		case DAY_OF_MONTH:
+			temporalLevel = 3;
+		case MONTH:
+			temporalLevel = 2;
+		case YEAR:
+			temporalLevel = 1;
+		}
+		
+		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
+		
+		this.needSublevelBitmaps = true;
+		if(temporalSubLevels <= 0 && spatialSubLevels <=0) {
+			this.needSublevelBitmaps = false;
+		}
+		
+		
 		createMetadataGraph();
 	}
 
@@ -537,7 +566,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 		}
-
+		
 		// Adding temporal and spatial features at the top
 		// to the existing attributes
 		
@@ -577,7 +606,20 @@ public class GeospatialFileSystem extends FileSystem {
 		} catch (Exception e) {
 			throw new FileSystemException("Error storing block: " + e.getClass().getCanonicalName(), e);
 		}
-
+		
+		
+		if(needSublevelBitmaps) {
+			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
+			if(bitmaps == null) {
+				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels);
+				blockBitmaps.put(name, bitmaps);
+			}
+			readBlockData(block.getData(), bitmaps, geohash, time);
+			
+		}
+		
+		
+		
 		if (latestTime == null || latestTime.getEnd() < meta.getTemporalProperties().getEnd()) {
 			this.latestTime = meta.getTemporalProperties();
 			this.latestSpace = geohash;
@@ -591,6 +633,56 @@ public class GeospatialFileSystem extends FileSystem {
 		this.geohashIndex.add(geohash);
 
 		return blockPath;
+	}
+	
+	
+	private void readBlockData(byte[] data, SubBlockLevelBitmaps bitmaps, String fileGeohash, String fileTime) {
+		// TODO Auto-generated method stub
+		
+		
+		String blockString = new String(data);
+		String[] records = blockString.split("\n");
+		
+		int removeLength = fileGeohash.length();
+		
+		for(String record: records) {
+			String[] fields = record.split(",");
+			long timestamp = reformatDatetime(fields[temporalPosn]);
+			
+			String geoHash = GeoHash.encode(parseFloat(fields[spatialPosn1]),parseFloat(fields[spatialPosn2]), stCache.getTotalSpatialLevels());
+			
+			String choppedGeohash = geoHash.substring(removeLength);
+			
+			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
+			
+			// populating spatial grid
+			//sg.addEntry(parseFloat(fields[spatialPosn2]),parseFloat(fields[spatialPosn1]), (int)recordCount);
+			// Getting spatial border records
+			
+			// calculating temporal border records
+			
+			boolean fringe = false;
+			if(timestamp<=borderingProperties.getDown2() && timestamp >= borderingProperties.getDown1()) {
+				borderingProperties.addDownTimeEntries(recordCount);
+				fringe = true;
+				/*if(!fringe)
+					borderingProperties.addFringeEntries((int)recordCount);*/
+				//logger.info("RIKI: ENTERED DOWN TIME ENTRY");
+			} else if(timestamp<=borderingProperties.getUp1() && timestamp >= borderingProperties.getUp2()) {
+				borderingProperties.addUpTimeEntries(recordCount);
+				fringe = true;
+				/*if(!fringe)
+					borderingProperties.addFringeEntries((int)recordCount);*/
+				//logger.info("RIKI: ENTERED UP TIME ENTRY");
+			}
+			if(fringe) {
+				populateGeoHashBorder(geoHash, borderingProperties, recordCount);
+			}
+			recordCount++;
+		}
+		
+		borderingProperties.updateRecordCount(currentRecordsCount);
+		
 	}
 	
 	public static long reformatDatetime(String date){
@@ -973,14 +1065,16 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws InterruptedException
 	 */
-	public List<String> listMatchingCells(String temporalProperties, List<Coordinates> spatialProperties, 
-			int reqSpatialResolution, int reqTemporalResolution, Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
+	public List<String> listMatchingCells(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+			Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
 		
 		String space = null;
 		List<Path<Feature, String>> paths = null;
 		List<String> blocks = new ArrayList<String>();
 		
 		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
+		
 		
 		/* temporal and spatial properties from the query event */
 		if (temporalProperties != null && spatialProperties != null) {
