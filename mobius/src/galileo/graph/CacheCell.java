@@ -1,5 +1,8 @@
 package galileo.graph;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import galileo.util.GeoHash;
 import galileo.util.SpatialBorder;
 
@@ -207,5 +210,13 @@ public class CacheCell {
 		this.freshCount += val;
 	}
 	
+	
+	public static void main(String arg[]) {
+		Calendar cal = Calendar.getInstance(); // creates calendar
+	    cal.setTime(new Date()); // sets calendar time/date
+	    cal.add(Calendar.HOUR_OF_DAY, 280); // adds one hour
+	    System.out.println(cal.getTime()); 
+		
+	}
 
 }
