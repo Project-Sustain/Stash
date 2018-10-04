@@ -7,7 +7,7 @@ public class SpatiotemporalHierarchicalCache {
 	
 	// spatial level 1 means geohash of length 1
 	// temporal levels are year, month, day, hr
-	public static int totalSpatialLevels = 7;
+	public static int totalSpatialLevels = 6;
 	public static int totalTemporalLevels = 4;
 	
 	public SpatiotemporalHierarchicalCache(int totalSpatialLevels, int totalTemporalLevels) {

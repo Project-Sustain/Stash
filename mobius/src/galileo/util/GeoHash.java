@@ -73,6 +73,7 @@ public class GeoHash {
 	public final static int MAX_PRECISION = 30; // 6 character precision = 30 (~
 												// 1.2km x 0.61km)
 
+	private static final String BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 	/**
 	 * This character array maps integer values (array indices) to their GeoHash
 	 * base32 alphabet equivalents.
@@ -472,6 +473,30 @@ public class GeoHash {
 
 		return longForm;
 	}
+	
+	public static String fromLongToString(long hash) {
+		String retStr = "";
+		String binaryString = Long.toBinaryString(hash);
+		
+		if(binaryString.length()%5 != 0) {
+			int ln = binaryString.length()%5;
+			
+			for(int i=0; i < 5-ln; i++) {
+				binaryString = "0"+binaryString;
+			}
+		}
+		
+		for(int i=0; i < binaryString.length(); i=i+5) {
+			String sb = binaryString.substring(i,i+5);
+			int foo = Integer.parseInt(sb, 2);
+			
+			retStr += BASE32.charAt(foo);
+			//System.out.println(BASE32.charAt(foo));
+		}
+        
+        return retStr;
+    }
+	
 
 	/**
 	 * Decode a GeoHash to an approximate bounding box that contains the

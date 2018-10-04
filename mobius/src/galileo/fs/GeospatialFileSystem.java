@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.joda.time.DateTime;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -611,7 +612,7 @@ public class GeospatialFileSystem extends FileSystem {
 		if(needSublevelBitmaps) {
 			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
 			if(bitmaps == null) {
-				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels);
+				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
 				blockBitmaps.put(name, bitmaps);
 			}
 			readBlockData(block.getData(), bitmaps, geohash, time);
@@ -636,9 +637,23 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	
+	/**
+	 * Populating a block's bitmaps based on records in it
+	 * @author sapmitra
+	 * @param data
+	 * @param bitmaps
+	 * @param fileGeohash
+	 * @param fileTime
+	 */
 	private void readBlockData(byte[] data, SubBlockLevelBitmaps bitmaps, String fileGeohash, String fileTime) {
 		// TODO Auto-generated method stub
 		
+		String[] timeTokens = fileTime.split("-");
+		
+		// The starting timestamp of the block at the given resolution
+		long startTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], temporalType);
+		
+		DateTime startDate = new DateTime(startTimeStamp);
 		
 		String blockString = new String(data);
 		String[] records = blockString.split("\n");
@@ -646,39 +661,29 @@ public class GeospatialFileSystem extends FileSystem {
 		int removeLength = fileGeohash.length();
 		
 		for(String record: records) {
-			String[] fields = record.split(",");
-			long timestamp = reformatDatetime(fields[temporalPosn]);
 			
+			String[] fields = record.split(",");
+			
+			
+			// Highest resolution geohash allowed by visualization application
 			String geoHash = GeoHash.encode(parseFloat(fields[spatialPosn1]),parseFloat(fields[spatialPosn2]), stCache.getTotalSpatialLevels());
+			
+			long timestamp = reformatDatetime(fields[temporalPosn]);
 			
 			String choppedGeohash = geoHash.substring(removeLength);
 			
+			bitmaps.populateBitmapUsingRecord(startDate, timestamp, choppedGeohash);
+			
 			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
 			
-			// populating spatial grid
-			//sg.addEntry(parseFloat(fields[spatialPosn2]),parseFloat(fields[spatialPosn1]), (int)recordCount);
-			// Getting spatial border records
+			// The fs temporal Level
+			int temporalLevel = TemporalType.getLevel(temporalType);
 			
-			// calculating temporal border records
+			long temporalIndex = TemporalType.getTemporalIndex(startDate, timestamp, temporalLevel);
 			
-			boolean fringe = false;
-			if(timestamp<=borderingProperties.getDown2() && timestamp >= borderingProperties.getDown1()) {
-				borderingProperties.addDownTimeEntries(recordCount);
-				fringe = true;
-				/*if(!fringe)
-					borderingProperties.addFringeEntries((int)recordCount);*/
-				//logger.info("RIKI: ENTERED DOWN TIME ENTRY");
-			} else if(timestamp<=borderingProperties.getUp1() && timestamp >= borderingProperties.getUp2()) {
-				borderingProperties.addUpTimeEntries(recordCount);
-				fringe = true;
-				/*if(!fringe)
-					borderingProperties.addFringeEntries((int)recordCount);*/
-				//logger.info("RIKI: ENTERED UP TIME ENTRY");
-			}
-			if(fringe) {
-				populateGeoHashBorder(geoHash, borderingProperties, recordCount);
-			}
-			recordCount++;
+			int bitMapIndex = temporalIndex*
+			
+			
 		}
 		
 		borderingProperties.updateRecordCount(currentRecordsCount);
