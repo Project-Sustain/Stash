@@ -9,6 +9,7 @@ import galileo.util.GeoHash;
 public class SubBlockLevelBitmaps {
 	
 	// Actual Number of sub-levels. 
+	
 	private int spatialFSLevel;
 	private int temporalFSLevel;
 	
@@ -118,6 +119,9 @@ public class SubBlockLevelBitmaps {
 		int temporalIndex = bitmapIndex/spatialSize;
 		
 		//GeoHash.hashToLong(hash);
+		GeoHash.fromLongToString(spatialIndex, sresolution);
+		
+		
 		
 		return null;
 	}
@@ -129,9 +133,8 @@ public class SubBlockLevelBitmaps {
 		//long hashToLong = GeoHash.hashToLong("0");
 		//System.out.println("0 "+hashToLong+GeoHash.fromLongToString(hashToLong));
 		
-		
-		long hashToLong = GeoHash.hashToLong("cx");
-		System.out.println("cx "+hashToLong+" "+GeoHash.fromLongToString(hashToLong));
+		long hashToLong = GeoHash.hashToLong("cx0");
+		System.out.println("cx "+hashToLong+" "+GeoHash.fromLongToString(hashToLong,3));
 		
 		
 		//hashToLong = GeoHash.hashToLong("f");

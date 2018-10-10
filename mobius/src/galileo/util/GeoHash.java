@@ -474,14 +474,14 @@ public class GeoHash {
 		return longForm;
 	}
 	
-	public static String fromLongToString(long hash) {
+	public static String fromLongToString(long hash, int precision) {
 		String retStr = "";
 		String binaryString = Long.toBinaryString(hash);
 		
-		if(binaryString.length()%5 != 0) {
-			int ln = binaryString.length()%5;
+		if(binaryString.length() < precision*BITS_PER_CHAR) {
+			int ln = precision*BITS_PER_CHAR - binaryString.length();
 			
-			for(int i=0; i < 5-ln; i++) {
+			for(int i=0; i < ln; i++) {
 				binaryString = "0"+binaryString;
 			}
 		}
