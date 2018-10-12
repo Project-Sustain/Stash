@@ -73,6 +73,34 @@ public enum TemporalType {
 		
 	}
 	
+	/**
+	 * Adds a certain amount of units to a given timestamp and returns the resulting timestamp
+	 * @author sapmitra
+	 * @param startTimestamp
+	 * @param amount
+	 * @param unit
+	 * @return
+	 */
+	public static long addTime(long startTimestamp, int amount, int unit) {
+		
+		Calendar c = Calendar.getInstance();
+		c.setTimeZone(TemporalHash.TIMEZONE);
+		c.setTimeInMillis(startTimestamp);
+		
+		if(unit == 1)
+			c.add(Calendar.YEAR, amount);
+		else if (unit ==2)
+			c.add(Calendar.MONTH, amount);
+		else if (unit ==3)
+			c.add(Calendar.DAY_OF_MONTH, amount);
+		else if (unit ==4)
+			c.add(Calendar.HOUR, amount);
+		
+		return c.getTimeInMillis();
+		
+		
+	}
+	
 	
 	public static void main(String arg[]) {
 		

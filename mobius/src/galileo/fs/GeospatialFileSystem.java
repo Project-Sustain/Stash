@@ -608,14 +608,20 @@ public class GeospatialFileSystem extends FileSystem {
 			throw new FileSystemException("Error storing block: " + e.getClass().getCanonicalName(), e);
 		}
 		
-		
+		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN S BLOCK
 		if(needSublevelBitmaps) {
+			
 			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
 			if(bitmaps == null) {
 				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
 				blockBitmaps.put(name, bitmaps);
 			}
-			readBlockData(block.getData(), bitmaps, geohash, time);
+			
+			try {
+				readBlockData(block.getData(), bitmaps, geohash, time);
+			} catch (Exception e) {
+				throw new FileSystemException("Error populating sub-block bitmaps: " + e);
+			}
 			
 		}
 		
@@ -644,8 +650,9 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param bitmaps
 	 * @param fileGeohash
 	 * @param fileTime
+	 * @throws ParseException 
 	 */
-	private void readBlockData(byte[] data, SubBlockLevelBitmaps bitmaps, String fileGeohash, String fileTime) {
+	private void readBlockData(byte[] data, SubBlockLevelBitmaps bitmaps, String fileGeohash, String fileTime) throws ParseException {
 		// TODO Auto-generated method stub
 		
 		String[] timeTokens = fileTime.split("-");
@@ -660,7 +667,10 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		int removeLength = fileGeohash.length();
 		
-		for(String record: records) {
+		// Creates a temporary bitmap using the records and then old to the old bitmap
+		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
+		
+		/*for(String record: records) {
 			
 			String[] fields = record.split(",");
 			
@@ -674,19 +684,8 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			bitmaps.populateBitmapUsingRecord(startDate, timestamp, choppedGeohash);
 			
-			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
 			
-			// The fs temporal Level
-			int temporalLevel = TemporalType.getLevel(temporalType);
-			
-			long temporalIndex = TemporalType.getTemporalIndex(startDate, timestamp, temporalLevel);
-			
-			int bitMapIndex = temporalIndex*
-			
-			
-		}
-		
-		borderingProperties.updateRecordCount(currentRecordsCount);
+		}*/
 		
 	}
 	
@@ -699,7 +698,7 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 
 	
-	private static float parseFloat(String input){
+	public static float parseFloat(String input){
 		try {
 			return Float.parseFloat(input);
 		} catch(Exception e){
