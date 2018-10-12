@@ -186,14 +186,15 @@ public class SubBlockLevelBitmaps {
 		//GeoHash.hashToLong(hash);
 		String geohashString = GeoHash.fromLongToString(spatialIndex, sresolution);
 		
-		
-		
 		long newTimestamp = TemporalType.addTime(startTimestamp, temporalIndex, tresolution);
 		String temporalString = getTemporalString(newTimestamp, tresolution);
 		
 		return temporalString+"$$"+geohashString;
 	}
 	
+	/**
+	 * Create a temporal string with xx for missing fields
+	 */
 	private static String getTemporalString(long timestamp, int temporalLevel) {
 		
 		Calendar c = Calendar.getInstance();
@@ -203,6 +204,7 @@ public class SubBlockLevelBitmaps {
 		int day = c.get(Calendar.DAY_OF_MONTH);
 		int month = c.get(Calendar.MONTH) + 1;
 		int year = c.get(Calendar.YEAR);
+		
 		switch (temporalLevel) {
 		case 4:
 			return String.format("%d-%d-%d-%d", year, month, day, hour);
