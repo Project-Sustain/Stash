@@ -54,8 +54,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.joda.time.DateTime;
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 import galileo.bmp.Bitmap;
 import galileo.bmp.BitmapException;
@@ -85,14 +88,20 @@ import galileo.dht.PartitionException;
 import galileo.dht.Partitioner;
 import galileo.dht.SelfJoinThread;
 import galileo.dht.SpatialHierarchyPartitioner;
+import galileo.dht.StandardDHTPartitioner;
 import galileo.dht.StorageNode;
 import galileo.dht.TemporalHierarchyPartitioner;
+import galileo.dht.VisualizationSummaryProcessor;
 import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
 import galileo.dht.hash.TemporalHash;
 import galileo.graph.FeaturePath;
 import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
+import galileo.graph.SparseSpatiotemporalMatrix;
+import galileo.graph.SpatiotemporalHierarchicalCache;
+import galileo.graph.SubBlockLevelBitmaps;
+import galileo.graph.SummaryStatistics;
 import galileo.query.Expression;
 import galileo.query.Operation;
 import galileo.query.Operator;
@@ -139,6 +148,9 @@ public class GeospatialFileSystem extends FileSystem {
 	private List<Pair<String, FeatureType>> featureList;
 	private SpatialHint spatialHint;
 	private String temporalHint;
+	
+	private List<String> summaryHints;
+	private List<Integer> summaryPosns;
 	private String storageRoot;
 
 	private MetadataGraph metadataGraph;
@@ -157,6 +169,13 @@ public class GeospatialFileSystem extends FileSystem {
 	private int spatialPosn1;
 	private int spatialPosn2;
 	private int spatialPartitioningType;
+	private int spatialSubLevels;
+	private int temporalSubLevels;
+	
+	private SpatiotemporalHierarchicalCache stCache;
+	private Map<String, SubBlockLevelBitmaps> blockBitmaps;
+
+	private boolean needSublevelBitmaps;
 
 	private static final String TEMPORAL_YEAR_FEATURE = "x__year__x";
 	private static final String TEMPORAL_MONTH_FEATURE = "x__month__x";
@@ -190,7 +209,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public GeospatialFileSystem(StorageNode sn, String storageDirectory, String name, int precision,
 			int temporalType, NetworkInfo networkInfo, String featureList, SpatialHint sHint, String temporalHint, 
-			boolean ignoreIfPresent, int spatialPartitioningType)
+			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution, List<String> summaryHints)
 			throws FileSystemException, IOException, SerializationException, PartitionException, HashException,
 			HashTopologyException {
 		super(storageDirectory, name, ignoreIfPresent);
@@ -198,6 +217,10 @@ public class GeospatialFileSystem extends FileSystem {
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
+		
+		this.summaryPosns = new ArrayList<Integer>();
+		this.summaryHints = summaryHints;
+		
 		
 		/* featurelist is a comma separated list of feature names: type(int) */
 		if (featureList != null) {
@@ -213,6 +236,9 @@ public class GeospatialFileSystem extends FileSystem {
 					spatialPosn1 = count;
 				} else if(featureName.equals(sHint.getLongitudeHint())) {
 					spatialPosn2 = count;
+				} else if(summaryHints.contains(featureName)) {
+					int ind = summaryHints.indexOf(featureName);
+					summaryPosns.add(ind, count);
 				}
 				count++;
 				
@@ -233,7 +259,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.network = networkInfo;
 		
-		this.partitioner = new SpatialHierarchyPartitioner(sn, this.network, spatialPartitioningType);
+		this.partitioner = new StandardDHTPartitioner(sn, this.network, spatialPartitioningType);
 		//this.partitioner = new TemporalHierarchyPartitioner(sn, this.network, this.temporalType.getType(), spatialPartitioningType);
 
 		this.timeFormat = System.getProperty("galileo.fs.GeospatialFileSystem.timeFormat", DEFAULT_TIME_FORMAT);
@@ -245,7 +271,31 @@ public class GeospatialFileSystem extends FileSystem {
 		this.timeFormatter.setTimeZone(TimeZone.getTimeZone("GMT"));
 		this.timeFormatter.applyPattern(timeFormat);
 		this.pathJournal = new PathJournal(this.storageDirectory + File.separator + pathStore);
-
+		
+		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
+		
+		this.spatialSubLevels = stCache.getTotalSpatialLevels()-geohashPrecision;
+		
+		int temporalLevel = 1;
+		switch (this.temporalType) {
+		case HOUR_OF_DAY:
+			temporalLevel = 4;
+		case DAY_OF_MONTH:
+			temporalLevel = 3;
+		case MONTH:
+			temporalLevel = 2;
+		case YEAR:
+			temporalLevel = 1;
+		}
+		
+		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
+		
+		this.needSublevelBitmaps = true;
+		if(temporalSubLevels <= 0 && spatialSubLevels <=0) {
+			this.needSublevelBitmaps = false;
+		}
+		
+		
 		createMetadataGraph();
 	}
 
@@ -315,7 +365,8 @@ public class GeospatialFileSystem extends FileSystem {
 		JSONObject state = new JSONObject();
 		state.put("name", this.name);
 		state.put("storageRoot", this.storageRoot);
-		state.put("precision", this.geohashPrecision);		state.put("geohashIndex", this.geohashIndex);
+		state.put("precision", this.geohashPrecision);		
+		state.put("geohashIndex", this.geohashIndex);
 		StringBuffer features = new StringBuffer();
 		if (this.featureList != null) {
 			for (Pair<String, FeatureType> pair : this.featureList)
@@ -329,6 +380,8 @@ public class GeospatialFileSystem extends FileSystem {
 			spHint.put("latHint", this.spatialHint.getLatitudeHint());
 			spHint.put("lngHint", this.spatialHint.getLongitudeHint());
 		}
+		state.put("spatialResolution", stCache.getTotalSpatialLevels());
+		state.put("temporalResolution", stCache.getTotalTemporalLevels());
 		state.put("spatialHint", spHint == null ? JSONObject.NULL : spHint);
 		state.put("temporalHint", this.temporalHint);
 		state.put("temporalType", this.temporalType.getType());
@@ -343,6 +396,7 @@ public class GeospatialFileSystem extends FileSystem {
 		state.put("spatialPosn1", this.spatialPosn1);
 		state.put("spatialPosn2", this.spatialPosn2);
 		state.put("spatialPartitioningType", this.spatialPartitioningType);
+		state.put("summaryHints", this.summaryHints);
 		
 		return state;
 	}
@@ -367,8 +421,17 @@ public class GeospatialFileSystem extends FileSystem {
 		int spPartitioningType = state.getInt("spatialPartitioningType");
 		String tHint = state.getString("temporalHint");
 		
+		int spatialResolution = state.getInt("spatialResolution");
+		int temporalResolution = state.getInt("temporalResolution");
+		
+		JSONArray sHints = state.getJSONArray("summaryHints");
+		List<String> summaryHints = new ArrayList<String>();
+		for (int i = 0; i < geohashIndices.length(); i++)
+			summaryHints.add(sHints.getString(i));
+		
 		GeospatialFileSystem gfs = new GeospatialFileSystem(storageNode, storageRoot, name, geohashPrecision,
-				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType);
+				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType, spatialResolution, temporalResolution, summaryHints);
+		
 		gfs.earliestTime = (state.get("earliestTime") != JSONObject.NULL)
 				? new TemporalProperties(state.getLong("earliestTime")) : null;
 		gfs.earliestSpace = (state.get("earliestSpace") != JSONObject.NULL) ? state.getString("earliestSpace") : null;
@@ -504,7 +567,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 		}
-
+		
 		// Adding temporal and spatial features at the top
 		// to the existing attributes
 		
@@ -544,7 +607,26 @@ public class GeospatialFileSystem extends FileSystem {
 		} catch (Exception e) {
 			throw new FileSystemException("Error storing block: " + e.getClass().getCanonicalName(), e);
 		}
-
+		
+		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN S BLOCK
+		if(needSublevelBitmaps) {
+			
+			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
+			if(bitmaps == null) {
+				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
+				blockBitmaps.put(name, bitmaps);
+			}
+			
+			try {
+				readBlockData(block.getData(), bitmaps, geohash, time);
+			} catch (Exception e) {
+				throw new FileSystemException("Error populating sub-block bitmaps: " + e);
+			}
+			
+		}
+		
+		
+		
 		if (latestTime == null || latestTime.getEnd() < meta.getTemporalProperties().getEnd()) {
 			this.latestTime = meta.getTemporalProperties();
 			this.latestSpace = geohash;
@@ -560,6 +642,53 @@ public class GeospatialFileSystem extends FileSystem {
 		return blockPath;
 	}
 	
+	
+	/**
+	 * Populating a block's bitmaps based on records in it
+	 * @author sapmitra
+	 * @param data
+	 * @param bitmaps
+	 * @param fileGeohash
+	 * @param fileTime
+	 * @throws ParseException 
+	 */
+	private void readBlockData(byte[] data, SubBlockLevelBitmaps bitmaps, String fileGeohash, String fileTime) throws ParseException {
+		// TODO Auto-generated method stub
+		
+		String[] timeTokens = fileTime.split("-");
+		
+		// The starting timestamp of the block at the given resolution
+		long startTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], temporalType);
+		
+		DateTime startDate = new DateTime(startTimeStamp);
+		
+		String blockString = new String(data);
+		String[] records = blockString.split("\n");
+		
+		int removeLength = fileGeohash.length();
+		
+		// Creates a temporary bitmap using the records and then old to the old bitmap
+		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
+		
+		/*for(String record: records) {
+			
+			String[] fields = record.split(",");
+			
+			
+			// Highest resolution geohash allowed by visualization application
+			String geoHash = GeoHash.encode(parseFloat(fields[spatialPosn1]),parseFloat(fields[spatialPosn2]), stCache.getTotalSpatialLevels());
+			
+			long timestamp = reformatDatetime(fields[temporalPosn]);
+			
+			String choppedGeohash = geoHash.substring(removeLength);
+			
+			bitmaps.populateBitmapUsingRecord(startDate, timestamp, choppedGeohash);
+			
+			
+		}*/
+		
+	}
+	
 	public static long reformatDatetime(String date){
 		String tmp = date.replace(".", "").replace("E9", "");
 		while(tmp.length()<13){
@@ -569,7 +698,7 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 
 	
-	private static float parseFloat(String input){
+	public static float parseFloat(String input){
 		try {
 			return Float.parseFloat(input);
 		} catch(Exception e){
@@ -788,6 +917,55 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		return String.format("%s-%s", getTemporalString(null), (space == null) ? getSpatialString(null) : space);
 	}
+	
+	
+	private String getCellKey(Path<Feature, String> path, String space, int spatialResolution, int temporalResolution) {
+		if (null != path && path.hasPayload()) {
+			List<Feature> labels = path.getLabels();
+			String year = "xxxx", month = "xx", day = "xx", hour = "xx";
+			int allset = (space == null) ? 0 : 1;
+			for (Feature label : labels) {
+				switch (label.getName().toLowerCase()) {
+				case TEMPORAL_YEAR_FEATURE:
+					year = label.getString();
+					allset++;
+					break;
+				case TEMPORAL_MONTH_FEATURE:
+					month = label.getString();
+					allset++;
+					break;
+				case TEMPORAL_DAY_FEATURE:
+					day = label.getString();
+					allset++;
+					break;
+				case TEMPORAL_HOUR_FEATURE:
+					hour = label.getString();
+					allset++;
+					break;
+				case SPATIAL_FEATURE:
+					if (space == null) {
+						space = label.getString();
+						allset++;
+					}
+					break;
+				}
+				if (allset == 5)
+					break;
+			}
+			
+			space = space.substring(0,spatialResolution);
+			
+			String[] tags = {year,month,day,hour};
+			
+			String temporalTag = tags[0];
+			for(int i=1; i < temporalResolution; i++) {
+				temporalTag += "-"+tags[i];
+			}
+			
+			return temporalTag+"$$"+space;
+		}
+		return null;
+	}
 
 	private String getSpaceKey(Path<Feature, String> path) {
 		if (null != path && path.hasPayload()) {
@@ -877,6 +1055,320 @@ public class GeospatialFileSystem extends FileSystem {
 		return paths;
 	}
 	
+	/**
+	 * LOOK AT THE MATCHING BLOCK LISTS AND ELIMINATE THE ONES THAT ALREADY HAVE ENTRIES IN THE CACHE
+	 * 
+	 * LOOKS AT THE CACHE AND RETURNS THE MATCHING CELLS I.E. BLOCKS ALREADY CACHED
+	 * ALSO RETURNS THE MATCHING SUMMARIES
+	 * 
+	 * @author sapmitra
+	 * @param temporalProperties
+	 * @param spatialProperties
+	 * @param reqSpatialResolution
+	 * @param reqTemporalResolution
+	 * @return
+	 * @throws InterruptedException
+	 */
+	public List<String> listMatchingCells(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+			Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
+		
+		String space = null;
+		List<Path<Feature, String>> paths = null;
+		List<String> blocks = new ArrayList<String>();
+		
+		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
+		
+		
+		/* temporal and spatial properties from the query event */
+		if (temporalProperties != null && spatialProperties != null) {
+			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
+			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
+					: sp.getSpatialRange().getBounds();
+			
+			/* Tries to get the geohash for the center-point of the MBR for the polygon */
+			space = getSpatialString(sp);
+			
+			/* Returns all 2 char geohashes that intersect with the searched polygon */
+			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
+			
+			hashLocations.retainAll(this.geohashIndex);
+			logger.info("baseLocations: " + hashLocations);
+			Query query = new Query();
+			
+			/* Builds an expression for the temporal query asking the top level temporal levels to be 
+			 * equal to whatever is in the time string */
+			// temporalProperties is a string of the format YEAR-MONTH-DAY-HOUR
+			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
+			
+			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			
+			for (String geohash : hashLocations) {
+				Set<GeoHash> intersections = new HashSet<>();
+				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
+				
+				// gets a 111000000 like binary representation of the geohash
+				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
+				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
+						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
+				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				for (GeoHash gh : intersections) {
+					String[] hashRange = gh.getValues(this.geohashPrecision);
+					if (hashRange != null) {
+						Operation op = new Operation(temporalExpressions);
+						if (hashRange.length == 1)
+							op.addExpressions(
+									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+						else {
+							op.addExpressions(
+									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+							op.addExpressions(
+									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
+						}
+						query.addOperation(op);
+					}
+				}
+			}
+			/* query intersection merges the query with metadata query */
+			/* returns a list of paths matching the query */
+			paths = executeParallelQuery(queryIntersection(query, null));
+		} else if (temporalProperties != null) {
+			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
+			Query query = new Query(
+					new Operation(temporalExpressions.toArray(new Expression[temporalExpressions.size()])));
+			paths = metadataGraph.evaluateQuery(queryIntersection(query, null));
+		} else if (spatialProperties != null) {
+			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
+			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
+					: sp.getSpatialRange().getBounds();
+			space = getSpatialString(sp);
+			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
+			hashLocations.retainAll(this.geohashIndex);
+			logger.info("baseLocations: " + hashLocations);
+			Query query = new Query();
+			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			for (String geohash : hashLocations) {
+				Set<GeoHash> intersections = new HashSet<>();
+				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
+				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
+				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
+						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
+				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				for (GeoHash gh : intersections) {
+					String[] hashRange = gh.getValues(this.geohashPrecision);
+					if (hashRange != null) {
+						Operation op = new Operation();
+						if (hashRange.length == 1)
+							op.addExpressions(
+									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+						else {
+							op.addExpressions(
+									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+							op.addExpressions(
+									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
+						}
+						query.addOperation(op);
+					}
+				}
+			}
+			/* Queryintersection combines the normal and metadata query */
+			paths = executeParallelQuery(queryIntersection(query, null));
+		} else {
+			// non-chronal non-spatial
+			paths = metadataGraph.getAllPaths();
+		}
+		
+		// Paths look like Path((root,f1,f2,f3,...),payload). Each path represents each DFS traversal of a tree
+		
+		// If the requested resolution is less than or equal to the file system's 
+		// resolution, the summary key will not need to be checked against each record for a block. 
+		// Rather the block key can be used.
+		TemporalType temporalType = getTemporalType();
+		int fsSpatialResolution = getGeohashPrecision();
+		int fsTemporalResolution = temporalType.getType();
+		
+		if(temporalType == TemporalType.DAY_OF_MONTH)
+			fsTemporalResolution = 3;
+		else if(temporalType == TemporalType.HOUR_OF_DAY)
+			fsTemporalResolution = 4;
+		
+		// CHECKING IF REQUEST RESOLUTION IS LOWER THAN THE FS RESOLUTION
+		// spR and tmR are the resolutions at which blocks will be grouped
+		// if the filesystems's resolution are higher, then grouping will be at the request's resolution
+		int spR = fsSpatialResolution;
+		int tmR = fsTemporalResolution;
+		
+		if(fsSpatialResolution >= reqSpatialResolution && fsTemporalResolution >= reqTemporalResolution) {
+			spR = reqSpatialResolution;
+			tmR = reqTemporalResolution;
+		}
+		
+		for (Path<Feature, String> path : paths) {
+			String groupKey = getCellKey(path, space, spR, tmR);
+			blocks = blockMap.get(groupKey);
+			if (blocks == null) {
+				blocks = new ArrayList<String>();
+				blockMap.put(groupKey, blocks);
+			}
+			blocks.addAll(path.getPayload());
+		}
+		
+		return blockMap;
+	}
+	
+	
+	/**
+	 * 
+	 * @param temporalProperties
+	 * @param spatialProperties
+	 * @param metaQuery
+	 * @param group: whether it is a dry run or not
+	 * @return
+	 * @throws InterruptedException
+	 */
+	
+	public Map<String, List<String>> listBlocksForVisualization(String temporalProperties, List<Coordinates> spatialProperties, 
+			int reqSpatialResolution, int reqTemporalResolution) throws InterruptedException {
+		 Map<String, List<String>> blockMap = new HashMap<String, List<String>>();
+		String space = null;
+		List<Path<Feature, String>> paths = null;
+		List<String> blocks = new ArrayList<String>();
+		/* temporal and spatial properties from the query event */
+		if (temporalProperties != null && spatialProperties != null) {
+			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
+			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
+					: sp.getSpatialRange().getBounds();
+			
+			/* Tries to get the geohash for the center-point of the MBR for the polygon */
+			space = getSpatialString(sp);
+			
+			/* Returns all 2 char geohashes that intersect with the searched polygon */
+			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
+			
+			hashLocations.retainAll(this.geohashIndex);
+			logger.info("baseLocations: " + hashLocations);
+			Query query = new Query();
+			
+			/* Builds an expression for the temporal query asking the top level temporal levels to be 
+			 * equal to whatever is in the time string */
+			// temporalProperties is a string of the format YEAR-MONTH-DAY-HOUR
+			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
+			
+			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			
+			for (String geohash : hashLocations) {
+				Set<GeoHash> intersections = new HashSet<>();
+				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
+				
+				// gets a 111000000 like binary representation of the geohash
+				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
+				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
+						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
+				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				for (GeoHash gh : intersections) {
+					String[] hashRange = gh.getValues(this.geohashPrecision);
+					if (hashRange != null) {
+						Operation op = new Operation(temporalExpressions);
+						if (hashRange.length == 1)
+							op.addExpressions(
+									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+						else {
+							op.addExpressions(
+									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+							op.addExpressions(
+									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
+						}
+						query.addOperation(op);
+					}
+				}
+			}
+			/* query intersection merges the query with metadata query */
+			/* returns a list of paths matching the query */
+			paths = executeParallelQuery(queryIntersection(query, null));
+		} else if (temporalProperties != null) {
+			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
+			Query query = new Query(
+					new Operation(temporalExpressions.toArray(new Expression[temporalExpressions.size()])));
+			paths = metadataGraph.evaluateQuery(queryIntersection(query, null));
+		} else if (spatialProperties != null) {
+			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
+			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
+					: sp.getSpatialRange().getBounds();
+			space = getSpatialString(sp);
+			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
+			hashLocations.retainAll(this.geohashIndex);
+			logger.info("baseLocations: " + hashLocations);
+			Query query = new Query();
+			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			for (String geohash : hashLocations) {
+				Set<GeoHash> intersections = new HashSet<>();
+				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
+				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
+				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
+						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
+				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				for (GeoHash gh : intersections) {
+					String[] hashRange = gh.getValues(this.geohashPrecision);
+					if (hashRange != null) {
+						Operation op = new Operation();
+						if (hashRange.length == 1)
+							op.addExpressions(
+									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+						else {
+							op.addExpressions(
+									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
+							op.addExpressions(
+									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
+						}
+						query.addOperation(op);
+					}
+				}
+			}
+			/* Queryintersection combines the normal and metadata query */
+			paths = executeParallelQuery(queryIntersection(query, null));
+		} else {
+			// non-chronal non-spatial
+			paths = metadataGraph.getAllPaths();
+		}
+		
+		// Paths look like Path((root,f1,f2,f3,...),payload). Each path represents each DFS traversal of a tree
+		
+		// If the requested resolution is less than or equal to the file system's 
+		// resolution, the summary key will not need to be checked against each record for a block. 
+		// Rather the block key can be used.
+		TemporalType temporalType = getTemporalType();
+		int fsSpatialResolution = getGeohashPrecision();
+		int fsTemporalResolution = temporalType.getType();
+		
+		if(temporalType == TemporalType.DAY_OF_MONTH)
+			fsTemporalResolution = 3;
+		else if(temporalType == TemporalType.HOUR_OF_DAY)
+			fsTemporalResolution = 4;
+		
+		// CHECKING IF REQUEST RESOLUTION IS LOWER THAN THE FS RESOLUTION
+		// spR and tmR are the resolutions at which blocks will be grouped
+		// if the filesystems's resolution are higher, then grouping will be at the request's resolution
+		int spR = fsSpatialResolution;
+		int tmR = fsTemporalResolution;
+		
+		if(fsSpatialResolution >= reqSpatialResolution && fsTemporalResolution >= reqTemporalResolution) {
+			spR = reqSpatialResolution;
+			tmR = reqTemporalResolution;
+		}
+		
+		for (Path<Feature, String> path : paths) {
+			String groupKey = getCellKey(path, space, spR, tmR);
+			blocks = blockMap.get(groupKey);
+			if (blocks == null) {
+				blocks = new ArrayList<String>();
+				blockMap.put(groupKey, blocks);
+			}
+			blocks.addAll(path.getPayload());
+		}
+		
+		return blockMap;
+	}
+	
 
 	/**
 	 * 
@@ -915,6 +1407,7 @@ public class GeospatialFileSystem extends FileSystem {
 			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
 			
 			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
+			
 			for (String geohash : hashLocations) {
 				Set<GeoHash> intersections = new HashSet<>();
 				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
@@ -1776,6 +2269,116 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	
+	/**
+	 * HANDLES VISUALIZATION OF EACH BLOCK KEY. THIS BLOCK KEY IS AT THE FILESYSTEM'S SPATIOTEMPORAL PRECISION 
+	 * @author sapmitra
+	 * @param blocks
+	 * @param geoQuery
+	 * @param grid
+	 * @param queryBitmap
+	 * @param spatialResolution
+	 * @param temporalResolution
+	 * @param summaryPosns
+	 * @param needMoreGrouping all records will be under the single blocksKey if this is false
+	 * @param blocksKey
+	 * @return
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public Map<String,SummaryStatistics[]> queryLocalSummary(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
+			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
+			throws IOException, InterruptedException {
+		
+		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
+		
+		List<String[]> featurePaths = new ArrayList<String[]>();
+		
+		// THIS READS THE ACTUAL BLOCKS
+		
+		boolean skipGridProcessing = false;
+		if (geoQuery.getPolygon() != null && geoQuery.getQuery() != null) {
+			/* If polygon complete encompasses geohash */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			
+			featurePaths = getFeaturePathsLocal(blocks);
+		} else if (geoQuery.getPolygon() != null) {
+			/* If grid lies completely inside polygon */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			featurePaths = getFeaturePathsLocal(blocks);
+		} else if (geoQuery.getQuery() != null) {
+			featurePaths = getFeaturePathsLocal(blocks);
+		} 
+		
+		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
+		int size = featurePaths.size();
+		int partition = java.lang.Math.max(size / numCores, MIN_GRID_POINTS);
+		int parallelism = java.lang.Math.min(size / partition, numCores);
+		
+		/* ALL THE RECORDS TO BE QUERIED ARE NOW INSIDE featurePaths */
+		
+		// FURTHER FILTERING OF FEATUREPATHS
+		
+		queryBitmap = skipGridProcessing ? null : queryBitmap;
+		if(parallelism <=0 ) {
+			//logger.log(Level.INFO, "RIKI: THIS HAPPENED");
+			parallelism = 1;
+		}
+		
+		if (parallelism > 0) {
+			
+			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+			
+			List<VisualizationSummaryProcessor> queryProcessors = new ArrayList<VisualizationSummaryProcessor>();
+			
+			for (int i = 0; i < parallelism; i++) {
+				int from = i * partition;
+				int to = (i + 1 != parallelism) ? (i + 1) * partition : size;
+				List<String[]> subset = new ArrayList<>(featurePaths.subList(from, to));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND2: "+Arrays.asList(featurePaths));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND3: "+Arrays.asList(subset));
+				if(subset != null) {
+					
+					VisualizationSummaryProcessor pqp = new VisualizationSummaryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap, summaryPosns,
+							spatialResolution, temporalResolution, needMoreGrouping, blocksKey);
+					
+					queryProcessors.add(pqp);
+					executor.execute(pqp);
+				}
+			}
+			
+			executor.shutdown();
+			boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+			if (!status)
+				logger.log(Level.WARNING, "queryFragments: Executor terminated because of the specified timeout=10minutes");
+			
+			for(VisualizationSummaryProcessor vqp : queryProcessors) {
+				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS6"+nqp.getFeaturePaths());
+				if(vqp.getLocalSummary().size() > 0) {
+					
+					Map<String, SummaryStatistics[]> localSummary = vqp.getLocalSummary();
+					
+					for(String key: localSummary.keySet()) {
+						
+						if(!allSummaries.containsKey(key)) {
+							allSummaries.put(key, localSummary.get(key));
+						} else {
+							SummaryStatistics[] oldStats = allSummaries.get(key);
+							SummaryStatistics[] statsUpdate = localSummary.get(key);
+							
+							SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+							allSummaries.put(key, mergedSummaries);
+						}
+						
+					}
+					
+				}
+				
+			}
+			
+		} 
+
+		return allSummaries;
+	}
 
 	public List<Pair<String, FeatureType>> getFeatureList() {
 		return featureList;
@@ -1862,6 +2465,17 @@ public class GeospatialFileSystem extends FileSystem {
 		
 	}
 	
+	public static void main(String arg[]) {
+		
+		String ss = "word1$$word2";
+		
+		String[] split = ss.split("\\$\\$");
+		
+		System.out.println(split[0]);
+		System.out.println(split[1]);
+		
+	}
+	
 	public int getFeaturePosition(String featureName) {
 		int featurePosn = -1;
 		int index = 0;
@@ -1883,17 +2497,50 @@ public class GeospatialFileSystem extends FileSystem {
 	public void setSpatialPartitioningType(int spatialPartitioningType) {
 		this.spatialPartitioningType = spatialPartitioningType;
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+	public List<String> getSummaryHints() {
+		return summaryHints;
+	}
+
+	public void setSummaryHints(List<String> summaryHints) {
+		this.summaryHints = summaryHints;
+	}
+
+	public List<Integer> getSummaryPosns() {
+		return summaryPosns;
+	}
+
+	public void setSummaryPosns(List<Integer> summaryPosns) {
+		this.summaryPosns = summaryPosns;
+	}
+
+	/**
+	 * NEWLY EXTRACTED SUMMARIES BEING PUT INTO THE TREE
+	 * @author sapmitra
+	 * @param allSummaries
+	 * @param spatialResolution
+	 * @param temporalResolution
+	 */
+	public void populateCacheTree(Map<String, SummaryStatistics[]> allSummaries, int spatialResolution, int temporalResolution) {
+		
+		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
+		
+		for(String key: allSummaries.keySet()) {
+			
+			stCache.addCell(allSummaries.get(key), key, cacheResolution);
+			
+		}
+		
+		
+	}
+
+	public SpatiotemporalHierarchicalCache getStCache() {
+		return stCache;
+	}
+
+	public void setStCache(SpatiotemporalHierarchicalCache stCache) {
+		this.stCache = stCache;
+	}
+
 	
 }

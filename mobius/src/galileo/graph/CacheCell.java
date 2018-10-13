@@ -1,5 +1,8 @@
 package galileo.graph;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import galileo.util.GeoHash;
 import galileo.util.SpatialBorder;
 
@@ -11,7 +14,7 @@ public class CacheCell {
 	private int spatialResolution;
 	private int temporalResolution;
 	
-	private SummaryStatistics stats;
+	private SummaryStatistics[] stats;
 	
 	private String spatialParent;
 	private String temporalParent;
@@ -40,7 +43,7 @@ public class CacheCell {
 	 * @param temporalResolution
 	 */
 	
-	public CacheCell(SummaryStatistics stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
+	public CacheCell(SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
 			int spatialResolution, int temporalResolution) {
 		
 		this.stats = stats;
@@ -123,11 +126,11 @@ public class CacheCell {
 		this.temporalResolution = temporalResolution;
 	}
 
-	public SummaryStatistics getStats() {
+	public SummaryStatistics[] getStats() {
 		return stats;
 	}
 
-	public void setStats(SummaryStatistics stats) {
+	public void setStats(SummaryStatistics[] stats) {
 		this.stats = stats;
 	}
 
@@ -203,5 +206,17 @@ public class CacheCell {
 		this.temporalNeighbors = temporalNeighbors;
 	}
 	
+	public void incrementFreshness(float val) {
+		this.freshCount += val;
+	}
+	
+	
+	public static void main(String arg[]) {
+		Calendar cal = Calendar.getInstance(); // creates calendar
+	    cal.setTime(new Date()); // sets calendar time/date
+	    cal.add(Calendar.HOUR_OF_DAY, 280); // adds one hour
+	    System.out.println(cal.getTime()); 
+		
+	}
 
 }

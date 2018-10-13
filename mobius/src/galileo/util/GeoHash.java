@@ -73,6 +73,7 @@ public class GeoHash {
 	public final static int MAX_PRECISION = 30; // 6 character precision = 30 (~
 												// 1.2km x 0.61km)
 
+	private static final String BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 	/**
 	 * This character array maps integer values (array indices) to their GeoHash
 	 * base32 alphabet equivalents.
@@ -472,6 +473,30 @@ public class GeoHash {
 
 		return longForm;
 	}
+	
+	public static String fromLongToString(long hash, int precision) {
+		String retStr = "";
+		String binaryString = Long.toBinaryString(hash);
+		
+		if(binaryString.length() < precision*BITS_PER_CHAR) {
+			int ln = precision*BITS_PER_CHAR - binaryString.length();
+			
+			for(int i=0; i < ln; i++) {
+				binaryString = "0"+binaryString;
+			}
+		}
+		
+		for(int i=0; i < binaryString.length(); i=i+5) {
+			String sb = binaryString.substring(i,i+5);
+			int foo = Integer.parseInt(sb, 2);
+			
+			retStr += BASE32.charAt(foo);
+			//System.out.println(BASE32.charAt(foo));
+		}
+        
+        return retStr;
+    }
+	
 
 	/**
 	 * Decode a GeoHash to an approximate bounding box that contains the
@@ -2699,6 +2724,89 @@ public class GeoHash {
 		
 	}
 	
+	/**
+	 * RETURNS THE DESIRED KEY AS TIME$$SPACE
+	 * TIME IS YEAR-MONTH-...
+	 * 
+	 * SUMMARY KEY SHOULD BE CALCULATED FOR EACH RECORD ONLY IF THE REQUESTED RESOLUTION IS HIGHER THAN THE 
+	 * RESOLUTION OF THE ACTUAL BLOCK
+	 * 
+	 * @author sapmitra
+	 * @param lat
+	 * @param lng
+	 * @param time
+	 * @param spatialResolution
+	 * @param temporalResolution
+	 * @return
+	 * @throws ParseException 
+	 */
+	public static String getSummaryKey(float lat, float lng, float time, int spatialResolution, int temporalResolution){
+		
+		String geohash = encode(lat, lng, spatialResolution);
+		
+		TemporalType tt = TemporalType.YEAR;
+		
+		if(temporalResolution == 1)
+			tt = TemporalType.YEAR;
+		else if(temporalResolution == 2)
+			tt = TemporalType.MONTH;
+		else if(temporalResolution == 3)
+			tt = TemporalType.DAY_OF_MONTH;
+		else if(temporalResolution == 4)
+			tt = TemporalType.HOUR_OF_DAY;
+		
+		String temporalString = getTimeStringFromTimestamp(time, tt);
+		
+		return temporalString+"$$"+geohash;
+		
+	}
+	
+	
+	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param year
+	 * @param month
+	 * @param day
+	 * @param hour
+	 * @param temporalType
+	 * @return
+	 * @throws ParseException
+	 */
+	public static String getTimeStringFromTimestamp(float timestamp, TemporalType temporalType){
+		
+		String temporalString = "";
+		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
+		calendar.setTimeZone(TemporalHash.TIMEZONE);
+		calendar.setTimeInMillis((long)timestamp);
+		//calendar.setLenient(false);
+		
+		int year = calendar.get(Calendar.YEAR);
+		int month = calendar.get(Calendar.MONTH)+1;
+		int day = calendar.get(Calendar.DAY_OF_MONTH);
+		int hour = calendar.get(Calendar.HOUR_OF_DAY);
+		
+		switch (temporalType) {
+			case HOUR_OF_DAY:
+				temporalString = year+"-"+month+"-"+day+"-"+hour;
+			    break;
+			case DAY_OF_MONTH:
+				temporalString = year+"-"+month+"-"+day;
+			    break;
+			case MONTH:
+				temporalString = year+"-"+month;
+			    break;
+			case YEAR:
+				temporalString = String.valueOf(year);
+			    break;
+			    
+		}
+		
+	    return temporalString;
+		
+	}
+	
 	public static void main(String arg[]) {
 		//List<String> borderingGeohashesForDirection = getBorderingGeohashesGivenDirection("u9", 4, "s");
 		
@@ -2711,9 +2819,9 @@ public class GeoHash {
 		//int[] spatialChildren = getSpatialChildren("u9", 4);
 		//daysBetweenDates(1990, 7, 7);
 		
-		System.out.println(Arrays.asList(getTemporalNeighbors("2000-01-1-00",4)));
+		//System.out.println(getSummaryKey(40.58f, -105.08f, 1537990007000f, 7, 4));
 		
-		
+		System.out.println(GeoHash.hashToLong("00p0"));
 	}
 	
 	

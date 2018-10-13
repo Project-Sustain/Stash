@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import galileo.dataset.Coordinates;
 import galileo.event.Event;
 import galileo.query.Expression;
 import galileo.query.Operation;
@@ -17,8 +18,12 @@ public class VisualizationRequest implements Event {
 	
 	private String fsName;
 	private Query featureQuery;
-	private List<String> geohashes;
+	private List<Coordinates> polygon;
 	private String timeString;
+	private int spatialResolution;
+	private int temporalResolution;
+	
+	private List<String> reqFeatures;
 
 	private void validate(String fsName) {
 		if (fsName == null || fsName.trim().length() == 0 || !fsName.matches("[a-z0-9-]{5,50}"))
@@ -75,7 +80,7 @@ public class VisualizationRequest implements Event {
 	}
 
 	public boolean isSpatial() {
-		return geohashes != null;
+		return polygon != null;
 	}
 
 	public boolean isTemporal() {
@@ -100,13 +105,18 @@ public class VisualizationRequest implements Event {
 			timeString = in.readString();
 		boolean isSpatial = in.readBoolean();
 		if (isSpatial) {
-			List<String> poly = new ArrayList<String>();
-			in.readStringCollection(poly);
-			geohashes = poly;
+			List<Coordinates> poly = new ArrayList<Coordinates>();
+			in.readSerializableCollection(Coordinates.class, poly);
+			polygon = poly;
 		}
 		boolean hasFeatureQuery = in.readBoolean();
 		if (hasFeatureQuery)
 			this.featureQuery = new Query(in);
+		this.spatialResolution = in.readInt();
+		this.temporalResolution = in.readInt();
+		
+		// this cannot be null
+		in.readStringCollection(reqFeatures);
 		
 	}
 
@@ -118,10 +128,15 @@ public class VisualizationRequest implements Event {
 			out.writeString(timeString);
 		out.writeBoolean(isSpatial());
 		if (isSpatial())
-			out.writeStringCollection(geohashes);
+			out.writeSerializableCollection(polygon);
 		out.writeBoolean(hasFeatureQuery());
 		if (hasFeatureQuery())
 			out.writeSerializable(this.featureQuery);
+		out.writeInt(spatialResolution);
+		out.writeInt(temporalResolution);
+		
+		//this cannot be null
+		out.writeStringCollection(reqFeatures);
 		
 	}
 
@@ -133,12 +148,12 @@ public class VisualizationRequest implements Event {
 		this.fsName = fsName;
 	}
 
-	public List<String> getGeohashes() {
-		return geohashes;
+	public List<Coordinates> getPolygon() {
+		return polygon;
 	}
 
-	public void setGeohashes(List<String> geohashes) {
-		this.geohashes = geohashes;
+	public void setGeohashes(List<Coordinates> polygon) {
+		this.polygon = polygon;
 	}
 
 	public String getTimeString() {
@@ -147,6 +162,34 @@ public class VisualizationRequest implements Event {
 
 	public void setTimeString(String timeString) {
 		this.timeString = timeString;
+	}
+
+	public int getSpatialResolution() {
+		return spatialResolution;
+	}
+
+	public void setSpatialResolution(int spatialResolution) {
+		this.spatialResolution = spatialResolution;
+	}
+
+	public int getTemporalResolution() {
+		return temporalResolution;
+	}
+
+	public void setTemporalResolution(int temporalResolution) {
+		this.temporalResolution = temporalResolution;
+	}
+
+	public void setPolygon(List<Coordinates> polygon) {
+		this.polygon = polygon;
+	}
+
+	public List<String> getReqFeatures() {
+		return reqFeatures;
+	}
+
+	public void setReqFeatures(List<String> reqFeatures) {
+		this.reqFeatures = reqFeatures;
 	}
 
 }

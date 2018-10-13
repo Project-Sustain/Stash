@@ -94,6 +94,7 @@ import galileo.comm.SurveyResponse;
 import galileo.comm.TemporalType;
 import galileo.comm.TrainingDataEvent;
 import galileo.comm.TrainingDataResponse;
+import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationRequest;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
@@ -114,6 +115,7 @@ import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.Path;
+import galileo.graph.SummaryStatistics;
 import galileo.net.ClientConnectionPool;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
@@ -314,10 +316,11 @@ public class StorageNode implements RequestListener {
 		event.setNodesPerGroup(request.getNodesPerGroup());
 		event.setTemporalType(request.getTemporalType());
 		event.setRasterized(request.isRasterized());
-		event.setSpatialUncertaintyPrecision(request.getSpatialUncertaintyPrecision());
-		event.setTemporalUncertaintyPrecision(request.getTemporalUncertaintyPrecision());
+		event.setSpatialResolution(request.getSpatialResolution());
+		event.setTemporalResolution(request.getTemporalResolution());
 		event.setTemporalHint(request.getTemporalHint());
 		event.setSpatialPartitioningType(request.getSpatialPartitioningType());
+		event.setSummaryHints(request.getSummaryHints());
 		for (NodeInfo node : nodes) {
 			logger.info("Requesting " + node + " to perform a file system action");
 			sendEvent(node, event);
@@ -336,7 +339,8 @@ public class StorageNode implements RequestListener {
 					
 					fs = new GeospatialFileSystem(this, this.rootDir, event.getName(), event.getPrecision(),
 							event.getTemporalValue(), this.network, event.getFeatures(),
-							event.getSpatialHint(),event.getTemporalHint(), false, event.getSpatialPartitioningType());
+							event.getSpatialHint(),event.getTemporalHint(), false, event.getSpatialPartitioningType(), 
+							event.getSpatialResolution(), event.getTemporalResolution(), event.getSummaryHints());
 					
 					if(event.getSpatialPartitioningType() <= 0)
 						fs.setSpatialPartitioningType(2);
@@ -700,6 +704,12 @@ public class StorageNode implements RequestListener {
 		
 	}
 	
+	/**
+	 * The request will contain a query area in terms of a polygon and a timestring
+	 * @author sapmitra
+	 * @param request
+	 * @param context
+	 */
 	@EventHandler
 	public void handleVisualizationRequest(VisualizationRequest request, EventContext context) {
 		
@@ -713,63 +723,30 @@ public class StorageNode implements RequestListener {
 		if (gfs != null) {
 			QueryResponse response = new QueryResponse(queryId, gfs.getFeaturesRepresentation(), new JSONObject());
 			
-			/* This metadata is simply used to find nodes. 
-			 * It only contains temnporal and spatial features */
-			Metadata data = new Metadata();
-			
-			if (request.isTemporal()) {
-				
-				/* Time in request if a - separated string */
-				String[] timeSplit = request.getTime().split("-");
-				int timeIndex = Arrays.asList(TemporalType.values()).indexOf(gfs.getTemporalType());
-				if (!timeSplit[timeIndex].contains("x")) {
-					logger.log(Level.INFO, "Temporal query: {0}", request.getTime());
-					Calendar c = Calendar.getInstance();
-					c.setTimeZone(TemporalHash.TIMEZONE);
-					int year = timeSplit[0].charAt(0) == 'x' ? c.get(Calendar.YEAR) : Integer.parseInt(timeSplit[0]);
-					int month = timeSplit[1].charAt(0) == 'x' ? c.get(Calendar.MONTH)
-							: Integer.parseInt(timeSplit[1]) - 1;
-					int day = timeSplit[2].charAt(0) == 'x' ? c.get(Calendar.DAY_OF_MONTH)
-							: Integer.parseInt(timeSplit[2]);
-					int hour = timeSplit[3].charAt(0) == 'x' ? c.get(Calendar.HOUR_OF_DAY)
-							: Integer.parseInt(timeSplit[3]);
-					c.set(year, month, day, hour, 0);
-					data.setTemporalProperties(new TemporalProperties(c.getTimeInMillis()));
-				}
-			}
 			if (request.isSpatial()) {
-				logger.log(Level.INFO, "Spatial query: {0}", request.getGeohashes());
-				data.setSpatialProperties(new SpatialProperties(new SpatialRange(request.getPolygon())));
+				logger.log(Level.INFO, "Spatial query: {0}", request.getPolygon());
 			}
-			Partitioner<Metadata> partitioner = gfs.getPartitioner();
+			StandardDHTPartitioner partitioner = (StandardDHTPartitioner)gfs.getPartitioner();
 			List<NodeInfo> nodes;
 			try {
 				/* TemporalHierarchyPartitioner */
 				/* ===================Finding the nodes that satisfy the query================== */
-				nodes = partitioner.findDestinations(data);
+				
+				Metadata data = new Metadata();
+				data.setSpatialProperties(new SpatialProperties(new SpatialRange(request.getPolygon())));
+				
+				nodes = partitioner.findDestinations(request.getPolygon());
+				
 				logger.info("destinations: " + nodes);
-				QueryEvent qEvent = (request.hasFeatureQuery() || request.hasMetadataQuery())
-						? new QueryEvent(queryId, request.getFilesystemName(), request.getFeatureQuery(),
-								request.getMetadataQuery())
-						: (request.isSpatial())
-								? new QueryEvent(queryId, request.getFilesystemName(), request.getPolygon())
-								: new QueryEvent(queryId, request.getFilesystemName(), request.getTime());
-
-				if (request.isDryRun()) {
-					qEvent.enableDryRun();
-					response.setDryRun(true);
-				}
-				if (request.isSpatial())
-					qEvent.setPolygon(request.getPolygon());
-				if (request.isTemporal())
-					qEvent.setTime(request.getTime());
-
+				
+				VisualizationEvent vEvent = new VisualizationEvent(queryId, request);
+						
 				try {
 					ClientRequestHandler reqHandler = new ClientRequestHandler(new ArrayList<NetworkDestination>(nodes),
 							context, this);
 					
 					/* Sending out query to all nodes */
-					reqHandler.handleRequest(qEvent, response);
+					reqHandler.handleRequest(vEvent, response);
 					this.requestHandlers.add(reqHandler);
 				} catch (IOException ioe) {
 					logger.log(Level.SEVERE,
@@ -802,6 +779,188 @@ public class StorageNode implements RequestListener {
 		
 	}
 
+	
+	
+	
+	/**
+	 * Handles Visualization event at each node
+	 * The request contains a polygon and a timestring, which for now can request for upto a day
+	 * @author sapmitra
+	 * @param event
+	 * @param context
+	 */
+	@EventHandler
+	public void handleVisualization(VisualizationEvent event, EventContext context) {
+		
+		long hostFileSize = 0;
+		long totalProcessingTime = 0;
+		long blocksProcessed = 0;
+		int totalNumPaths = 0;
+		JSONObject resultJSON = new JSONObject();
+		Map<String,SummaryStatistics[]> extractedSummaries = new HashMap<String,SummaryStatistics[]>();
+		Map<String,SummaryStatistics[]> savedSummaries = new HashMap<String,SummaryStatistics[]>();
+		
+		long processingTime = System.currentTimeMillis();
+		try {
+			logger.info(event.getFeatureQueryString());
+			String fsName = event.getFilesystemName();
+			GeospatialFileSystem fs = fsMap.get(fsName);
+			if (fs != null) {
+				
+				TemporalType temporalType = fs.getTemporalType();
+				
+				int fsSpatialResolution = fs.getGeohashPrecision();
+				int fsTemporalResolution = temporalType.getType();
+				
+				if(temporalType == TemporalType.DAY_OF_MONTH)
+					fsTemporalResolution = 3;
+				else if(temporalType == TemporalType.HOUR_OF_DAY)
+					fsTemporalResolution = 4;
+				
+				boolean needMoreGrouping = true;
+				
+				// In this case, we do not need to get summarykey for each of the records
+				// as they are processed from a block. 
+				// The summarykey in this case will be generated from the block key instead
+				// THE SUMMARYKEY IN THIS CASE WILL NEED TO BE GENERATED ONCE PER PATH AND NOT FOR EACH RECORD
+				if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
+					needMoreGrouping = false;
+				}
+				
+				
+				
+				/* Feature Query is not needed to list blocks */
+				// KEY Format : year-month-day-hour$$geohash
+				
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+						event.getSpatialResolution(), event.getTemporalResolution());
+				
+				List<String> blocksToReject = fs.listMatchingCells(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+				
+				JSONArray filePaths = new JSONArray();
+				
+				if (blockMap.keySet().size() > 0) {
+					
+					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
+						
+						hostFileSize = 0;
+						filePaths = new JSONArray();
+						// maximum parallelism = 64
+						ExecutorService executor = Executors.newFixedThreadPool(Math.min(blockMap.keySet().size(), 2 * numCores));
+						
+						List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
+						
+						GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(), event.getPolygon());
+						
+						for (String blockKey : blockMap.keySet()) {
+							
+							/* Converts the bounds of geohash into a 1024x1024 region */
+							String[] tokens = blockKey.split("\\$\\$");
+							GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
+							
+							Bitmap queryBitmap = null;
+							
+							if (geoQuery.getPolygon() != null)
+								queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
+							
+							List<String> blocks = blockMap.get(blockKey);
+							
+							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
+									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), needMoreGrouping, blockKey);
+							
+							queryProcessors.add(qp);
+							executor.execute(qp);
+							
+						}
+						executor.shutdown();
+						boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+						if (!status)
+							logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
+						
+						// Sum up the output from query processors
+						for (VisualizationQueryProcessor qp : queryProcessors) {
+							
+							if (qp.getResultSummaries().size() > 0) {
+								Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
+								
+								for(String key: localSummary.keySet()) {
+									
+									if(!extractedSummaries.containsKey(key)) {
+										extractedSummaries.put(key, localSummary.get(key));
+									} else {
+										SummaryStatistics[] oldStats = extractedSummaries.get(key);
+										SummaryStatistics[] statsUpdate = localSummary.get(key);
+										
+										SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+										extractedSummaries.put(key, mergedSummaries);
+									}
+									
+								}
+							}
+						}
+					} 
+				}
+				
+				// POPULATE THE CACHE TREE
+				// ALSO POPULATE FILE BITMAPS
+				fs.populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+				
+				JSONArray summaryJSONs = new JSONArray();
+				
+				for(String key: extractedSummaries.keySet()) {
+					
+					JSONObject obj = new JSONObject();
+					obj.put("key", key);
+					String summaryString = "";
+					
+					JSONArray summarystats = new JSONArray();
+					
+					int i=0;
+					
+					for(SummaryStatistics ss : extractedSummaries.get(key)) {
+						if(i==0)
+							summaryString = ss.toString();
+						else 
+							summaryString += ","+ss.toString();
+					}
+					
+					obj.put("summary", summaryString);
+					
+					summaryJSONs.put(obj);
+				}
+				
+				totalProcessingTime = System.currentTimeMillis() - processingTime;
+				totalNumPaths = filePaths.length();
+				
+				resultJSON.put("hostName", this.canonicalHostname);
+				resultJSON.put("hostPort", this.port);
+				resultJSON.put("summaries", summaryJSONs);
+			} else {
+				logger.log(Level.SEVERE, "Requested file system(" + fsName
+						+ ") not found. Ignoring the query and returning empty results.");
+			}
+		} catch (Exception e) {
+			logger.log(Level.SEVERE,
+					"Something went wrong while querying the filesystem. No results obtained. Sending blank list to the client. Issue details follow:",
+					e);
+		}
+
+		JSONObject responseJSON = new JSONObject();
+		responseJSON.put("filesystem", event.getFilesystemName());
+		
+		responseJSON.put("result", resultJSON);
+		responseJSON.put("totalProcessingTime", totalProcessingTime);
+		
+		
+		QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
+		try {
+			context.sendReply(response);
+		} catch (IOException ioe) {
+			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
+		}
+	}
+	
+	
 	/**
 	 * Handles a query request from a client. Query requests result in a number
 	 * of subqueries being performed across the Galileo network.
