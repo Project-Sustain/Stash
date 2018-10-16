@@ -796,6 +796,7 @@ public class StorageNode implements RequestListener {
 		long totalProcessingTime = 0;
 		long blocksProcessed = 0;
 		int totalNumPaths = 0;
+		
 		JSONObject resultJSON = new JSONObject();
 		Map<String,SummaryStatistics[]> extractedSummaries = new HashMap<String,SummaryStatistics[]>();
 		Map<String,SummaryStatistics[]> savedSummaries = new HashMap<String,SummaryStatistics[]>();
@@ -827,15 +828,22 @@ public class StorageNode implements RequestListener {
 					needMoreGrouping = false;
 				}
 				
-				
-				
 				/* Feature Query is not needed to list blocks */
 				// KEY Format : year-month-day-hour$$geohash
 				
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 						event.getSpatialResolution(), event.getTemporalResolution());
 				
-				List<String> blocksToReject = fs.listMatchingCells(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+				// FIGURING OUT WHAT DATA IS ALREADY IN THE CACHES
+				if(needMoreGrouping) {
+					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
+					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+				} else {
+					// NOT SUB-BLOCK LEVEL
+					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+				}
+				
+				
 				
 				JSONArray filePaths = new JSONArray();
 				

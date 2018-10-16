@@ -140,7 +140,7 @@ public class GeospatialFileSystem extends FileSystem {
 	private NetworkInfo network;
 	private Partitioner<Metadata> partitioner;
 	private TemporalType temporalType;
-	
+	private int temporalLevel;
 	/*
 	 * Must be comma-separated name:type string where type is an int returned by
 	 * FeatureType
@@ -276,7 +276,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.spatialSubLevels = stCache.getTotalSpatialLevels()-geohashPrecision;
 		
-		int temporalLevel = 1;
+		temporalLevel = 1;
 		switch (this.temporalType) {
 		case HOUR_OF_DAY:
 			temporalLevel = 4;
@@ -1064,21 +1064,33 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @author sapmitra
 	 * @param temporalProperties
 	 * @param spatialProperties
-	 * @param reqSpatialResolution
-	 * @param reqTemporalResolution
+	 * @param reqSpatialResolution Spatial resolution of event
+	 * @param reqTemporalResolution Temporal resolution of event
 	 * @return
 	 * @throws InterruptedException
 	 */
-	public List<String> listMatchingCells(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public List<String> listMatchingCellsForSubBlock(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
 		
 		String space = null;
+		
 		List<Path<Feature, String>> paths = null;
-		List<String> blocks = new ArrayList<String>();
 		
 		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		
 		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
 		
+		for(String blockKey : blockKeys) {
+			
+			List<String> blocks = blockMap.get(blockKey);
+			
+			for(String block : blocks) {
+				
+				// Get block's
+				checkForExistingSummaries(blockKey, geohashPrecision, temporalLevel, level);
+				
+			}
+		}
 		
 		/* temporal and spatial properties from the query event */
 		if (temporalProperties != null && spatialProperties != null) {
@@ -1216,7 +1228,30 @@ public class GeospatialFileSystem extends FileSystem {
 		return blockMap;
 	}
 	
-	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param blockKey
+	 * @param fsSpatialPrecision
+	 * @param fsTemporalPrecision
+	 * @param level - The current level of cache we are looking at
+	 */
+	private void checkForExistingSummaries(String blockPath, String blockKey, int fsSpatialPrecision, int fsTemporalPrecision, int level) {
+		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
+		// ACCESS THE BITMAP FOR THAT BLOCK
+		SubBlockLevelBitmaps subBlockLevelBitmaps = blockBitmaps.get(blockPath);
+		if(subBlockLevelBitmaps == null)
+			return;
+		
+		
+		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
+		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
+		
+		// CREATE A BITMAP OF THE QUERY AREA FOR THE BLOCK BASED ON THE SPATIOTEMPORAL QUERY
+		
+		
+	}
+
 	/**
 	 * 
 	 * @param temporalProperties

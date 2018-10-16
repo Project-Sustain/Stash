@@ -57,10 +57,11 @@ public class SubBlockLevelBitmaps {
 	 */
 	
 	private int getMapIndex(int spatialLevel, int temporalLevel) {
+		
 		int spLvl = spatialLevel - spatialFSLevel;
 		int tLvl = temporalLevel - temporalFSLevel;
 		
-		int indx = (spLvl)*spatialLevels + tLvl;
+		int indx = (tLvl)*spatialLevels + spLvl;
 		return indx;
 	}
 	
@@ -161,6 +162,25 @@ public class SubBlockLevelBitmaps {
 				
 			}
 		}
+		
+	}
+	
+	public static int getBitmapIndexFromKey(int fsSpatialLevel, int fsTemporalLevel, int relativeSpatialLevel,
+			int relativeTemporalLevel, String key) {
+		
+		
+		String[] tokens = key.split("\\$\\$");
+		String temporalString = tokens[0];
+		String spatialString  = tokens[1];
+		
+		String choppedGeohash = spatialString.substring(fsTemporalLevel);
+		
+		int spatialIndex = (int)GeoHash.hashToLong(choppedGeohash);
+		
+		
+		
+		
+		return 0;
 		
 	}
 	

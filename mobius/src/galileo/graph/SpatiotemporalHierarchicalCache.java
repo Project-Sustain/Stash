@@ -77,7 +77,7 @@ public class SpatiotemporalHierarchicalCache {
 	 */
 	public int getCacheLevel(int spatialResolution, int temporalResolution) {
 		
-		int levelNum = (spatialResolution-1)*totalTemporalLevels + (temporalResolution-1);
+		int levelNum = (temporalResolution-1)*totalSpatialLevels + (spatialResolution-1);
 		
 		return levelNum;
 	}
