@@ -13,8 +13,7 @@ import galileo.util.GeoHash;
 
 public class SubBlockLevelBitmaps {
 	
-	// Actual Number of sub-levels. 
-	
+	// FS block level 
 	private int spatialFSLevel;
 	private int temporalFSLevel;
 	
@@ -37,14 +36,27 @@ public class SubBlockLevelBitmaps {
 	/**
 	 * RETURNS THE BITMAP FOR A REQUESTED SPATIOTEMPORAL LEVEL
 	 * @author sapmitra
-	 * @param spatialLevel
-	 * @param temporalLevel
+	 * @param spatialLevel - actual sp level, not relative
+	 * @param temporalLevel = actual tmp level, not relative
 	 * @return
 	 */
 	public Bitmap getBitMapForParticularLevel(int spatialLevel, int temporalLevel) {
 		int indx = getMapIndex(spatialLevel, temporalLevel);
 		
 		return spatioTemporalBitmaps[indx];
+		
+	}
+	
+	/**
+	 * RETURNS THE BITMAP FOR A REQUESTED SPATIOTEMPORAL LEVEL
+	 * @author sapmitra
+	 * @param spatialLevel
+	 * @param temporalLevel
+	 * @return
+	 */
+	public Bitmap getBitMapForParticularLevel(int spatiotemporalLevel) {
+		
+		return spatioTemporalBitmaps[spatiotemporalLevel];
 		
 	}
 	
@@ -56,7 +68,7 @@ public class SubBlockLevelBitmaps {
 	 * @return
 	 */
 	
-	private int getMapIndex(int spatialLevel, int temporalLevel) {
+	public int getMapIndex(int spatialLevel, int temporalLevel) {
 		
 		int spLvl = spatialLevel - spatialFSLevel;
 		int tLvl = temporalLevel - temporalFSLevel;
@@ -256,6 +268,46 @@ public class SubBlockLevelBitmaps {
 		//hashToLong = GeoHash.hashToLong("z");
 		//System.out.println("z "+hashToLong+GeoHash.fromLongToString(hashToLong));
 		
+	}
+
+	public int getSpatialFSLevel() {
+		return spatialFSLevel;
+	}
+
+	public void setSpatialFSLevel(int spatialFSLevel) {
+		this.spatialFSLevel = spatialFSLevel;
+	}
+
+	public int getTemporalFSLevel() {
+		return temporalFSLevel;
+	}
+
+	public void setTemporalFSLevel(int temporalFSLevel) {
+		this.temporalFSLevel = temporalFSLevel;
+	}
+
+	public int getSpatialLevels() {
+		return spatialLevels;
+	}
+
+	public void setSpatialLevels(int spatialLevels) {
+		this.spatialLevels = spatialLevels;
+	}
+
+	public int getTemporalLevels() {
+		return temporalLevels;
+	}
+
+	public void setTemporalLevels(int temporalLevels) {
+		this.temporalLevels = temporalLevels;
+	}
+
+	public Bitmap[] getSpatioTemporalBitmaps() {
+		return spatioTemporalBitmaps;
+	}
+
+	public void setSpatioTemporalBitmaps(Bitmap[] spatioTemporalBitmaps) {
+		this.spatioTemporalBitmaps = spatioTemporalBitmaps;
 	}
 
 }

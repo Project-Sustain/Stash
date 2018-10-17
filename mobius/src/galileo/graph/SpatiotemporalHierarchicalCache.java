@@ -82,6 +82,18 @@ public class SpatiotemporalHierarchicalCache {
 		return levelNum;
 	}
 	
+	/**
+	 * RETURNS THE EXACT SPARSE SPATIOTEMPORAL MATRIX/CACHE FOR A GIVEN LEVEL
+	 * @author sapmitra
+	 * @param level - spatiotemporal level
+	 * @return
+	 */
+	public SparseSpatiotemporalMatrix getSpecificCache(int level) {
+		
+		return cacheLevels[level];
+		
+	}
+	
 	public static void main(String arg[]) {
 		
 		SpatiotemporalHierarchicalCache s = new SpatiotemporalHierarchicalCache();

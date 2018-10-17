@@ -1076,7 +1076,8 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		List<Path<Feature, String>> paths = null;
 		
-		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		
+		
 		
 		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
 		
@@ -1084,10 +1085,13 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			List<String> blocks = blockMap.get(blockKey);
 			
+			// The level of stcache we need to look at
+			int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+			
 			for(String block : blocks) {
 				
-				// Get block's
-				checkForExistingSummaries(blockKey, geohashPrecision, temporalLevel, level);
+				// Look into stcache for available summaries
+				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, geohashPrecision, temporalLevel, level);
 				
 			}
 		}
@@ -1236,21 +1240,43 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param fsTemporalPrecision
 	 * @param level - The current level of cache we are looking at
 	 */
-	private void checkForExistingSummaries(String blockPath, String blockKey, int fsSpatialPrecision, int fsTemporalPrecision, int level) {
+	private void checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
+			int fsSpatialPrecision, int fsTemporalPrecision, int level) {
+		
 		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
 		// ACCESS THE BITMAP FOR THAT BLOCK
 		SubBlockLevelBitmaps subBlockLevelBitmaps = blockBitmaps.get(blockPath);
+		
 		if(subBlockLevelBitmaps == null)
 			return;
 		
+		Bitmap block_cell_bitmap = subBlockLevelBitmaps.getBitMapForParticularLevel(reqSpatialPrecision, reqTemporalPrecision);
 		
 		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
+		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
+		
+		
 		
 		// CREATE A BITMAP OF THE QUERY AREA FOR THE BLOCK BASED ON THE SPATIOTEMPORAL QUERY
 		
 		
 	}
+	
+	/**
+	 * Creating a Bitmap of all cells in a block that is contained in a Sparse spatiotemporal matrix
+	 * @author sapmitra
+	 * @param blockKey
+	 * @param cache
+	 * @return
+	 */
+	private Bitmap createBitmapFromCache(String blockKey, SparseSpatiotemporalMatrix cache) {
+		
+		
+		return null;
+	}
+	
+	
 
 	/**
 	 * 
