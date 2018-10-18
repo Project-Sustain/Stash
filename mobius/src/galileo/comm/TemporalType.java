@@ -48,7 +48,7 @@ public enum TemporalType {
 	}
 	
 	/**
-	 * 
+	 * INDEX OF A GIVEN TIMESTAMP FOR A BLOCK BITMAP
 	 * @author sapmitra
 	 * @param startTimeStamp the starting timestamp of a block
 	 * @param currentTimeStamp the timestamp of the record
@@ -58,6 +58,30 @@ public enum TemporalType {
 	public static long getTemporalIndex (DateTime d1, long currentTimeStamp, int desiredLevel) {
 		
 		DateTime d2 = new DateTime(currentTimeStamp);
+		
+		long tmpIndex = 0;
+		
+		if(desiredLevel == 2)
+			tmpIndex = Months.monthsBetween(d1, d2).getMonths();
+		else if(desiredLevel == 3)
+			tmpIndex = Days.daysBetween(d1, d2).getDays();
+		else if(desiredLevel == 4)
+			tmpIndex = Hours.hoursBetween(d1, d2).getHours();
+		
+		
+		return tmpIndex;
+		
+	}
+	
+	/**
+	 * INDEX OF A GIVEN TIMESTAMP FOR A BLOCK BITMAP
+	 * @author sapmitra
+	 * @param startTimeStamp the starting timestamp of a block
+	 * @param currentTimeStamp the timestamp of the record
+	 * @param desiredLevel the number of desired units between the two timestamps, could be month, hour...so on
+	 * @return
+	 */
+	public static long getTemporalIndex (DateTime d1, DateTime d2, int desiredLevel) {
 		
 		long tmpIndex = 0;
 		
@@ -111,6 +135,22 @@ public enum TemporalType {
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 2));
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 3));
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 4));
+	}
+
+	public static TemporalType getTypeFromLevel(int reqTemporalResolution) {
+		
+		TemporalType tt = TemporalType.YEAR;
+		switch (reqTemporalResolution) {
+		case 4:
+			tt = TemporalType.HOUR_OF_DAY;
+		case 3:
+			tt = TemporalType.DAY_OF_MONTH;
+		case 2:
+			tt = TemporalType.MONTH;
+		case 1:
+			tt = TemporalType.YEAR;
+		}
+		return tt;
 	}
 	
 }

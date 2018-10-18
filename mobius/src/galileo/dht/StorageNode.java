@@ -835,7 +835,9 @@ public class StorageNode implements RequestListener {
 						event.getSpatialResolution(), event.getTemporalResolution());
 				
 				// FIGURING OUT WHAT DATA IS ALREADY IN THE CACHES
+				// FETCH CACHED DATA AND REMOVE THEM FROM THE LIST OF CANDIDATE BLOCKS TO BE SEARCHED
 				if(needMoreGrouping) {
+					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
 				} else {

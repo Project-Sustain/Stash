@@ -64,20 +64,17 @@ public class SparseSpatiotemporalMatrix {
 	 * @param temporalResolution2 
 	 * @param spatialResolution2 
 	 */
+	
 	public void addCell(SummaryStatistics[] summ, String key) {
 		
+		// The new summary replaces the old cache summary, whatever may be the case
 		CacheCell c = cells.get(key);
-		if(c == null) {
-			// This cell is empty
-			c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution);
-			cells.put(key, c);
+		
+		// This cell is empty
+		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution);
+		cells.put(key, c);
 			
-		} else {
-			// THIS CELL EXISTS
-			// JUST UPDATE THE SUMMARY STATISTICS OF THIS CELL
-			
-			
-		}
+		
 		
 	}
 	

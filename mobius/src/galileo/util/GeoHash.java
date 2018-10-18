@@ -1785,8 +1785,17 @@ public class GeoHash {
 		
 	}
 	
-	
-	private static String getTemporalOrientation(String time1, String time2, TemporalType t1, TemporalType t2) throws ParseException {
+	/**
+	 * RETURNS ORIENTATION OF TIMESTRING2 WRT TIMESTRING1
+	 * @author sapmitra
+	 * @param time1
+	 * @param time2
+	 * @param t1
+	 * @param t2
+	 * @return
+	 * @throws ParseException
+	 */
+	public static String getTemporalOrientation(String time1, String time2, TemporalType t1, TemporalType t2) throws ParseException {
 		
 		String[] tokens = time1.split("-");
 		String[] tokens2 = time2.split("-");

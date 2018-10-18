@@ -1074,10 +1074,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		String space = null;
 		
+		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
+		
 		List<Path<Feature, String>> paths = null;
-		
-		
-		
 		
 		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
 		
@@ -1091,174 +1090,61 @@ public class GeospatialFileSystem extends FileSystem {
 			for(String block : blocks) {
 				
 				// Look into stcache for available summaries
-				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, geohashPrecision, temporalLevel, level);
+				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, geohashPrecision, temporalLevel, level);
 				
 			}
 		}
 		
-		/* temporal and spatial properties from the query event */
-		if (temporalProperties != null && spatialProperties != null) {
-			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
-			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
-					: sp.getSpatialRange().getBounds();
-			
-			/* Tries to get the geohash for the center-point of the MBR for the polygon */
-			space = getSpatialString(sp);
-			
-			/* Returns all 2 char geohashes that intersect with the searched polygon */
-			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
-			
-			hashLocations.retainAll(this.geohashIndex);
-			logger.info("baseLocations: " + hashLocations);
-			Query query = new Query();
-			
-			/* Builds an expression for the temporal query asking the top level temporal levels to be 
-			 * equal to whatever is in the time string */
-			// temporalProperties is a string of the format YEAR-MONTH-DAY-HOUR
-			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
-			
-			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
-			
-			for (String geohash : hashLocations) {
-				Set<GeoHash> intersections = new HashSet<>();
-				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
-				
-				// gets a 111000000 like binary representation of the geohash
-				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
-				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
-						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
-				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
-				for (GeoHash gh : intersections) {
-					String[] hashRange = gh.getValues(this.geohashPrecision);
-					if (hashRange != null) {
-						Operation op = new Operation(temporalExpressions);
-						if (hashRange.length == 1)
-							op.addExpressions(
-									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
-						else {
-							op.addExpressions(
-									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
-							op.addExpressions(
-									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
-						}
-						query.addOperation(op);
-					}
-				}
-			}
-			/* query intersection merges the query with metadata query */
-			/* returns a list of paths matching the query */
-			paths = executeParallelQuery(queryIntersection(query, null));
-		} else if (temporalProperties != null) {
-			List<Expression> temporalExpressions = buildTemporalExpression(temporalProperties);
-			Query query = new Query(
-					new Operation(temporalExpressions.toArray(new Expression[temporalExpressions.size()])));
-			paths = metadataGraph.evaluateQuery(queryIntersection(query, null));
-		} else if (spatialProperties != null) {
-			SpatialProperties sp = new SpatialProperties(new SpatialRange(spatialProperties));
-			List<Coordinates> geometry = sp.getSpatialRange().hasPolygon() ? sp.getSpatialRange().getPolygon()
-					: sp.getSpatialRange().getBounds();
-			space = getSpatialString(sp);
-			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
-			hashLocations.retainAll(this.geohashIndex);
-			logger.info("baseLocations: " + hashLocations);
-			Query query = new Query();
-			Polygon polygon = GeoHash.buildAwtPolygon(geometry);
-			for (String geohash : hashLocations) {
-				Set<GeoHash> intersections = new HashSet<>();
-				String pattern = "%" + (geohash.length() * GeoHash.BITS_PER_CHAR) + "s";
-				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
-				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
-						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
-				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
-				for (GeoHash gh : intersections) {
-					String[] hashRange = gh.getValues(this.geohashPrecision);
-					if (hashRange != null) {
-						Operation op = new Operation();
-						if (hashRange.length == 1)
-							op.addExpressions(
-									new Expression(Operator.EQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
-						else {
-							op.addExpressions(
-									new Expression(Operator.GREATEREQUAL, new Feature(SPATIAL_FEATURE, hashRange[0])));
-							op.addExpressions(
-									new Expression(Operator.LESSEQUAL, new Feature(SPATIAL_FEATURE, hashRange[1])));
-						}
-						query.addOperation(op);
-					}
-				}
-			}
-			/* Queryintersection combines the normal and metadata query */
-			paths = executeParallelQuery(queryIntersection(query, null));
-		} else {
-			// non-chronal non-spatial
-			paths = metadataGraph.getAllPaths();
-		}
-		
-		// Paths look like Path((root,f1,f2,f3,...),payload). Each path represents each DFS traversal of a tree
-		
-		// If the requested resolution is less than or equal to the file system's 
-		// resolution, the summary key will not need to be checked against each record for a block. 
-		// Rather the block key can be used.
-		TemporalType temporalType = getTemporalType();
-		int fsSpatialResolution = getGeohashPrecision();
-		int fsTemporalResolution = temporalType.getType();
-		
-		if(temporalType == TemporalType.DAY_OF_MONTH)
-			fsTemporalResolution = 3;
-		else if(temporalType == TemporalType.HOUR_OF_DAY)
-			fsTemporalResolution = 4;
-		
-		// CHECKING IF REQUEST RESOLUTION IS LOWER THAN THE FS RESOLUTION
-		// spR and tmR are the resolutions at which blocks will be grouped
-		// if the filesystems's resolution are higher, then grouping will be at the request's resolution
-		int spR = fsSpatialResolution;
-		int tmR = fsTemporalResolution;
-		
-		if(fsSpatialResolution >= reqSpatialResolution && fsTemporalResolution >= reqTemporalResolution) {
-			spR = reqSpatialResolution;
-			tmR = reqTemporalResolution;
-		}
-		
-		for (Path<Feature, String> path : paths) {
-			String groupKey = getCellKey(path, space, spR, tmR);
-			blocks = blockMap.get(groupKey);
-			if (blocks == null) {
-				blocks = new ArrayList<String>();
-				blockMap.put(groupKey, blocks);
-			}
-			blocks.addAll(path.getPayload());
-		}
-		
-		return blockMap;
+		return null;
 	}
 	
 	/**
-	 * 
+	 * FOR A SINGLE BLOCK, CHECK THE EXISTING CACHE KEYS FOR MATCH
 	 * @author sapmitra
 	 * @param blockKey
+	 * @param reqTemporalType 
 	 * @param fsSpatialPrecision
 	 * @param fsTemporalPrecision
 	 * @param level - The current level of cache we are looking at
+	 * @throws ParseException 
 	 */
 	private void checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
-			int fsSpatialPrecision, int fsTemporalPrecision, int level) {
-		
-		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
-		// ACCESS THE BITMAP FOR THAT BLOCK
-		SubBlockLevelBitmaps subBlockLevelBitmaps = blockBitmaps.get(blockPath);
-		
-		if(subBlockLevelBitmaps == null)
-			return;
-		
-		Bitmap block_cell_bitmap = subBlockLevelBitmaps.getBitMapForParticularLevel(reqSpatialPrecision, reqTemporalPrecision);
+			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision, int level) throws ParseException {
 		
 		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
 		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
 		
+		String[] tokens = blockKey.split("\\$\\$");
+		String blockTimeTokens[] = tokens[0].split("-");
 		
+		long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
+		DateTime blockTime = new DateTime(blockTimeStamp);
+		
+		// ***************CACHE BITMAP***************
+		Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(), reqTemporalType, temporalType, reqTemporalPrecision);
+		
+		if(cacheBitmap == null) {
+			// NO NEED TO LOOK FOR EXISTING SUMMARIES....IT'S EMPTY
+			// LET THEM KNOW THAT THIS BLOCK NEEDS TO BE PROCESSED
+			return;
+		}
+		
+		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
+		// ACCESS THE BITMAP FOR THAT BLOCK
+		SubBlockLevelBitmaps subBlockLevelBitmaps = blockBitmaps.get(blockPath);
+		
+		// ***************BLOCK BITMAP***************
+		Bitmap block_cell_bitmap = subBlockLevelBitmaps.getBitMapForParticularLevel(reqSpatialPrecision, reqTemporalPrecision);
+		
+		if(block_cell_bitmap == null)
+			return;
 		
 		// CREATE A BITMAP OF THE QUERY AREA FOR THE BLOCK BASED ON THE SPATIOTEMPORAL QUERY
+		
+		// ***************QUERY BITMAP***************
+		
+		
 		
 		
 	}
@@ -1269,12 +1155,58 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param blockKey
 	 * @param cache
 	 * @return
+	 * @throws ParseException 
 	 */
-	private Bitmap createBitmapFromCache(String blockKey, SparseSpatiotemporalMatrix cache) {
+	private Bitmap createBitmapFromCacheForGivenBlock(DateTime blockTimeObject, String blockTime, String blockGeoHash, Set<String> cacheCells, 
+			TemporalType cellType, TemporalType blockType, int currentTemporalLevel) throws ParseException {
 		
+		Bitmap blockBitmap = new Bitmap();
+		boolean somethingFound = false;
+		
+		for(String key : cacheCells) {
+			
+			String[] tokens = key.split("\\$\\$");
+			
+			String cellTimeString = tokens[0];
+			String cellGeohashString = tokens[1];
+			
+			String[] cellTimeTokens = cellTimeString.split("-");
+			
+			// see if cell is contained in the block
+			// get the index for that cell in the block, if yes
+			
+			String spatialOrientation = GeoHash.getSpatialOrientationHeuristic(blockGeoHash, cellGeohashString);
+			String temporalOrientation = GeoHash.getTemporalOrientation(blockTime, cellTimeString, blockType, cellType);
+			
+			if(spatialOrientation == "full" && temporalOrientation == "full") {
+				// THIS CELL IS CONTAINED IN THE BLOCK IN QUESTION
+				// START CREATING THE BITMAP
+				
+				// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
+				String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
+				
+				int spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+				int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
+				
+				long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
+				DateTime cellTime = new DateTime(cellTimeStamp);
+				
+				int temporalIndex = (int)TemporalType.getTemporalIndex(blockTimeObject, cellTime, currentTemporalLevel);
+				
+				int spatiotemporalIndex = (int)(temporalIndex*spatialSize + spatialIndex);
+				
+				blockBitmap.set(spatiotemporalIndex);
+				somethingFound = true;
+			}
+			
+		}
+		
+		if(somethingFound)
+			return blockBitmap;
 		
 		return null;
 	}
+	
 	
 	
 
