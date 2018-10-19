@@ -818,14 +818,14 @@ public class StorageNode implements RequestListener {
 				else if(temporalType == TemporalType.HOUR_OF_DAY)
 					fsTemporalResolution = 4;
 				
-				boolean needMoreGrouping = true;
+				boolean subBlockLevel = true;
 				
 				// In this case, we do not need to get summarykey for each of the records
 				// as they are processed from a block. 
 				// The summarykey in this case will be generated from the block key instead
 				// THE SUMMARYKEY IN THIS CASE WILL NEED TO BE GENERATED ONCE PER PATH AND NOT FOR EACH RECORD
 				if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
-					needMoreGrouping = false;
+					subBlockLevel = false;
 				}
 				
 				/* Feature Query is not needed to list blocks */
@@ -836,7 +836,7 @@ public class StorageNode implements RequestListener {
 				
 				// FIGURING OUT WHAT DATA IS ALREADY IN THE CACHES
 				// FETCH CACHED DATA AND REMOVE THEM FROM THE LIST OF CANDIDATE BLOCKS TO BE SEARCHED
-				if(needMoreGrouping) {
+				if(subBlockLevel) {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
@@ -876,7 +876,7 @@ public class StorageNode implements RequestListener {
 							List<String> blocks = blockMap.get(blockKey);
 							
 							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
-									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), needMoreGrouping, blockKey);
+									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), subBlockLevel, blockKey);
 							
 							queryProcessors.add(qp);
 							executor.execute(qp);

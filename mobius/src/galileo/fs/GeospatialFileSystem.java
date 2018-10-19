@@ -1068,29 +1068,45 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param reqTemporalResolution Temporal resolution of event
 	 * @return
 	 * @throws InterruptedException
+	 * @throws ParseException 
 	 */
-	public List<String> listMatchingCellsForSubBlock(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
-			Map<String, SummaryStatistics[]> savedSummaries) throws InterruptedException {
-		
-		String space = null;
+	public List<String> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
 		
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
 		
-		List<Path<Feature, String>> paths = null;
-		
-		List<String> blockKeys = new ArrayList<String>(blockMap.keySet());
-		
-		for(String blockKey : blockKeys) {
+		for(String blockKey : blockMap.keySet()) {
 			
 			List<String> blocks = blockMap.get(blockKey);
 			
 			// The level of stcache we need to look at
 			int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
 			
+			// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
+			// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
+			SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
+			
+			String[] tokens = blockKey.split("\\$\\$");
+			String blockTimeTokens[] = tokens[0].split("-");
+			
+			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
+			DateTime blockTime = new DateTime(blockTimeStamp);
+			
+			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ?***************
+			Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
+					reqTemporalType, temporalType, reqTemporalResolution);
+			
+			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
+				// NOTHING IN CACHE
+				// LOOK INTO THE ENTIRE BLOCKS
+				return null;
+			}
+			
 			for(String block : blocks) {
 				
 				// Look into stcache for available summaries
-				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, geohashPrecision, temporalLevel, level);
+				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
+						geohashPrecision, temporalLevel, polygon, queryTimeString, cacheBitmap);
 				
 			}
 		}
@@ -1112,26 +1128,17 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws ParseException 
 	 */
 	private int checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
-			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision, int level,
-			List<Coordinates> polygon, String queryTimeString) throws ParseException {
-		
+			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision,
+			List<Coordinates> polygon, String queryTimeString, Bitmap cacheBitmap) throws ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
 		long qt1 = Long.valueOf(timeTokens[0]);
 		long qt2 = Long.valueOf(timeTokens[1]);
 		
-		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
-		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
-		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
-		
 		String[] tokens = blockKey.split("\\$\\$");
-		String blockTimeTokens[] = tokens[0].split("-");
 		
-		long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
-		DateTime blockTime = new DateTime(blockTimeStamp);
 		
 		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ?***************
-		Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(), reqTemporalType, temporalType, reqTemporalPrecision);
 		
 		if(cacheBitmap == null) {
 			// NO NEED TO LOOK FOR EXISTING SUMMARIES....IT'S EMPTY
