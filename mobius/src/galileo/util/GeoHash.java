@@ -181,6 +181,20 @@ public class GeoHash {
 		return this.binaryHash.hashCode();
 	}
 
+	/**
+	 * GET STARTIMESTAMP FROM A TEMPORAL STRING
+	 * @author sapmitra
+	 * @param temporalString
+	 * @param temporalType
+	 * @return
+	 * @throws ParseException
+	 */
+	public static long getStartTimeStamp(String temporalString, TemporalType temporalType) throws ParseException {
+		
+		String timeTokens[] = temporalString.split("-");
+		return getStartTimeStamp(timeTokens[0],timeTokens[1],timeTokens[2],timeTokens[3], temporalType);
+		
+	}
 	
 	/**
 	 * 
@@ -816,6 +830,7 @@ public class GeoHash {
 	 * @return
 	 */
 	public static boolean checkEnclosure(List<Coordinates> polygon, List<Coordinates> flank) {
+		
 		Polygon geometry = new Polygon();
 		for (Coordinates coords : polygon) {
 			Point<Integer> point = coordinatesToXY(coords);
@@ -901,6 +916,55 @@ public class GeoHash {
 		cs2.add(c12);cs2.add(c22);cs2.add(c32);cs2.add(c42);
 		
 		return checkIntersection(cs1,cs2);
+	}
+	
+	
+	/**
+	 * CHECK IF A GEOHASH IS ENCLOSED IN A POLYGON
+	 * @author sapmitra
+	 * @param geohash
+	 * @param polygon
+	 * @return
+	 */
+	
+	public static boolean checkEnclosure(List<Coordinates> polygon, String geohash) {
+		
+		SpatialRange range = decodeHash(geohash);
+		
+		Coordinates c1 = new Coordinates(range.getLowerBoundForLatitude(), range.getLowerBoundForLongitude());
+		Coordinates c2 = new Coordinates(range.getUpperBoundForLatitude(), range.getLowerBoundForLongitude());
+		Coordinates c3 = new Coordinates(range.getUpperBoundForLatitude(), range.getUpperBoundForLongitude());
+		Coordinates c4 = new Coordinates(range.getLowerBoundForLatitude(), range.getUpperBoundForLongitude());
+		
+		ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
+		cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+		
+		
+		return checkEnclosure(polygon,cs1);
+	}
+	
+	/**
+	 * CHECK IF A GEOHASH INTERSECTS A POLYGON
+	 * @author sapmitra
+	 * @param geohash
+	 * @param polygon
+	 * @return
+	 */
+	
+	public static boolean checkIntersection(List<Coordinates> polygon, String geohash) {
+		
+		SpatialRange range = decodeHash(geohash);
+		
+		Coordinates c1 = new Coordinates(range.getLowerBoundForLatitude(), range.getLowerBoundForLongitude());
+		Coordinates c2 = new Coordinates(range.getUpperBoundForLatitude(), range.getLowerBoundForLongitude());
+		Coordinates c3 = new Coordinates(range.getUpperBoundForLatitude(), range.getUpperBoundForLongitude());
+		Coordinates c4 = new Coordinates(range.getLowerBoundForLatitude(), range.getUpperBoundForLongitude());
+		
+		ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
+		cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+		
+		
+		return checkIntersection(polygon,cs1);
 	}
 	
 	public static void main2(String arg[]) {

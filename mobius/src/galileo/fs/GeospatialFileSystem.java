@@ -1100,16 +1100,25 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	/**
 	 * FOR A SINGLE BLOCK, CHECK THE EXISTING CACHE KEYS FOR MATCH
+	 * 
 	 * @author sapmitra
 	 * @param blockKey
 	 * @param reqTemporalType 
 	 * @param fsSpatialPrecision
 	 * @param fsTemporalPrecision
+	 * @param queryTimeString - two timestamps
 	 * @param level - The current level of cache we are looking at
+	 * @return -1 means nothing found 0 means full intersection 1 means partial found
 	 * @throws ParseException 
 	 */
-	private void checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
-			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision, int level) throws ParseException {
+	private int checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
+			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision, int level,
+			List<Coordinates> polygon, String queryTimeString) throws ParseException {
+		
+		
+		String[] timeTokens = queryTimeString.split("-");
+		long qt1 = Long.valueOf(timeTokens[0]);
+		long qt2 = Long.valueOf(timeTokens[1]);
 		
 		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
@@ -1121,32 +1130,122 @@ public class GeospatialFileSystem extends FileSystem {
 		long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 		DateTime blockTime = new DateTime(blockTimeStamp);
 		
-		// ***************CACHE BITMAP***************
+		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ?***************
 		Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(), reqTemporalType, temporalType, reqTemporalPrecision);
 		
 		if(cacheBitmap == null) {
 			// NO NEED TO LOOK FOR EXISTING SUMMARIES....IT'S EMPTY
 			// LET THEM KNOW THAT THIS BLOCK NEEDS TO BE PROCESSED
-			return;
+			return -1;
 		}
 		
 		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
 		// ACCESS THE BITMAP FOR THAT BLOCK
 		SubBlockLevelBitmaps subBlockLevelBitmaps = blockBitmaps.get(blockPath);
 		
-		// ***************BLOCK BITMAP***************
+		// ***************BLOCK BITMAP - WHAT CELLS ARE THERE IN A BLOCK ? ***************
 		Bitmap block_cell_bitmap = subBlockLevelBitmaps.getBitMapForParticularLevel(reqSpatialPrecision, reqTemporalPrecision);
 		
 		if(block_cell_bitmap == null)
-			return;
+			return -1;
 		
 		// CREATE A BITMAP OF THE QUERY AREA FOR THE BLOCK BASED ON THE SPATIOTEMPORAL QUERY
 		
+		boolean blockContainment = true;
+		
 		// ***************QUERY BITMAP***************
+		boolean spatialEnclosure = GeoHash.checkEnclosure(polygon, tokens[1]);
+		String temporalEnclosure = GeoHash.getTemporalOrientation(queryTimeString, tokens[0], temporalType, reqTemporalType);
+		
+		if(spatialEnclosure && temporalEnclosure == "full") {
+			blockContainment = true;
+		} else {
+			blockContainment = false;
+		}
+		
+		// ***********THE CELLS NEEDED BY THE QUERY**********************
+		Bitmap requirement;
+		
+		if(blockContainment) {
+			
+			requirement = block_cell_bitmap;
+			
+		} else {
+			// Create the extra bitmap for the query region
+			requirement = refineBlockBitmapUsingQueryArea(polygon, qt1, qt2, block_cell_bitmap.toArray(), reqSpatialPrecision, reqTemporalPrecision,
+					reqTemporalType, geohashPrecision, temporalLevel);
+		}
+		
+		// IF WHAT IS REQUIRED IS ALREADY CONTAINED IN MEMORY
+		Bitmap and = requirement.and(cacheBitmap);
+		
+		List<String> keysToBeFetchedFromCache = new ArrayList<String>();
+		
+		if(and.equals(requirement)) {
+			// WE CAN IGNORE PROCESSING THIS BLOCK
+			// ITS STORED IN THE CACHE
+			
+			// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
+			return 0;
+			
+		} else {
+			
+			int[] requiredIndices = and.toArray();
+			// convert these indices to cell keys. These need to be queried for
+			
+			for(int i: requiredIndices) {
+				
+				String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+				keysToBeFetchedFromCache.add(cellKey);
+			}
+		}
+		
+		return -1;
+		
+	}
+	
+	/**
+	 * REFINING THE BITMAP OF THE PORTION OF THE BLOCK THE QUERY PASSES.
+	 * CALLED ONLY IF BLOCK'S EXTENT IS NOT FULLY COVERED BY QUERY REGION
+	 * 
+	 * @author sapmitra
+	 * @param polygon
+	 * @param qt1 start time
+	 * @param qt2 end time
+	 * @param temporalLevel2 
+	 * @param geohashPrecision2 
+	 * @param reqTemporalPrecision 
+	 * @param reqSpatialPrecision 
+	 * @return
+	 * @throws ParseException 
+	 */
+	private Bitmap refineBlockBitmapUsingQueryArea (List<Coordinates> polygon, long qt1, long qt2, int[] indices, 
+			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType, int geohashPrecision, int temporalLevel) throws ParseException {
+		
+		Bitmap refinedBitmap = new Bitmap();
+		
+		for(int i : indices) {
+			
+			String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+			
+			String[] cellKeyTokens = cellKey.split("\\$\\$");
+			
+			long cellTimestamp = GeoHash.getStartTimeStamp(cellKeyTokens[0], reqTemporalType);
+			
+			boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellKeyTokens[1]);
+			boolean temporalIntersection = false;
+			
+			if(cellTimestamp >= qt1 && cellTimestamp <= qt2 )
+				temporalIntersection = true;
+			
+			
+			if(spatialIntersection && temporalIntersection) {
+				refinedBitmap.set(i);
+			}
+		}
 		
 		
-		
-		
+		return refinedBitmap;
 	}
 	
 	/**
