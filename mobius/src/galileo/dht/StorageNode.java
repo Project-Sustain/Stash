@@ -839,10 +839,12 @@ public class StorageNode implements RequestListener {
 				if(subBlockLevel) {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
-					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+					List<String> blocksToReject = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				} else {
 					// NOT SUB-BLOCK LEVEL
-					List<String> blocksToReject = fs.listMatchingCellsForSubBlock(blockMap, event.getSpatialResolution(), event.getTemporalResolution(), savedSummaries);
+					List<String> blocksToReject = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				}
 				
 				

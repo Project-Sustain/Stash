@@ -110,6 +110,7 @@ import galileo.serialization.SerializationException;
 import galileo.serialization.Serializer;
 import galileo.util.PathFragments;
 import galileo.util.BorderingProperties;
+import galileo.util.CellRequirements;
 import galileo.util.GeoHash;
 import galileo.util.Math;
 import galileo.util.OrientationManager;
@@ -1056,28 +1057,28 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	/**
-	 * LOOK AT THE MATCHING BLOCK LISTS AND ELIMINATE THE ONES THAT ALREADY HAVE ENTRIES IN THE CACHE
-	 * 
-	 * LOOKS AT THE CACHE AND RETURNS THE MATCHING CELLS I.E. BLOCKS ALREADY CACHED
-	 * ALSO RETURNS THE MATCHING SUMMARIES
+	 * RETURN AN EQUIVALENT TO BLOCKMAP, WHERE, INSTEAD OF BLOCKPATHS, A CELLREQUIREMENT OBJECT IS REQUIRED FOR A BLOCK
 	 * 
 	 * @author sapmitra
-	 * @param temporalProperties
-	 * @param spatialProperties
-	 * @param reqSpatialResolution Spatial resolution of event
-	 * @param reqTemporalResolution Temporal resolution of event
+	 * @param blockMap
+	 * @param reqSpatialResolution
+	 * @param reqTemporalResolution
+	 * @param savedSummaries
+	 * @param queryTimeString - Two timestamps
+	 * @param polygon - Query polygon
 	 * @return
 	 * @throws InterruptedException
-	 * @throws ParseException 
+	 * @throws ParseException
 	 */
-	public List<String> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public Map<String, List<CellRequirements>> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
 		
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
+		Map<String, List<CellRequirements>> requirementMap = new HashMap<String, List<CellRequirements>>();
 		
 		for(String blockKey : blockMap.keySet()) {
 			
-			List<String> blocks = blockMap.get(blockKey);
+			// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
 			
 			// The level of stcache we need to look at
 			int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
@@ -1096,17 +1097,57 @@ public class GeospatialFileSystem extends FileSystem {
 			Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
 					reqTemporalType, temporalType, reqTemporalResolution);
 			
+			boolean cacheIsEmpty = false;
 			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
 				// NOTHING IN CACHE
 				// LOOK INTO THE ENTIRE BLOCKS
-				return null;
+				cacheIsEmpty = true;
 			}
+			
+			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
+			
+			List<String> blocks = blockMap.get(blockKey);
 			
 			for(String block : blocks) {
 				
-				// Look into stcache for available summaries
-				checkForExistingSummaries(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
-						geohashPrecision, temporalLevel, polygon, queryTimeString, cacheBitmap);
+				// Look into what the block contains
+				// Refine it with the bounds of the query if it is not fully contained
+				if(!cacheIsEmpty) {
+					
+					Bitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
+							geohashPrecision, temporalLevel, polygon, queryTimeString);
+					
+					
+					// IF WHAT IS REQUIRED IS ALREADY CONTAINED IN MEMORY
+					Bitmap and = blockRequirement.and(cacheBitmap);
+					
+					List<String> keysToBeFetchedFromCache = new ArrayList<String>();
+					
+					if(and.equals(blockRequirement)) {
+						
+						// WE CAN IGNORE PROCESSING THIS BLOCK
+						// ITS STORED IN THE CACHE
+						
+						// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
+						return 0;
+						
+					} else {
+						
+						int[] requiredIndices = and.toArray();
+						// convert these indices to cell keys. These need to be queried for
+						
+						for(int i: requiredIndices) {
+							
+							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+							keysToBeFetchedFromCache.add(cellKey);
+						}
+					}
+				} else {
+					// CACHE EMPTY
+					// REQUIREMENT MODE 3
+					CellRequirements cr = new CellRequirements(block);
+					populateMap(requirementMap, cr, blockKey);
+				}
 				
 			}
 		}
@@ -1114,11 +1155,22 @@ public class GeospatialFileSystem extends FileSystem {
 		return null;
 	}
 	
+	private void populateMap (Map<String, List<CellRequirements>> requirementMap, CellRequirements cr, String mapKey) {
+		
+		List<CellRequirements> crs = requirementMap.get(mapKey);
+		if(crs == null) {
+			crs = new ArrayList<CellRequirements>();
+			requirementMap.put(mapKey, crs);
+		}
+		crs.add(cr);
+		
+	}
+	
 	/**
 	 * FOR A SINGLE BLOCK, CHECK THE EXISTING CACHE KEYS FOR MATCH
 	 * 
 	 * @author sapmitra
-	 * @param blockKey
+	 * @param blockKey - spatiotemporal information of the block
 	 * @param reqTemporalType 
 	 * @param fsSpatialPrecision
 	 * @param fsTemporalPrecision
@@ -1127,24 +1179,15 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return -1 means nothing found 0 means full intersection 1 means partial found
 	 * @throws ParseException 
 	 */
-	private int checkForExistingSummaries(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
+	private Bitmap checkForAvailableBlockCells(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
 			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision,
-			List<Coordinates> polygon, String queryTimeString, Bitmap cacheBitmap) throws ParseException {
+			List<Coordinates> polygon, String queryTimeString) throws ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
 		long qt1 = Long.valueOf(timeTokens[0]);
 		long qt2 = Long.valueOf(timeTokens[1]);
 		
 		String[] tokens = blockKey.split("\\$\\$");
-		
-		
-		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ?***************
-		
-		if(cacheBitmap == null) {
-			// NO NEED TO LOOK FOR EXISTING SUMMARIES....IT'S EMPTY
-			// LET THEM KNOW THAT THIS BLOCK NEEDS TO BE PROCESSED
-			return -1;
-		}
 		
 		// USE BLOCK-PATH TO LOOK AT THE CELLS CONTAINED THE BLOCK
 		// ACCESS THE BITMAP FOR THAT BLOCK
@@ -1153,8 +1196,9 @@ public class GeospatialFileSystem extends FileSystem {
 		// ***************BLOCK BITMAP - WHAT CELLS ARE THERE IN A BLOCK ? ***************
 		Bitmap block_cell_bitmap = subBlockLevelBitmaps.getBitMapForParticularLevel(reqSpatialPrecision, reqTemporalPrecision);
 		
+		// NOT SUPPOSED TO HAPPEN
 		if(block_cell_bitmap == null)
-			return -1;
+			return null;
 		
 		// CREATE A BITMAP OF THE QUERY AREA FOR THE BLOCK BASED ON THE SPATIOTEMPORAL QUERY
 		
@@ -1183,31 +1227,7 @@ public class GeospatialFileSystem extends FileSystem {
 					reqTemporalType, geohashPrecision, temporalLevel);
 		}
 		
-		// IF WHAT IS REQUIRED IS ALREADY CONTAINED IN MEMORY
-		Bitmap and = requirement.and(cacheBitmap);
-		
-		List<String> keysToBeFetchedFromCache = new ArrayList<String>();
-		
-		if(and.equals(requirement)) {
-			// WE CAN IGNORE PROCESSING THIS BLOCK
-			// ITS STORED IN THE CACHE
-			
-			// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
-			return 0;
-			
-		} else {
-			
-			int[] requiredIndices = and.toArray();
-			// convert these indices to cell keys. These need to be queried for
-			
-			for(int i: requiredIndices) {
-				
-				String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
-				keysToBeFetchedFromCache.add(cellKey);
-			}
-		}
-		
-		return -1;
+		return requirement;
 		
 	}
 	
