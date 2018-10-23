@@ -207,7 +207,7 @@ public class SubBlockLevelBitmaps {
 	 * @param tFSLevels
 	 * @return
 	 */
-	public static String getKeyFromBitmapIndex(int bitmapIndex, int sresolution, int tresolution, int sFSLevel, long startTimestamp) {
+	public static String getKeyFromBitmapIndex(int bitmapIndex, String blockGeohash, int sresolution, int tresolution, int sFSLevel, long startTimestamp) {
 		
 		int spatialSize = (int)java.lang.Math.pow(32, sresolution - sFSLevel);
 		
@@ -216,7 +216,10 @@ public class SubBlockLevelBitmaps {
 		int temporalIndex = bitmapIndex/spatialSize;
 		
 		//GeoHash.hashToLong(hash);
-		String geohashString = GeoHash.fromLongToString(spatialIndex, sresolution);
+		
+		String geohashString = blockGeohash;
+		if(sresolution > sFSLevel)
+			geohashString += GeoHash.fromLongToString(spatialIndex, sresolution);
 		
 		long newTimestamp = TemporalType.addTime(startTimestamp, temporalIndex, tresolution);
 		String temporalString = getTemporalString(newTimestamp, tresolution);

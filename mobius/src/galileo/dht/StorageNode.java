@@ -125,6 +125,7 @@ import galileo.net.ServerMessageRouter;
 import galileo.query.Query;
 import galileo.serialization.SerializationException;
 import galileo.util.BorderingProperties;
+import galileo.util.CellRequirements;
 import galileo.util.GeoHash;
 import galileo.util.PathFragments;
 import galileo.util.PathsAndOrientations;
@@ -839,11 +840,11 @@ public class StorageNode implements RequestListener {
 				if(subBlockLevel) {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
-					List<String> blocksToReject = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+					Map<String, List<CellRequirements>> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				} else {
 					// NOT SUB-BLOCK LEVEL
-					List<String> blocksToReject = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+					Map<String, List<CellRequirements>> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				}
 				

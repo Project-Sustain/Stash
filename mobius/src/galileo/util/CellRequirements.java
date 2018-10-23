@@ -1,7 +1,9 @@
 package galileo.util;
 
 import java.util.List;
+import java.util.Map;
 
+import galileo.bmp.Bitmap;
 import galileo.graph.SummaryStatistics;
 
 /**
@@ -18,26 +20,30 @@ public class CellRequirements {
 	// 3 means full processing needed
 	private int requirementMode;
 	private List<String> cellsMissing;
-	private SummaryStatistics[] summariesFoundInCache;
 
 	// NOTHING RELEVANT FOUND IN CACHE
 	public CellRequirements(String blockPath) {
+		
 		this.blockPath = blockPath;
 		this.requirementMode = 3;
 	}
 	
+	// EVERYTHING FOUND IN CACHE
+	// FETCH FROM CACHE
+	public CellRequirements(String blockPath, int requirementMode) {
+		
+		this.blockPath = blockPath;
+		this.requirementMode = requirementMode;
+		
+	}
+
 	public List<String> getCellsMissing() {
 		return cellsMissing;
 	}
 	public void setCellsMissing(List<String> cellsMissing) {
 		this.cellsMissing = cellsMissing;
 	}
-	public SummaryStatistics[] getSummariesFoundInCache() {
-		return summariesFoundInCache;
-	}
-	public void setSummariesFoundInCache(SummaryStatistics[] summariesFoundInCache) {
-		this.summariesFoundInCache = summariesFoundInCache;
-	}
+	
 	public int getRequirementMode() {
 		return requirementMode;
 	}

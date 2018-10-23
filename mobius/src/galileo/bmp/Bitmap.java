@@ -25,6 +25,7 @@ software, even if advised of the possibility of such damage.
 
 package galileo.bmp;
 
+import java.util.Arrays;
 import java.util.Iterator;
 
 import com.googlecode.javaewah.EWAHCompressedBitmap;
@@ -66,6 +67,10 @@ public class Bitmap implements Iterable<Integer> {
 
     public Bitmap xor(Bitmap otherBitmap) {
         return new Bitmap(this.bmp.xor(otherBitmap.bmp));
+    }
+    
+    public Bitmap andNot(Bitmap otherBitmap) {
+    	return new Bitmap(this.bmp.andNot(otherBitmap.bmp));
     }
 
     public Bitmap and(Bitmap otherBitmap) {
@@ -222,5 +227,35 @@ public class Bitmap implements Iterable<Integer> {
     @Override
     public Iterator<Integer> iterator() {
         return bmp.iterator();
+    }
+    
+    
+    public static void main(String arg[]) {
+    	
+    	Bitmap m1 = new Bitmap();
+    	Bitmap m2 = new Bitmap();
+    	
+    	
+    	m1.set(1);
+    	m1.set(3);
+    	
+    	m2.set(3);
+    	m2.set(1);
+    	
+    	int[] array1 = m2.toArray();
+    	
+    	System.out.println("==========");
+    	for(int i: array1)
+    		System.out.print(i+" ");
+    	System.out.println();
+    	System.out.println("==========");
+    	
+    	
+    	Bitmap andNot = m1.andNot(m2);
+    	int[] array = andNot.toArray();
+    	System.out.println(array.length);
+    	
+    	
+    	
     }
 }

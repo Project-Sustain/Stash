@@ -97,6 +97,22 @@ public enum TemporalType {
 		
 	}
 	
+	public static long getTemporalStringFromIndex (DateTime d1, DateTime d2, int desiredLevel) {
+		
+		long tmpIndex = 0;
+		
+		if(desiredLevel == 2)
+			tmpIndex = Months.monthsBetween(d1, d2).getMonths();
+		else if(desiredLevel == 3)
+			tmpIndex = Days.daysBetween(d1, d2).getDays();
+		else if(desiredLevel == 4)
+			tmpIndex = Hours.hoursBetween(d1, d2).getHours();
+		
+		
+		return tmpIndex;
+		
+	}
+	
 	/**
 	 * Adds a certain amount of units to a given timestamp and returns the resulting timestamp
 	 * @author sapmitra

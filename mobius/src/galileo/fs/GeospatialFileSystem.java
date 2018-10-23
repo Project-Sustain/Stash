@@ -95,6 +95,7 @@ import galileo.dht.VisualizationSummaryProcessor;
 import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
 import galileo.dht.hash.TemporalHash;
+import galileo.graph.CacheCell;
 import galileo.graph.FeaturePath;
 import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
@@ -109,6 +110,7 @@ import galileo.query.Query;
 import galileo.serialization.SerializationException;
 import galileo.serialization.Serializer;
 import galileo.util.PathFragments;
+import galileo.util.PathRequirements;
 import galileo.util.BorderingProperties;
 import galileo.util.CellRequirements;
 import galileo.util.GeoHash;
@@ -1070,13 +1072,20 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
-	public Map<String, List<CellRequirements>> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public Map<String, PathRequirements> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
 		
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
-		Map<String, List<CellRequirements>> requirementMap = new HashMap<String, List<CellRequirements>>();
+		Map<String, PathRequirements> requirementMap = new HashMap<String, PathRequirements>();
 		
 		for(String blockKey : blockMap.keySet()) {
+			
+			PathRequirements req = new PathRequirements();
+			requirementMap.put(blockKey, req);
+			
+			String[] timeTokens = queryTimeString.split("-");
+			long qt1 = Long.valueOf(timeTokens[0]);
+			long qt2 = Long.valueOf(timeTokens[1]);
 			
 			// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
 			
@@ -1093,18 +1102,31 @@ public class GeospatialFileSystem extends FileSystem {
 			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 			DateTime blockTime = new DateTime(blockTimeStamp);
 			
-			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ?***************
+			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
 			Bitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-					reqTemporalType, temporalType, reqTemporalResolution);
+					reqTemporalType, temporalType, reqTemporalResolution, polygon, qt1, qt2);
 			
 			boolean cacheIsEmpty = false;
+			
 			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
 				// NOTHING IN CACHE
 				// LOOK INTO THE ENTIRE BLOCKS
 				cacheIsEmpty = true;
 			}
 			
+			// FETCH WHATEVER IS ALREADY IN CACHE
+			Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+			
+			if(!cacheIsEmpty) {
+				cacheSummariesFound = fetchCacheEntriesUsingBitmap(cacheBitmap, geohashPrecision, reqSpatialResolution, 
+						temporalLevel, reqTemporalResolution, cache.getCells(), tokens[1], blockTimeStamp);
+				req.setSummariesFoundInCache(cacheSummariesFound);
+			}
+				
+			
 			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
+			// FIGURE OUT WHAT NEEDS TO BE QUIRIED IN THE FILESYSTEM
+			// EVERYTHING ELSE HAS ALREADY BEEN FETCHED FROM THE CACHE
 			
 			List<String> blocks = blockMap.get(blockKey);
 			
@@ -1114,56 +1136,52 @@ public class GeospatialFileSystem extends FileSystem {
 				// Refine it with the bounds of the query if it is not fully contained
 				if(!cacheIsEmpty) {
 					
+					// WHAT CELLS ARE IN THE ACTUAL BLOCK
 					Bitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
 							geohashPrecision, temporalLevel, polygon, queryTimeString);
 					
-					
 					// IF WHAT IS REQUIRED IS ALREADY CONTAINED IN MEMORY
-					Bitmap and = blockRequirement.and(cacheBitmap);
+					
+					Bitmap andNot = blockRequirement.andNot(cacheBitmap);
 					
 					List<String> keysToBeFetchedFromCache = new ArrayList<String>();
 					
-					if(and.equals(blockRequirement)) {
+					if(andNot.equals(blockRequirement)) {
 						
 						// WE CAN IGNORE PROCESSING THIS BLOCK
 						// ITS STORED IN THE CACHE
 						
 						// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
-						return 0;
+						CellRequirements cr = new CellRequirements(block, 1);
+						
+						req.addCellrequirements(cr);
 						
 					} else {
 						
-						int[] requiredIndices = and.toArray();
+						// SOME OF THE BLOCK CELLS IS IN CACHE
+						// SOME OF IT NEEDS TO BE FETCHED
+						int[] requiredIndices = andNot.toArray();
 						// convert these indices to cell keys. These need to be queried for
 						
 						for(int i: requiredIndices) {
 							
-							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialResolution, reqTemporalResolution, geohashPrecision, temporalLevel);
 							keysToBeFetchedFromCache.add(cellKey);
 						}
 					}
 				} else {
 					// CACHE EMPTY
 					// REQUIREMENT MODE 3
-					CellRequirements cr = new CellRequirements(block);
-					populateMap(requirementMap, cr, blockKey);
+					CellRequirements cr = new CellRequirements(block, 3);
+					
+					req.addCellrequirements(cr);
 				}
 				
 			}
+			
 		}
 		
-		return null;
-	}
-	
-	private void populateMap (Map<String, List<CellRequirements>> requirementMap, CellRequirements cr, String mapKey) {
-		
-		List<CellRequirements> crs = requirementMap.get(mapKey);
-		if(crs == null) {
-			crs = new ArrayList<CellRequirements>();
-			requirementMap.put(mapKey, crs);
-		}
-		crs.add(cr);
-		
+		return requirementMap;
 	}
 	
 	/**
@@ -1186,6 +1204,7 @@ public class GeospatialFileSystem extends FileSystem {
 		String[] timeTokens = queryTimeString.split("-");
 		long qt1 = Long.valueOf(timeTokens[0]);
 		long qt2 = Long.valueOf(timeTokens[1]);
+		
 		
 		String[] tokens = blockKey.split("\\$\\$");
 		
@@ -1224,7 +1243,7 @@ public class GeospatialFileSystem extends FileSystem {
 		} else {
 			// Create the extra bitmap for the query region
 			requirement = refineBlockBitmapUsingQueryArea(polygon, qt1, qt2, block_cell_bitmap.toArray(), reqSpatialPrecision, reqTemporalPrecision,
-					reqTemporalType, geohashPrecision, temporalLevel);
+					reqTemporalType, geohashPrecision, temporalLevel, tokens[1]);
 		}
 		
 		return requirement;
@@ -1247,13 +1266,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws ParseException 
 	 */
 	private Bitmap refineBlockBitmapUsingQueryArea (List<Coordinates> polygon, long qt1, long qt2, int[] indices, 
-			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType, int geohashPrecision, int temporalLevel) throws ParseException {
+			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType, int geohashPrecision,
+			int temporalLevel, String blockGeohash) throws ParseException {
 		
 		Bitmap refinedBitmap = new Bitmap();
 		
 		for(int i : indices) {
 			
-			String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+			String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, blockGeohash, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
 			
 			String[] cellKeyTokens = cellKey.split("\\$\\$");
 			
@@ -1262,7 +1282,7 @@ public class GeospatialFileSystem extends FileSystem {
 			boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellKeyTokens[1]);
 			boolean temporalIntersection = false;
 			
-			if(cellTimestamp >= qt1 && cellTimestamp <= qt2 )
+			if(cellTimestamp >= qt1 || cellTimestamp <= qt2 )
 				temporalIntersection = true;
 			
 			
@@ -1284,7 +1304,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws ParseException 
 	 */
 	private Bitmap createBitmapFromCacheForGivenBlock(DateTime blockTimeObject, String blockTime, String blockGeoHash, Set<String> cacheCells, 
-			TemporalType cellType, TemporalType blockType, int currentTemporalLevel) throws ParseException {
+			TemporalType cellType, TemporalType blockType, int currentTemporalLevel, List<Coordinates> polygon, long qt1, long qt2) throws ParseException {
 		
 		Bitmap blockBitmap = new Bitmap();
 		boolean somethingFound = false;
@@ -1304,25 +1324,40 @@ public class GeospatialFileSystem extends FileSystem {
 			String spatialOrientation = GeoHash.getSpatialOrientationHeuristic(blockGeoHash, cellGeohashString);
 			String temporalOrientation = GeoHash.getTemporalOrientation(blockTime, cellTimeString, blockType, cellType);
 			
+			
 			if(spatialOrientation == "full" && temporalOrientation == "full") {
+				
 				// THIS CELL IS CONTAINED IN THE BLOCK IN QUESTION
-				// START CREATING THE BITMAP
 				
-				// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
-				String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
-				
-				int spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
-				int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
-				
+				// CHECK IF IT IS CONTAINED IN THE POLYGON AND TIMERANGE OF THE QUERY
 				long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
-				DateTime cellTime = new DateTime(cellTimeStamp);
+				boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellGeohashString);
+				boolean temporalIntersection = false;
 				
-				int temporalIndex = (int)TemporalType.getTemporalIndex(blockTimeObject, cellTime, currentTemporalLevel);
+				if(cellTimeStamp >= qt1 || cellTimeStamp <= qt2 )
+					temporalIntersection = true;
 				
-				int spatiotemporalIndex = (int)(temporalIndex*spatialSize + spatialIndex);
-				
-				blockBitmap.set(spatiotemporalIndex);
-				somethingFound = true;
+				if(spatialIntersection && temporalIntersection) {
+					
+					
+					// START CREATING THE BITMAP
+					
+					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
+					String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
+					
+					int spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
+					
+					
+					DateTime cellTime = new DateTime(cellTimeStamp);
+					
+					int temporalIndex = (int)TemporalType.getTemporalIndex(blockTimeObject, cellTime, currentTemporalLevel);
+					
+					int spatiotemporalIndex = (int)(temporalIndex*spatialSize + spatialIndex);
+					
+					blockBitmap.set(spatiotemporalIndex);
+					somethingFound = true;
+				}
 			}
 			
 		}
@@ -1331,6 +1366,39 @@ public class GeospatialFileSystem extends FileSystem {
 			return blockBitmap;
 		
 		return null;
+	}
+	
+	/**
+	 * USING A BITMAP, WE FETCH THE ACTUAL ENTRIES IN THE CACHE
+	 * 
+	 * @author sapmitra
+	 * @param bmap
+	 * @param blockTimeObject
+	 * @param blockTime
+	 * @param blockGeoHash
+	 * @param cacheCells
+	 * @param cellType
+	 * @param blockType
+	 * @param currentTemporalLevel
+	 * @return
+	 * @throws ParseException
+	 */
+	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingBitmap(Bitmap bmap, int fsSpatialLevel, int reqSpatialLevel, int fsTemporalLevel, int reqTemporalLevel,
+			HashMap<String, CacheCell> cells, String blockGeoHash, long startTimestamp) throws ParseException {
+		
+		Map<String, SummaryStatistics[]> summariesFound = new HashMap<String, SummaryStatistics[]>();
+		
+		for(int indx : bmap.toArray()) {
+			
+			String cacheCellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(indx, blockGeoHash, reqSpatialLevel, reqTemporalLevel, fsSpatialLevel, startTimestamp);
+			
+			if(cells.get(cacheCellKey) != null) {
+				SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
+				summariesFound.put(cacheCellKey, stats);
+			}
+			
+		}
+		return summariesFound;
 	}
 	
 	
