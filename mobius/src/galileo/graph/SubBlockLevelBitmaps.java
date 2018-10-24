@@ -4,7 +4,10 @@ import java.util.Calendar;
 
 import org.joda.time.DateTime;
 
+import com.googlecode.javaewah.EWAHCompressedBitmap;
+
 import galileo.bmp.Bitmap;
+import galileo.bmp.CorrectedBitmap;
 import galileo.comm.TemporalType;
 import galileo.dataset.TemporalProperties;
 import galileo.dht.hash.TemporalHash;
@@ -21,7 +24,7 @@ public class SubBlockLevelBitmaps {
 	private int spatialLevels;
 	// Number of sub block level temporalLevels
 	private int temporalLevels;
-	private Bitmap[] spatioTemporalBitmaps;
+	private CorrectedBitmap[] spatioTemporalBitmaps;
 	
 	public SubBlockLevelBitmaps(int spatialSubLevels, int temporalSubLevels, int geohashPrecision, int temporalFSLevel) {
 		
@@ -29,7 +32,7 @@ public class SubBlockLevelBitmaps {
 		this.temporalLevels = temporalSubLevels;
 		this.spatialFSLevel = geohashPrecision;
 		this.temporalFSLevel = temporalFSLevel;
-		this.spatioTemporalBitmaps = new Bitmap[(spatialLevels+1)*(temporalLevels+1)];
+		this.spatioTemporalBitmaps = new CorrectedBitmap[(spatialLevels+1)*(temporalLevels+1)];
 		
 	}
 	
@@ -40,7 +43,7 @@ public class SubBlockLevelBitmaps {
 	 * @param temporalLevel = actual tmp level, not relative
 	 * @return
 	 */
-	public Bitmap getBitMapForParticularLevel(int spatialLevel, int temporalLevel) {
+	public CorrectedBitmap getBitMapForParticularLevel(int spatialLevel, int temporalLevel) {
 		int indx = getMapIndex(spatialLevel, temporalLevel);
 		
 		return spatioTemporalBitmaps[indx];
@@ -54,7 +57,7 @@ public class SubBlockLevelBitmaps {
 	 * @param temporalLevel
 	 * @return
 	 */
-	public Bitmap getBitMapForParticularLevel(int spatiotemporalLevel) {
+	public CorrectedBitmap getBitMapForParticularLevel(int spatiotemporalLevel) {
 		
 		return spatioTemporalBitmaps[spatiotemporalLevel];
 		
@@ -89,7 +92,7 @@ public class SubBlockLevelBitmaps {
 	 */
 	public void populateTemporaryBitmapUsingRecords (String[] records, int spatialPosn1, int spatialPosn2, int temporalPosn, int removeLength, DateTime startDate) {
 		
-		Bitmap[] temporaryBitmaps  = new Bitmap[(spatialLevels+1)*(temporalLevels+1)];
+		CorrectedBitmap[] temporaryBitmaps  = new CorrectedBitmap[(spatialLevels+1)*(temporalLevels+1)];
 		
 		for(String record: records) {
 			
@@ -103,16 +106,20 @@ public class SubBlockLevelBitmaps {
 			
 			String choppedGeohash = geoHash.substring(removeLength);
 			
+			// CREATE A SET OF TEMPORARY BITMAPS
 			populateBitmapUsingRecord(startDate, timestamp, choppedGeohash, temporaryBitmaps);
-			
 			
 		}
 		
+		// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
 		for(int i = 0; i< temporaryBitmaps.length; i++) {
+			
 			if(spatioTemporalBitmaps[i] == null) {
+				temporaryBitmaps[i].applyUpdates();
 				spatioTemporalBitmaps[i] = temporaryBitmaps[i];
 			} else {
-				spatioTemporalBitmaps[i] = spatioTemporalBitmaps[i].or(temporaryBitmaps[i]);
+				temporaryBitmaps[i].applyUpdates();
+				spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
 			}
 		}
 	}
@@ -124,7 +131,7 @@ public class SubBlockLevelBitmaps {
 	 * @param recordTimestamp
 	 * @param choppedGeohash The remainder portion of the geohash below block level
 	 */
-	public void populateBitmapUsingRecord(DateTime startTime, long recordTimestamp, String choppedGeohash, Bitmap[] temporaryBitmaps) {
+	public void populateBitmapUsingRecord(DateTime startTime, long recordTimestamp, String choppedGeohash, CorrectedBitmap[] temporaryBitmaps) {
 		
 		
 		// Update each bitmap corresponding to a record
@@ -158,17 +165,16 @@ public class SubBlockLevelBitmaps {
 				if(j > 0)
 					temporalIndex = TemporalType.getTemporalIndex(startTime, recordTimestamp, currentTemporalLevel);
 				
-				Bitmap bm = temporaryBitmaps[indx];
+				CorrectedBitmap bm = temporaryBitmaps[indx];
 				
 				if(bm == null) {
-					bm = new Bitmap();
+					bm = new CorrectedBitmap();
 					temporaryBitmaps[indx] = bm;
 				}
 				
 				int spatialSize = (int)java.lang.Math.pow(32, i);
 				
 				int spatiotemporalIndex = (int)(temporalIndex*spatialSize + spatialIndex);
-				
 				
 				bm.set(spatiotemporalIndex);
 				
@@ -305,11 +311,11 @@ public class SubBlockLevelBitmaps {
 		this.temporalLevels = temporalLevels;
 	}
 
-	public Bitmap[] getSpatioTemporalBitmaps() {
+	public CorrectedBitmap[] getSpatioTemporalBitmaps() {
 		return spatioTemporalBitmaps;
 	}
 
-	public void setSpatioTemporalBitmaps(Bitmap[] spatioTemporalBitmaps) {
+	public void setSpatioTemporalBitmaps(CorrectedBitmap[] spatioTemporalBitmaps) {
 		this.spatioTemporalBitmaps = spatioTemporalBitmaps;
 	}
 

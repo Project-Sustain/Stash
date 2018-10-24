@@ -37,6 +37,12 @@ public class CellRequirements {
 		
 	}
 
+	public CellRequirements(String block, int requirementMode, List<String> keysToBeFetchedFromCache) {
+		this.blockPath = block;
+		this.requirementMode = requirementMode;
+		this.cellsMissing = keysToBeFetchedFromCache;
+	}
+
 	public List<String> getCellsMissing() {
 		return cellsMissing;
 	}

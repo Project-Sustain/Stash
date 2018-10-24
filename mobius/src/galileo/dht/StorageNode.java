@@ -128,6 +128,7 @@ import galileo.util.BorderingProperties;
 import galileo.util.CellRequirements;
 import galileo.util.GeoHash;
 import galileo.util.PathFragments;
+import galileo.util.PathRequirements;
 import galileo.util.PathsAndOrientations;
 import galileo.util.Requirements;
 import galileo.util.SuperCube;
@@ -830,6 +831,7 @@ public class StorageNode implements RequestListener {
 				}
 				
 				/* Feature Query is not needed to list blocks */
+				
 				// KEY Format : year-month-day-hour$$geohash
 				
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
@@ -840,11 +842,12 @@ public class StorageNode implements RequestListener {
 				if(subBlockLevel) {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
-					Map<String, List<CellRequirements>> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+					Map<String, PathRequirements> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				} else {
+					
 					// NOT SUB-BLOCK LEVEL
-					Map<String, List<CellRequirements>> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				}
 				
