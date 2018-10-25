@@ -842,7 +842,7 @@ public class StorageNode implements RequestListener {
 				if(subBlockLevel) {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
-					Map<String, PathRequirements> blockRequirements = fs.listMatchingSubCellsForPath(blockMap, event.getSpatialResolution(), 
+					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSubBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
 				} else {
 					

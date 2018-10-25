@@ -953,16 +953,29 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			space = space.substring(0,spatialResolution);
 			
-			String[] tags = {year,month,day,hour};
 			
-			String temporalTag = tags[0];
-			for(int i=1; i < temporalResolution; i++) {
-				temporalTag += "-"+tags[i];
-			}
+			String temporalTag = getTemporalString(year, month, day, hour, temporalResolution);
+			
 			
 			return temporalTag+"$$"+space;
 		}
 		return null;
+	}
+	
+	
+	private String getTemporalString(String year, String month, String day, String hour, int type) {
+		
+		switch (type) {
+		case 4:
+			return String.format("%d-%d-%d-%d", year, month, day, hour);
+		case 3:
+			return String.format("%d-%d-%d-xx", year, month, day);
+		case 2:
+			return String.format("%d-%d-xx-xx", year, month);
+		case 1:
+			return String.format("%d-xx-xx-xx", year);
+		}
+		return String.format("%d-%d-%d-xx", year, month, day);
 	}
 
 	private String getSpaceKey(Path<Feature, String> path) {
@@ -1054,6 +1067,7 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	/**
+	 * THIS IS IN CASE WE HAVE TO LOOK AT A SUB BLOCK LEVEL
 	 * RETURN AN EQUIVALENT TO BLOCKMAP, WHERE, INSTEAD OF BLOCKPATHS, A CELLREQUIREMENT OBJECT IS REQUIRED FOR A BLOCK
 	 * 
 	 * @author sapmitra
@@ -1067,10 +1081,27 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
-	public Map<String, PathRequirements> listMatchingSubCellsForPath(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public Map<String, PathRequirements> listMatchingCellsForSubBlockResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
 		
+		// IF EITHER OF SPATIAL OR TEMPORAL RESOLUTION GOES BELOW BLOCK LEVEL,
+		// WHILE THE OTHER STAYS ABOVE IT, THE ONE ABOVE MUST BE BROUGHT DOWN TO THE LEVEL OF THE BLOCK,
+		// SO THAT THE CELLS CAN BE MATCHED
+		
+		int blockBitmapResolutionSpatial = reqSpatialResolution;
+		int blockBitmapResolutionTemporal = reqTemporalResolution;
+		
+		if(reqSpatialResolution < geohashPrecision) {
+			blockBitmapResolutionSpatial = geohashPrecision;
+		}
+		
+		if(reqTemporalResolution < temporalLevel) {
+			blockBitmapResolutionTemporal = temporalLevel;
+		}
+		
+		TemporalType blockBitmapTemporalType = TemporalType.getTypeFromLevel(blockBitmapResolutionTemporal);
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
+		
 		Map<String, PathRequirements> requirementMap = new HashMap<String, PathRequirements>();
 		
 		for(String blockKey : blockMap.keySet()) {
@@ -1099,7 +1130,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
 			CorrectedBitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-					reqTemporalType, temporalType, reqTemporalResolution, polygon, qt1, qt2);
+					reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
 			
 			boolean cacheIsEmpty = false;
 			
@@ -1113,8 +1144,8 @@ public class GeospatialFileSystem extends FileSystem {
 			Map<String, SummaryStatistics[]> cacheSummariesFound = null;
 			
 			if(!cacheIsEmpty) {
-				cacheSummariesFound = fetchCacheEntriesUsingBitmap(cacheBitmap, geohashPrecision, reqSpatialResolution, 
-						temporalLevel, reqTemporalResolution, cache.getCells(), tokens[1], blockTimeStamp);
+				cacheSummariesFound = fetchCacheEntriesUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
+						temporalLevel, blockBitmapResolutionTemporal, cache.getCells(), tokens[1], blockTimeStamp);
 				req.setSummariesFoundInCache(cacheSummariesFound);
 			}
 				
@@ -1132,8 +1163,8 @@ public class GeospatialFileSystem extends FileSystem {
 				if(!cacheIsEmpty) {
 					
 					// WHAT CELLS ARE IN THE ACTUAL BLOCK
-					CorrectedBitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
-							geohashPrecision, temporalLevel, polygon, queryTimeString);
+					CorrectedBitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, blockBitmapResolutionSpatial, blockBitmapResolutionTemporal, 
+							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, queryTimeString);
 					
 					// WHAT PART OF THE REQUIREMENT IS NOT IN MEMORY
 					CorrectedBitmap andNot = new CorrectedBitmap(blockRequirement.andNot(cacheBitmap));
@@ -1161,7 +1192,9 @@ public class GeospatialFileSystem extends FileSystem {
 						
 						for(int i: requiredIndices) {
 							
-							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, tokens[1], reqSpatialResolution, reqTemporalResolution, geohashPrecision, temporalLevel);
+							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, tokens[1], blockBitmapResolutionSpatial, blockBitmapResolutionTemporal,
+									geohashPrecision, temporalLevel);
+							
 							keysToBeFetchedFromCache.add(cellKey);
 						}
 						CellRequirements cr = new CellRequirements(block, 2, keysToBeFetchedFromCache);
@@ -1223,9 +1256,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// ***************QUERY BITMAP***************
 		boolean spatialEnclosure = GeoHash.checkEnclosure(polygon, tokens[1]);
-		String temporalEnclosure = GeoHash.getTemporalOrientation(queryTimeString, tokens[0], temporalType, reqTemporalType);
+		String temporalEnclosure = GeoHash.getTemporalOrientationSimplified(queryTimeString, tokens[0], temporalType, reqTemporalType);
 		
-		if(spatialEnclosure && temporalEnclosure == "full") {
+		if(spatialEnclosure && (temporalEnclosure.equals("full")||temporalEnclosure.equals("full-st"))) {
 			blockContainment = true;
 		} else {
 			blockContainment = false;
@@ -1241,7 +1274,7 @@ public class GeospatialFileSystem extends FileSystem {
 		} else {
 			// Create the extra bitmap for the query region
 			requirement = refineBlockBitmapUsingQueryArea(polygon, qt1, qt2, block_cell_bitmap.toArray(), reqSpatialPrecision, reqTemporalPrecision,
-					reqTemporalType, geohashPrecision, temporalLevel, tokens[1]);
+					reqTemporalType, tokens[1]);
 		}
 		
 		return requirement;
@@ -1264,8 +1297,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws ParseException 
 	 */
 	private CorrectedBitmap refineBlockBitmapUsingQueryArea (List<Coordinates> polygon, long qt1, long qt2, int[] indices, 
-			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType, int geohashPrecision,
-			int temporalLevel, String blockGeohash) throws ParseException {
+			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType,  String blockGeohash) throws ParseException {
 		
 		CorrectedBitmap refinedBitmap = new CorrectedBitmap();
 		
@@ -1295,55 +1327,70 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	/**
 	 * Creating a Bitmap of all cells in a block that is contained in a Sparse spatiotemporal matrix
+	 * 
 	 * @author sapmitra
 	 * @param blockKey
 	 * @param cache
+	 * @param currentTemporalLevel - The temporal level for each bitmap cell
 	 * @return
 	 * @throws ParseException 
 	 */
+	
 	private CorrectedBitmap createBitmapFromCacheForGivenBlock(DateTime blockTimeObject, String blockTime, String blockGeoHash, Set<String> cacheCells, 
 			TemporalType cellType, TemporalType blockType, int currentTemporalLevel, List<Coordinates> polygon, long qt1, long qt2) throws ParseException {
 		
+		// This is at block's bitmap level, representing which cells of the block are covered by cache entries
 		CorrectedBitmap blockBitmap = new CorrectedBitmap();
+		
 		boolean somethingFound = false;
 		
+		// In this loop, for each cache key, we find which block bitmap bits it covers, if any
 		for(String key : cacheCells) {
 			
-			String[] tokens = key.split("\\$\\$");
+			String[] cellTokens = key.split("\\$\\$");
 			
-			String cellTimeString = tokens[0];
-			String cellGeohashString = tokens[1];
+			String cellTimeString = cellTokens[0];
+			String cellGeohashString = cellTokens[1];
 			
 			String[] cellTimeTokens = cellTimeString.split("-");
 			
-			// see if cell is contained in the block
+			// see if cache cell is contained in the block
+			// or if the block intersects with the cache cell
 			// get the index for that cell in the block, if yes
 			
-			String spatialOrientation = GeoHash.getSpatialOrientationHeuristic(blockGeoHash, cellGeohashString);
-			String temporalOrientation = GeoHash.getTemporalOrientation(blockTime, cellTimeString, blockType, cellType);
+			// full means the two extents are equal
+			// full-st means block extent encloses cache extent
+			// full-rev means cache extent encloses block extent
+			
+			String spatialOrientation = GeoHash.getSpatialOrientationSimplified(blockGeoHash, cellGeohashString);
+			String temporalOrientation = GeoHash.getTemporalOrientationSimplified(blockTime, cellTimeString, blockType, cellType);
 			
 			
-			if(spatialOrientation == "full" && temporalOrientation == "full") {
+			// CHECK IF THE CACHE CELL IS CONTAINED IN THE POLYGON AND TIMERANGE OF THE QUERY
+			long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
+			boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellGeohashString);
+			boolean temporalIntersection = false;
+			
+			if(cellTimeStamp >= qt1 && cellTimeStamp <= qt2 )
+				temporalIntersection = true;
+			
+			// THIS CACHE CELL IS TO BE CONSIDERED FOR EXTRACTION
+			if(spatialIntersection && temporalIntersection && spatialOrientation.contains("full") && temporalOrientation.contains("full")) {
 				
-				// THIS CELL IS CONTAINED IN THE BLOCK IN QUESTION
-				
-				// CHECK IF IT IS CONTAINED IN THE POLYGON AND TIMERANGE OF THE QUERY
-				long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
-				boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellGeohashString);
-				boolean temporalIntersection = false;
-				
-				if(cellTimeStamp >= qt1 || cellTimeStamp <= qt2 )
-					temporalIntersection = true;
-				
-				if(spatialIntersection && temporalIntersection) {
-					
+				// THIS CELL IS FULLY CONTAINED IN THE BLOCK IN QUESTION
+				// Cache cell dimension is lesser than block extent
+				if(spatialOrientation.equals("full-st") && temporalOrientation.equals("full-st")) {
 					
 					// START CREATING THE BITMAP
 					
 					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
 					String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
 					
-					int spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					int spatialIndex = 0;
+					
+					if(partialGeohash.length() > 0)
+						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					
 					int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
 					
 					
@@ -1355,7 +1402,49 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					blockBitmap.set(spatiotemporalIndex);
 					somethingFound = true;
+					
+				} else if(spatialOrientation.equals("full") || spatialOrientation.equals("full-st")) {
+					
+					// Spatially the cache cell is larger or equal to a block, but temporally, it is below block level
+					// The block bitmap in this case would only consider temporal level, since spatial level is the entire block
+					
+					// START CREATING THE BITMAP
+					
+					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
+					
+					int spatialSize = 1;
+					
+					DateTime cellTime = new DateTime(cellTimeStamp);
+					
+					int temporalIndex = (int)TemporalType.getTemporalIndex(blockTimeObject, cellTime, currentTemporalLevel);
+					
+					int spatiotemporalIndex = (int)(temporalIndex*spatialSize);
+					
+					blockBitmap.set(spatiotemporalIndex);
+					somethingFound = true;
+					
+					
+				} else if(temporalOrientation.equals("full") || temporalOrientation.equals("full-st")) {
+					
+					// Temporally the cache cell is larger or equal to a block, but spatially, it is below block level
+					// The block bitmap in this case would only consider spatial level, since temporal level is the entire block
+					// START CREATING THE BITMAP
+					
+					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
+					String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
+					
+					int spatialIndex = 0;
+					
+					if(partialGeohash.length() > 0)
+						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					
+					int spatiotemporalIndex = (int)(spatialIndex);
+					
+					blockBitmap.set(spatiotemporalIndex);
+					somethingFound = true;
 				}
+				
+				
 			}
 			
 		}
@@ -1383,14 +1472,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws ParseException
 	 */
-	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int reqSpatialLevel, int fsTemporalLevel, int reqTemporalLevel,
+	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
 			HashMap<String, CacheCell> cells, String blockGeoHash, long startTimestamp) throws ParseException {
 		
 		Map<String, SummaryStatistics[]> summariesFound = new HashMap<String, SummaryStatistics[]>();
 		
 		for(int indx : bmap.toArray()) {
 			
-			String cacheCellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(indx, blockGeoHash, reqSpatialLevel, reqTemporalLevel, fsSpatialLevel, startTimestamp);
+			String cacheCellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(indx, blockGeoHash, bitmapSpatialLevel, bitmapTemporalLevel, fsSpatialLevel, startTimestamp);
 			
 			if(cells.get(cacheCellKey) != null) {
 				SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
@@ -1403,6 +1492,8 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	
 	/**
+	 * 
+	 * If REQ SPATIAL AND TEMPORAL LEVEL ARE BOTH LOWER THAN THE BLOCK LEVELS, I.E. ONE OR MORE BLOCKS FIT IN A SINGLE CACHE CELL
 	 * 
 	 * @author sapmitra
 	 * @param blockMap

@@ -1886,6 +1886,43 @@ public class GeoHash {
 		return "ignore";
 	}
 	
+	
+	/**
+	 * RETURNS ORIENTATION OF TIMESTRING2 WRT TIMESTRING1
+	 * @author sapmitra
+	 * @param time1
+	 * @param time2
+	 * @param t1
+	 * @param t2
+	 * @return
+	 * @throws ParseException
+	 */
+	public static String getTemporalOrientationSimplified(String time1, String time2, TemporalType t1, TemporalType t2) throws ParseException {
+		
+		String[] tokens = time1.split("-");
+		String[] tokens2 = time2.split("-");
+		
+		long startTime1 = getStartTimeStamp(tokens[0], tokens[1], tokens[2], tokens[3], t1);
+		long endTime1 = getEndTimeStamp(tokens[0], tokens[1], tokens[2], tokens[3], t1);
+		
+		long startTime2 = getStartTimeStamp(tokens2[0], tokens2[1], tokens2[2], tokens2[3], t2);
+		long endTime2 = getEndTimeStamp(tokens2[0], tokens2[1], tokens2[2], tokens2[3], t2);
+		
+		// time1 equals time2
+		if(startTime2==startTime1 && endTime2==endTime1)
+			return "full";
+		// time 1 encloses time 2
+		else if(startTime2>=startTime1 && endTime2<=endTime1)
+			return "full-st";
+		// time2 encloses time1
+		else if(startTime1>=startTime2 && endTime1<=endTime2)
+			return "full-rev";
+		
+		
+		return "ignore";
+	}
+	
+	
 	/**
 	 * 
 	 * @author sapmitra
@@ -1969,6 +2006,33 @@ public class GeoHash {
 		}
 		
 		return "ignore";
+		
+	}
+	
+	/**
+	 * Check which of g1 and g2 contains whom
+	 * @author sapmitra
+	 * @param g1
+	 * @param g2
+	 * @return
+	 */
+	public static String getSpatialOrientationSimplified(String g1, String g2) {
+		
+		String orientation = "none";
+		
+		if(g1.equals(g2))
+			return "full";
+		
+		boolean enc = checkEnclosure(g1, g2);
+		
+		if(enc)
+			return "full-st";
+		
+		boolean enc2 = checkEnclosure(g2, g1);
+		if(enc2)
+			return "full-rev";
+		
+		return orientation;
 		
 	}
 
