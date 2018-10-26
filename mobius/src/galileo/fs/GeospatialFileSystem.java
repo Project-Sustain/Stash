@@ -1082,7 +1082,20 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws ParseException
 	 */
 	public Map<String, PathRequirements> listMatchingCellsForSubBlockResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
-			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
+			String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
+		
+		String[] timeTokens = queryTimeString.split("-");
+		long qt1 = Long.valueOf(timeTokens[0]);
+		long qt2 = Long.valueOf(timeTokens[1]);
+		
+		// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
+		
+		// The level of stcache we need to look at
+		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		
+		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
+		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
+		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
 		
 		// IF EITHER OF SPATIAL OR TEMPORAL RESOLUTION GOES BELOW BLOCK LEVEL,
 		// WHILE THE OTHER STAYS ABOVE IT, THE ONE ABOVE MUST BE BROUGHT DOWN TO THE LEVEL OF THE BLOCK,
@@ -1108,19 +1121,6 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			PathRequirements req = new PathRequirements();
 			requirementMap.put(blockKey, req);
-			
-			String[] timeTokens = queryTimeString.split("-");
-			long qt1 = Long.valueOf(timeTokens[0]);
-			long qt2 = Long.valueOf(timeTokens[1]);
-			
-			// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
-			
-			// The level of stcache we need to look at
-			int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
-			
-			// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
-			// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
-			SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
 			
 			String[] tokens = blockKey.split("\\$\\$");
 			String blockTimeTokens[] = tokens[0].split("-");
@@ -1457,6 +1457,51 @@ public class GeospatialFileSystem extends FileSystem {
 		return null;
 	}
 	
+	
+	
+	private List<String> getCacheCellsForForQueryArea(Set<String> cacheCells, TemporalType cellType, int currentTemporalLevel, 
+			List<Coordinates> polygon, long qt1, long qt2) throws ParseException {
+		
+		List<String> matchingCacheKeys = new ArrayList<String>();
+		// This is at block's bitmap level, representing which cells of the block are covered by cache entries
+		boolean somethingFound = false;
+		
+		// In this loop, for each cache key, we find which block bitmap bits it covers, if any
+		for(String key : cacheCells) {
+			
+			String[] cellTokens = key.split("\\$\\$");
+			
+			String cellTimeString = cellTokens[0];
+			String cellGeohashString = cellTokens[1];
+			
+			String[] cellTimeTokens = cellTimeString.split("-");
+			
+			// CHECK IF THE CACHE CELL IS CONTAINED IN THE POLYGON AND TIMERANGE OF THE QUERY
+			long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
+			boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellGeohashString);
+			boolean temporalIntersection = false;
+			
+			if(cellTimeStamp >= qt1 && cellTimeStamp <= qt2 )
+				temporalIntersection = true;
+			
+			// THIS CACHE CELL IS TO BE CONSIDERED FOR EXTRACTION
+			if (spatialIntersection && temporalIntersection) {
+
+				matchingCacheKeys.add(key);
+				somethingFound = true;
+
+			}
+			
+		}
+		
+		if(somethingFound) {
+			
+			return matchingCacheKeys;
+		}
+		
+		return null;
+	}
+	
 	/**
 	 * USING A BITMAP, WE FETCH THE ACTUAL ENTRIES IN THE CACHE
 	 * 
@@ -1490,10 +1535,32 @@ public class GeospatialFileSystem extends FileSystem {
 		return summariesFound;
 	}
 	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param cacheKeys
+	 * @param cells
+	 * @return
+	 */
+	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingKeys(List<String> cacheKeys, HashMap<String, CacheCell> cells) {
+		
+		Map<String, SummaryStatistics[]> summariesFound = new HashMap<String, SummaryStatistics[]>();
+		
+		for(String cacheCellKey : cacheKeys) {
+			
+			if(cells.get(cacheCellKey) != null) {
+				SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
+				summariesFound.put(cacheCellKey, stats);
+			}
+			
+		}
+		return summariesFound;
+	}
+	
 	
 	/**
 	 * 
-	 * If REQ SPATIAL AND TEMPORAL LEVEL ARE BOTH LOWER THAN THE BLOCK LEVELS, I.E. ONE OR MORE BLOCKS FIT IN A SINGLE CACHE CELL
+	 * If REQ SPATIAL AND TEMPORAL "LEVEL" ARE BOTH LOWER THAN THE BLOCK LEVELS, I.E. ONE OR MORE BLOCKS FIT IN A SINGLE CACHE CELL
 	 * 
 	 * @author sapmitra
 	 * @param blockMap
@@ -1506,119 +1573,63 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
-	public Map<String, PathRequirements> listMatchingCellsForSuperResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
-			Map<String, SummaryStatistics[]> savedSummaries, String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
+	public Map<String, SummaryStatistics[]> listMatchingCellsForSuperResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+			String queryTimeString, List<Coordinates> polygon, Map<String, List<String>> refinedBlockMap) throws InterruptedException, ParseException {
 		
+		String[] timeTokens = queryTimeString.split("-");
+		long qt1 = Long.valueOf(timeTokens[0]);
+		long qt2 = Long.valueOf(timeTokens[1]);
+
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
-		Map<String, PathRequirements> requirementMap = new HashMap<String, PathRequirements>();
 		
-		for(String blockKey : blockMap.keySet()) {
-			
-			PathRequirements req = new PathRequirements();
-			requirementMap.put(blockKey, req);
-			
-			String[] timeTokens = queryTimeString.split("-");
-			long qt1 = Long.valueOf(timeTokens[0]);
-			long qt2 = Long.valueOf(timeTokens[1]);
-			
-			// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
-			
-			// The level of stcache we need to look at
-			int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
-			
-			// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
-			// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
-			SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
-			
-			String[] tokens = blockKey.split("\\$\\$");
-			String blockTimeTokens[] = tokens[0].split("-");
-			
-			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
-			DateTime blockTime = new DateTime(blockTimeStamp);
-			
-			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
-			CorrectedBitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-					reqTemporalType, temporalType, reqTemporalResolution, polygon, qt1, qt2);
-			
-			boolean cacheIsEmpty = false;
-			
-			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
-				// NOTHING IN CACHE
-				// LOOK INTO THE ENTIRE BLOCKS
-				cacheIsEmpty = true;
-			}
-			
-			// FETCH WHATEVER IS ALREADY IN CACHE
-			Map<String, SummaryStatistics[]> cacheSummariesFound = null;
-			
-			if(!cacheIsEmpty) {
-				cacheSummariesFound = fetchCacheEntriesUsingBitmap(cacheBitmap, geohashPrecision, reqSpatialResolution, 
-						temporalLevel, reqTemporalResolution, cache.getCells(), tokens[1], blockTimeStamp);
-				req.setSummariesFoundInCache(cacheSummariesFound);
-			}
-				
-			
-			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
-			// FIGURE OUT WHAT NEEDS TO BE QUIRIED IN THE FILESYSTEM
-			// EVERYTHING ELSE HAS ALREADY BEEN FETCHED FROM THE CACHE
-			
-			List<String> blocks = blockMap.get(blockKey);
-			
-			for(String block : blocks) {
-				
-				// Look into what the block contains
-				// Refine it with the bounds of the query if it is not fully contained
-				if(!cacheIsEmpty) {
-					
-					// WHAT CELLS ARE IN THE ACTUAL BLOCK
-					CorrectedBitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, reqSpatialResolution, reqTemporalResolution, reqTemporalType, 
-							geohashPrecision, temporalLevel, polygon, queryTimeString);
-					
-					// WHAT PART OF THE REQUIREMENT IS NOT IN MEMORY
-					CorrectedBitmap andNot = new CorrectedBitmap(blockRequirement.andNot(cacheBitmap));
-					
-					if(andNot.toArray().length == 0) {
-						
-						// WE CAN IGNORE PROCESSING THIS BLOCK
-						// ITS STORED IN THE CACHE
-						
-						// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
-						CellRequirements cr = new CellRequirements(block, 1);
-						
-						req.addCellrequirements(cr);
-						
-					} else {
-						
-						// SOME OF THE BLOCK CELLS IS IN CACHE
-						// SOME OF IT NEEDS TO BE FETCHED
-						
-						// ONLY THE FOLLOWING CELLS NEED TO BE SEARCHED FOR THIS BLOCK
-						int[] requiredIndices = andNot.toArray();
-						// convert these indices to cell keys. These need to be queried for
-						
-						List<String> keysToBeFetchedFromCache = new ArrayList<String>();
-						
-						for(int i: requiredIndices) {
-							
-							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, tokens[1], reqSpatialResolution, reqTemporalResolution, geohashPrecision, temporalLevel);
-							keysToBeFetchedFromCache.add(cellKey);
-						}
-						CellRequirements cr = new CellRequirements(block, 2, keysToBeFetchedFromCache);
-						req.addCellrequirements(cr);
-					}
-				} else {
-					// CACHE EMPTY
-					// REQUIREMENT MODE 3
-					CellRequirements cr = new CellRequirements(block, 3);
-					
-					req.addCellrequirements(cr);
-				}
-				
-			}
-			
+		
+		// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
+
+		// The level of stcache we need to look at
+		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
+		
+		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
+		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
+		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
+		
+		
+		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
+		List<String> matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
+		
+		boolean cacheIsEmpty = false;
+		
+		if(matchingCacheKeys == null || matchingCacheKeys.size() == 0) {
+			// NOTHING IN CACHE
+			// LOOK INTO THE ENTIRE BLOCKS
+			cacheIsEmpty = true;
 		}
 		
-		return requirementMap;
+		// FETCH WHATEVER IS ALREADY IN CACHE
+		Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+		
+		if(!cacheIsEmpty) {
+			cacheSummariesFound = fetchCacheEntriesUsingKeys(matchingCacheKeys, cache.getCells());
+			
+		} else {
+			// NOTHING OF IMPORTANCE FOUND IN CACHE, ALL FILES NEED TO BE PROCESSED
+			refinedBlockMap = blockMap;
+			return cacheSummariesFound;
+		}
+		
+		refinedBlockMap = new HashMap<String, List<String>>();
+		
+		// CACHE KEYS AND MAP KEYS MUST LOOK IDENTICAL IN CASE OF SUPER RESOLUTION
+		for (String blockKey : blockMap.keySet()) {
+
+			if(!matchingCacheKeys.contains(blockKey)) {
+				refinedBlockMap.put(blockKey, blockMap.get(blockKey));
+			}
+		
+		}
+
+	
+		
+		return cacheSummariesFound;
 	}
 	
 	

@@ -801,7 +801,6 @@ public class StorageNode implements RequestListener {
 		
 		JSONObject resultJSON = new JSONObject();
 		Map<String,SummaryStatistics[]> extractedSummaries = new HashMap<String,SummaryStatistics[]>();
-		Map<String,SummaryStatistics[]> savedSummaries = new HashMap<String,SummaryStatistics[]>();
 		
 		long processingTime = System.currentTimeMillis();
 		try {
@@ -843,24 +842,31 @@ public class StorageNode implements RequestListener {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSubBlockResolution(blockMap, event.getSpatialResolution(), 
-							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
+							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
 				} else {
 					
+					Map<String, List<String>> refinedBlockMap = null;
 					// NOT SUB-BLOCK LEVEL
-					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
-							event.getTemporalResolution(), savedSummaries, event.getTimeString(), event.getPolygon());
+					Map<String, SummaryStatistics[]> fetchedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
+							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
+					
+					boolean cacheIsEmpty = false;
+					if(fetchedSummaries == null) {
+						cacheIsEmpty = true;
+					}
+					
+					
+					
+					
 				}
 				
-				
-				
-				JSONArray filePaths = new JSONArray();
 				
 				if (blockMap.keySet().size() > 0) {
 					
 					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
 						
 						hostFileSize = 0;
-						filePaths = new JSONArray();
+						
 						// maximum parallelism = 64
 						ExecutorService executor = Executors.newFixedThreadPool(Math.min(blockMap.keySet().size(), 2 * numCores));
 						
@@ -946,7 +952,6 @@ public class StorageNode implements RequestListener {
 				}
 				
 				totalProcessingTime = System.currentTimeMillis() - processingTime;
-				totalNumPaths = filePaths.length();
 				
 				resultJSON.put("hostName", this.canonicalHostname);
 				resultJSON.put("hostPort", this.port);
