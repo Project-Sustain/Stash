@@ -69,6 +69,7 @@ import galileo.bmp.GeoavailabilityQuery;
 import galileo.bmp.QueryTransform;
 import galileo.comm.SpatialGrid;
 import galileo.comm.TemporalType;
+import galileo.comm.VisualizationEvent;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
 import galileo.dataset.Metadata;
@@ -92,6 +93,7 @@ import galileo.dht.SpatialHierarchyPartitioner;
 import galileo.dht.StandardDHTPartitioner;
 import galileo.dht.StorageNode;
 import galileo.dht.TemporalHierarchyPartitioner;
+import galileo.dht.VisualizationQueryProcessor;
 import galileo.dht.VisualizationSummaryProcessor;
 import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
@@ -1626,8 +1628,6 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 		
 		}
-
-	
 		
 		return cacheSummariesFound;
 	}
@@ -2926,6 +2926,11 @@ public class GeospatialFileSystem extends FileSystem {
 		this.summaryHints = summaryHints;
 	}
 
+	/**
+	 * The positions of the features that need summaries on them
+	 * @author sapmitra
+	 * @return
+	 */
 	public List<Integer> getSummaryPosns() {
 		return summaryPosns;
 	}
@@ -2951,7 +2956,6 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		
-		
 	}
 
 	public SpatiotemporalHierarchicalCache getStCache() {
@@ -2962,5 +2966,102 @@ public class GeospatialFileSystem extends FileSystem {
 		this.stCache = stCache;
 	}
 
+	/**
+	 * IN CASE OF SUPER RESOLUTION
+	 * @author sapmitra
+	 * @param event 
+	 * @param fetchedSummaries 
+	 * @throws InterruptedException 
+	 */
+	public void fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, Map<String, SummaryStatistics[]> extractedSummaries, VisualizationEvent event) throws InterruptedException {
+		
+		if(extractedSummaries == null)
+			extractedSummaries = new HashMap<String, SummaryStatistics[]>();
+			
+		if (blockMap.keySet().size() > 0) {
+			
+			if (event.getFeatureQuery() != null || event.getPolygon() != null) {
+				
+				// maximum parallelism = 64
+				ExecutorService executor = Executors.newFixedThreadPool(java.lang.Math.min(blockMap.keySet().size(), 2 * numCores));
+				
+				List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
+				
+				GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(), event.getPolygon());
+				
+				for (String blockKey : blockMap.keySet()) {
+					
+					/* Converts the bounds of geohash into a 1024x1024 region */
+					String[] tokens = blockKey.split("\\$\\$");
+					GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
+					
+					Bitmap queryBitmap = null;
+					
+					if (geoQuery.getPolygon() != null)
+						queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
+					
+					List<String> blocks = blockMap.get(blockKey);
+					
+					VisualizationQueryProcessor qp = new VisualizationQueryProcessor(this, blocks, geoQuery, blockGrid, queryBitmap, 
+							event.getSpatialResolution(), event.getTemporalResolution(), getSummaryPosns(), false, blockKey);
+					
+					queryProcessors.add(qp);
+					executor.execute(qp);
+					
+				}
+				executor.shutdown();
+				boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+				if (!status)
+					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
+				
+				// Sum up the output from query processors
+				for (VisualizationQueryProcessor qp : queryProcessors) {
+					
+					if (qp.getResultSummaries().size() > 0) {
+						Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
+						
+						for(String key: localSummary.keySet()) {
+							
+							if(!extractedSummaries.containsKey(key)) {
+								extractedSummaries.put(key, localSummary.get(key));
+							} else {
+								SummaryStatistics[] oldStats = extractedSummaries.get(key);
+								SummaryStatistics[] statsUpdate = localSummary.get(key);
+								
+								SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+								extractedSummaries.put(key, mergedSummaries);
+							}
+							
+						}
+					}
+				}
+			} 
+		}
+		// POPULATE THE CACHE TREE
+		// ALSO POPULATE FILE BITMAPS
+		populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 }

@@ -800,7 +800,7 @@ public class StorageNode implements RequestListener {
 		int totalNumPaths = 0;
 		
 		JSONObject resultJSON = new JSONObject();
-		Map<String,SummaryStatistics[]> extractedSummaries = new HashMap<String,SummaryStatistics[]>();
+		Map<String,SummaryStatistics[]> extractedSummaries;
 		
 		long processingTime = System.currentTimeMillis();
 		try {
@@ -844,18 +844,19 @@ public class StorageNode implements RequestListener {
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSubBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
 				} else {
-					
-					Map<String, List<String>> refinedBlockMap = null;
 					// NOT SUB-BLOCK LEVEL
-					Map<String, SummaryStatistics[]> fetchedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
+					Map<String, List<String>> refinedBlockMap = null;
+					
+					extractedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
 					boolean cacheIsEmpty = false;
-					if(fetchedSummaries == null) {
+					
+					if(extractedSummaries == null) {
 						cacheIsEmpty = true;
 					}
 					
-					
+					fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);
 					
 					
 				}
@@ -868,7 +869,7 @@ public class StorageNode implements RequestListener {
 						hostFileSize = 0;
 						
 						// maximum parallelism = 64
-						ExecutorService executor = Executors.newFixedThreadPool(Math.min(blockMap.keySet().size(), 2 * numCores));
+						ExecutorService executor = Executors.newFixedThreadPool(java.lang.Math.min(blockMap.keySet().size(), 2 * numCores));
 						
 						List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
 						
