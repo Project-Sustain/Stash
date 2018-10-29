@@ -106,6 +106,7 @@ import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.graph.SubBlockLevelBitmaps;
 import galileo.graph.SummaryStatistics;
+import galileo.graph.SummaryWrapper;
 import galileo.query.Expression;
 import galileo.query.Operation;
 import galileo.query.Operator;
@@ -2942,17 +2943,21 @@ public class GeospatialFileSystem extends FileSystem {
 	/**
 	 * NEWLY EXTRACTED SUMMARIES BEING PUT INTO THE TREE
 	 * @author sapmitra
-	 * @param allSummaries
+	 * @param finalisedSummaries
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 */
-	public void populateCacheTree(Map<String, SummaryStatistics[]> allSummaries, int spatialResolution, int temporalResolution) {
+	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution) {
 		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
 		
-		for(String key: allSummaries.keySet()) {
+		for(String key: finalisedSummaries.keySet()) {
 			
-			stCache.addCell(allSummaries.get(key), key, cacheResolution);
+			SummaryWrapper sw = finalisedSummaries.get(key);
+			
+			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
+			if(sw.isNeedsInsertion())
+				stCache.addCell(sw.getStats(), key, cacheResolution);
 			
 		}
 		
@@ -2973,8 +2978,9 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param fetchedSummaries 
 	 * @throws InterruptedException 
 	 */
-	public void fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, Map<String, SummaryStatistics[]> extractedSummaries, VisualizationEvent event) throws InterruptedException {
+	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, Map<String, SummaryStatistics[]> extractedSummaries, VisualizationEvent event) throws InterruptedException {
 		
+		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
 		if(extractedSummaries == null)
 			extractedSummaries = new HashMap<String, SummaryStatistics[]>();
 			
@@ -3014,6 +3020,14 @@ public class GeospatialFileSystem extends FileSystem {
 				if (!status)
 					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
 				
+				
+				for(String k : extractedSummaries.keySet()) {
+					
+					SummaryStatistics[] sts = extractedSummaries.get(k);
+					SummaryWrapper sw = new SummaryWrapper(false, sts);
+					finalisedSummaries.put(k, sw);
+					
+				}
 				// Sum up the output from query processors
 				for (VisualizationQueryProcessor qp : queryProcessors) {
 					
@@ -3022,14 +3036,16 @@ public class GeospatialFileSystem extends FileSystem {
 						
 						for(String key: localSummary.keySet()) {
 							
-							if(!extractedSummaries.containsKey(key)) {
-								extractedSummaries.put(key, localSummary.get(key));
+							if(!finalisedSummaries.containsKey(key)) {
+								SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
+								finalisedSummaries.put(key, sw);
 							} else {
-								SummaryStatistics[] oldStats = extractedSummaries.get(key);
+								SummaryStatistics[] oldStats = finalisedSummaries.get(key).getStats();
 								SummaryStatistics[] statsUpdate = localSummary.get(key);
 								
-								SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
-								extractedSummaries.put(key, mergedSummaries);
+								SummaryStatistics[] mergedSummaries = SummaryStatistics.preMergeSummaries(oldStats, statsUpdate);
+								SummaryWrapper sw = new SummaryWrapper(true, mergedSummaries);
+								finalisedSummaries.put(key, sw);
 							}
 							
 						}
@@ -3039,7 +3055,9 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+		
+		return finalisedSummaries;
 	}
 	
 	

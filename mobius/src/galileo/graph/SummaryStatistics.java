@@ -91,6 +91,27 @@ public class SummaryStatistics {
 	}
 	
 	/**
+	 * NOT FULL MERGING, ATTRIBUTES SUCH AS AVG ARE LEFT OUT AND ONLY TOTAL AND COUNTE ARE UPDATED
+	 * @author sapmitra
+	 * @param oldStats
+	 * @param statsUpdate
+	 * @return
+	 */
+	public static SummaryStatistics[] preMergeSummaries(SummaryStatistics[] oldStats, SummaryStatistics[] statsUpdate) {
+		
+		SummaryStatistics[] newStats = new SummaryStatistics[oldStats.length];
+		for(int i=0; i< oldStats.length; i++) {
+			
+			SummaryStatistics old = oldStats[i];
+			SummaryStatistics upd = statsUpdate[i];
+			
+			SummaryStatistics newstat = preMergeSummary(old, upd);
+			newStats[i] = newstat;
+		}
+		return newStats;
+	}
+	
+	/**
 	 * 
 	 * @author sapmitra
 	 * @param old
@@ -98,6 +119,21 @@ public class SummaryStatistics {
 	 * @return
 	 */
 	public static SummaryStatistics mergeSummary(SummaryStatistics old, SummaryStatistics upd) {
+		
+		if(old.getMax() < upd.getMax()) {
+			old.setMax(upd.getMax());
+		}
+		if(old.getMin() < upd.getMin()) {
+			old.setMin(upd.getMin());
+		}
+		old.addToTmpSum(upd.getTmpSum());
+		old.increaseCount(upd.getCount());
+		
+		return old;
+		
+	}
+	
+	public static SummaryStatistics preMergeSummary(SummaryStatistics old, SummaryStatistics upd) {
 		
 		if(old.getMax() < upd.getMax()) {
 			old.setMax(upd.getMax());

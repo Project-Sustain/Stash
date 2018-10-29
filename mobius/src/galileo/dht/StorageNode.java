@@ -116,6 +116,7 @@ import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.Path;
 import galileo.graph.SummaryStatistics;
+import galileo.graph.SummaryWrapper;
 import galileo.net.ClientConnectionPool;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
@@ -800,7 +801,7 @@ public class StorageNode implements RequestListener {
 		int totalNumPaths = 0;
 		
 		JSONObject resultJSON = new JSONObject();
-		Map<String,SummaryStatistics[]> extractedSummaries;
+		Map<String, SummaryWrapper> finalSummaries;
 		
 		long processingTime = System.currentTimeMillis();
 		try {
@@ -843,11 +844,14 @@ public class StorageNode implements RequestListener {
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSubBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
+					
+					
 				} else {
+					
 					// NOT SUB-BLOCK LEVEL
 					Map<String, List<String>> refinedBlockMap = null;
 					
-					extractedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
+					Map<String,SummaryStatistics[]> extractedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
 					boolean cacheIsEmpty = false;
@@ -856,81 +860,17 @@ public class StorageNode implements RequestListener {
 						cacheIsEmpty = true;
 					}
 					
-					fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);
-					
+					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
+					// HERE THE CACHE WILL BE POPULATED AND 
+					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
+					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);
 					
 				}
 				
-				
-				if (blockMap.keySet().size() > 0) {
-					
-					if (event.getFeatureQuery() != null || event.getPolygon() != null) {
-						
-						hostFileSize = 0;
-						
-						// maximum parallelism = 64
-						ExecutorService executor = Executors.newFixedThreadPool(java.lang.Math.min(blockMap.keySet().size(), 2 * numCores));
-						
-						List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
-						
-						GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(), event.getPolygon());
-						
-						for (String blockKey : blockMap.keySet()) {
-							
-							/* Converts the bounds of geohash into a 1024x1024 region */
-							String[] tokens = blockKey.split("\\$\\$");
-							GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
-							
-							Bitmap queryBitmap = null;
-							
-							if (geoQuery.getPolygon() != null)
-								queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
-							
-							List<String> blocks = blockMap.get(blockKey);
-							
-							VisualizationQueryProcessor qp = new VisualizationQueryProcessor(fs, blocks, geoQuery, blockGrid, queryBitmap, 
-									event.getSpatialResolution(), event.getTemporalResolution(), fs.getSummaryPosns(), subBlockLevel, blockKey);
-							
-							queryProcessors.add(qp);
-							executor.execute(qp);
-							
-						}
-						executor.shutdown();
-						boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
-						if (!status)
-							logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
-						
-						// Sum up the output from query processors
-						for (VisualizationQueryProcessor qp : queryProcessors) {
-							
-							if (qp.getResultSummaries().size() > 0) {
-								Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
-								
-								for(String key: localSummary.keySet()) {
-									
-									if(!extractedSummaries.containsKey(key)) {
-										extractedSummaries.put(key, localSummary.get(key));
-									} else {
-										SummaryStatistics[] oldStats = extractedSummaries.get(key);
-										SummaryStatistics[] statsUpdate = localSummary.get(key);
-										
-										SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
-										extractedSummaries.put(key, mergedSummaries);
-									}
-									
-								}
-							}
-						}
-					} 
-				}
-				
-				// POPULATE THE CACHE TREE
-				// ALSO POPULATE FILE BITMAPS
-				fs.populateCacheTree(extractedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
-				
+				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS */
 				JSONArray summaryJSONs = new JSONArray();
 				
-				for(String key: extractedSummaries.keySet()) {
+				for(String key: finalSummaries.keySet()) {
 					
 					JSONObject obj = new JSONObject();
 					obj.put("key", key);
@@ -940,7 +880,7 @@ public class StorageNode implements RequestListener {
 					
 					int i=0;
 					
-					for(SummaryStatistics ss : extractedSummaries.get(key)) {
+					for(SummaryStatistics ss : finalSummaries.get(key).getStats()) {
 						if(i==0)
 							summaryString = ss.toString();
 						else 
