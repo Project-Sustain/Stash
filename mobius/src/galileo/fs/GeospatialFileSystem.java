@@ -2965,8 +2965,11 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param finalisedSummaries
 	 * @param spatialResolution
 	 * @param temporalResolution
+	 * @param string 
+	 * @param list 
 	 */
-	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution) {
+	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
+			List<Coordinates> polygon, String timeString) {
 		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
 		
@@ -3077,7 +3080,7 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution());
+		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), event.getTimeString());
 		
 		return finalisedSummaries;
 	}

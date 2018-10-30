@@ -73,6 +73,10 @@ public class GeoHash {
 	public final static int MAX_PRECISION = 30; // 6 character precision = 30 (~
 												// 1.2km x 0.61km)
 
+	public static List<Character> evenChars = Arrays.asList('b','c','f','g','u','v','y','z','8','9','d','e','s','t','w','x','2','3','6','7','k','m','q','r','0','1','4','5','h','j','n','p');
+	public static List<Character> oddChars = Arrays.asList('p','r','x','z','n','q','w','y','j','m','t','v','h','k','s','u','5','7','e','g','4','6','d','f','1','3','9','c','0','2','8','b');
+	
+	
 	private static final String BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 	/**
 	 * This character array maps integer values (array indices) to their GeoHash
@@ -2171,29 +2175,33 @@ public class GeoHash {
 	}
 	
 	/**
-	 * Get the Ids of all the internal geohashes.
+	 * Get the Ids of all the internal children.
 	 * THIS DOES NOT RETURN SPATIAL ID.
 	 * @author sapmitra
 	 * @param geoHash
 	 * @param level
 	 * @return
 	 */
-	public static String[] getSpatialChildren(String geoHash, int level) {
+	public static List<String> getSpatialChildren(String geoHash) {
 		
-		SpatialRange range1 = GeoHash.decodeHash(geoHash);
+		int length = geoHash.length();
 		
-		Coordinates c1 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getLowerBoundForLongitude());
-		Coordinates c2 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getLowerBoundForLongitude());
-		Coordinates c3 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getUpperBoundForLongitude());
-		Coordinates c4 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getUpperBoundForLongitude());
+		List<Character> addOns = null;
 		
-		ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
-		cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+		if(length%2 == 0) {
+			addOns = evenChars;
+		} else {
+			addOns = oddChars;
+		}
 		
-		String[] internalGeohashes = GeoHash.getIntersectingGeohashesForConvexBoundingPolygon(cs1, geoHash.length()+level);
+		List<String> neighbors = new ArrayList<String>();
 		
+		for(Character c : addOns) {
+			
+			neighbors.add(geoHash+c);
+		}
 		
-		return internalGeohashes;
+		return neighbors;
 		
 	}
 	
@@ -2275,14 +2283,6 @@ public class GeoHash {
 			return bp;
 			
 		}
-		
-	}
-	
-	
-	public static void getRelatives(String geoHash, String timeString) {
-		
-		String parent = getSpatialParent(geoHash, 1);
-		getTemporalParent(timeString);
 		
 	}
 	
@@ -2628,25 +2628,31 @@ public class GeoHash {
 	}
 	
 	/**
-	 * Returns the temporal parent one level up.
-	 * THIS DOES NOT RETURN TEMPORAL ID
+	 * Returns time-string one level up
+	 * 
 	 * @author sapmitra
 	 * @param timeString
+	 * @param temporalLevel - current temporal level
 	 * @return
 	 */
-	public static String getTemporalParent(String timeString) {
+	public static String getTemporalParent(String timeString, int temporalLevel) {
 		
 		String[] components = timeString.split("-");
 		
-		if(components.length <= 1) {
+		if(temporalLevel <= 1) {
 			return null;
 		}
 			
 		String parent = components[0];
 		
-		for(int i = 1; i < components.length - 1; i++) {
+		for(int i = 1; i < temporalLevel-1; i++) {
 			
 			parent+="-"+components[i];
+		}
+		
+		for(int i = temporalLevel-1; i < 4 ; i++) {
+			
+			parent+="-xx";
 		}
 		
 		return parent;
@@ -2656,28 +2662,26 @@ public class GeoHash {
 	
 	/**
 	 * Get temporal children for the immediate lower temporal level. 
-	 * THIS DOES NOT RETURN TEMPORAL ID
+	 * RETURNS CHILDREN ONE LEVEL DOWN
 	 * @author sapmitra
 	 * @param timeString
 	 * @param temporalResolution This is the current temporal resolution of the timeString
 	 * @return
 	 */
-	public static String[] getTemporalChildren(String timeString, int temporalResolution) {
+	public static List<String> getTemporalChildren(String timeString, int temporalResolution) {
+		
+		List<String> children = new ArrayList<String>();
 		
 		String[] components = timeString.split("-");
 		
-		if(components.length < temporalResolution) {
-			return null;
-		}
 			
 		if(temporalResolution == 1) {
 			//year
 			
-			String[] children = new String[12];
-			
 			for(int i=1; i < 13; i++) {
 				
-				children[i-1] = components[0]+"-"+i;
+				String child = components[0]+"-"+i+"-xx-xx";
+				children.add(child);
 				
 			}
 			
@@ -2695,11 +2699,9 @@ public class GeoHash {
 			int daysInMonth = mycal.getActualMaximum(Calendar.DAY_OF_MONTH); 
 			
 			
-			String[] children = new String[daysInMonth];
-			
 			for(int i=1; i <= daysInMonth; i++) {
 				
-				children[i-1] = components[0]+"-"+components[1]+"-"+i;
+				children.add(components[0]+"-"+components[1]+"-"+i+"-xx");
 				
 			}
 			return children;
@@ -2707,11 +2709,9 @@ public class GeoHash {
 		} else if(temporalResolution == 3) {
 			//day
 			
-			String[] children = new String[12];
-			
 			for(int i=0; i < 24; i++) {
 				
-				children[i] = components[0]+"-"+components[1]+"-"+components[2]+"-"+i;
+				children.add(components[0]+"-"+components[1]+"-"+components[2]+"-"+i);
 				
 			}
 			
@@ -2992,6 +2992,8 @@ public class GeoHash {
 		//System.out.println(getSummaryKey(40.58f, -105.08f, 1537990007000f, 7, 4));
 		
 		System.out.println(GeoHash.hashToLong("00p0"));
+		
+		System.out.println(getTemporalParent("2018-01-11-xx", 3));
 	}
 	
 	/**
@@ -3009,11 +3011,11 @@ public class GeoHash {
 		int numStepsUp = 0;
 		
 		if(geoHash.length() % 2 == 0) {
-			numStepsSide = 8*reqPrecision;
-			numStepsUp = 4*reqPrecision;
-		} else {
-			numStepsUp = 8*reqPrecision;
 			numStepsSide = 4*reqPrecision;
+			numStepsUp = 2*reqPrecision;
+		} else {
+			numStepsUp = 4*reqPrecision;
+			numStepsSide = 2*reqPrecision;
 		}
 		
 		List<String> startingLineup = new ArrayList<String>();

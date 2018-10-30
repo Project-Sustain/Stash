@@ -861,6 +861,8 @@ public class StorageNode implements RequestListener {
 					}
 					
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
+					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES
+					// SummaryWrapper has needsInsertion that saya if it needs to be populated in cache
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
 					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);

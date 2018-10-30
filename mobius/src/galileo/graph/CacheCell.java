@@ -21,8 +21,8 @@ public class CacheCell {
 	private String spatialParent;
 	private String temporalParent;
 	
-	private String[] spatialChildren;
-	private String[] temporalChildren;
+	private List<String> spatialChildren;
+	private List<String> temporalChildren;
 	
 	private List<String> spatialNeighbors;
 	private List<String> temporalNeighbors;
@@ -31,7 +31,8 @@ public class CacheCell {
 	private boolean hasChildren;
 	
 	
-	private float freshCount;
+	private float freshness;
+	private long lastAccessed;
 	
 	/**
 	 * CREATING A NEW CACHE CELL
@@ -57,28 +58,29 @@ public class CacheCell {
 		this.temporalInfo = components[0];
 		this.spatialInfo = components[1];
 		
-		
+		/* NEIGHBORS FOR THIS LEVEL */
 		spatialNeighbors = GeoHash.getSpatialNeighboursSimplified(spatialInfo, GeospatialFileSystem.SPATIAL_SPREAD);
 		temporalNeighbors = GeoHash.getTemporalNeighbors(temporalInfo, temporalResolution);
 		
+		/* PARENTS ONE LEVEL UP */
 		if(spatialResolution > 1)
 			spatialParent = GeoHash.getSpatialParent(spatialInfo, 1);
 		else 
 			spatialParent = null;
 		
 		if(temporalResolution > 1)
-			temporalParent = GeoHash.getTemporalParent(temporalInfo);
+			temporalParent = GeoHash.getTemporalParent(temporalInfo, temporalResolution);
 		else
 			temporalParent = null;
 		
-
 		hasParent = true;
 		
 		if(spatialParent == null && temporalParent == null)
 			hasParent = false;
 		
+		/* CHILDREN ONE LEVEL DOWN */
 		if(spatialResolution < SpatiotemporalHierarchicalCache.totalSpatialLevels )
-			spatialChildren = GeoHash.getSpatialChildren(spatialInfo, 1);
+			spatialChildren = GeoHash.getSpatialChildren(spatialInfo);
 		else 
 			spatialChildren = null;
 		
@@ -92,7 +94,7 @@ public class CacheCell {
 		if(spatialChildren == null && temporalChildren == null)
 			hasChildren = false;
 		
-		this.freshCount = 1;
+		this.freshness = 1;
 		
 	}
 
@@ -138,12 +140,12 @@ public class CacheCell {
 		this.stats = stats;
 	}
 
-	public float getFreshCount() {
-		return freshCount;
+	public float getFreshness() {
+		return freshness;
 	}
 
-	public void setFreshCount(float freshCount) {
-		this.freshCount = freshCount;
+	public void setFreshness(float freshness) {
+		this.freshness = freshness;
 	}
 
 	public String getSpatialParent() {
@@ -160,22 +162,6 @@ public class CacheCell {
 
 	public void setTemporalParent(String temporalParent) {
 		this.temporalParent = temporalParent;
-	}
-
-	public String[] getSpatialChildren() {
-		return spatialChildren;
-	}
-
-	public void setSpatialChildren(String[] spatialChildren) {
-		this.spatialChildren = spatialChildren;
-	}
-
-	public String[] getTemporalChildren() {
-		return temporalChildren;
-	}
-
-	public void setTemporalChildren(String[] temporalChildren) {
-		this.temporalChildren = temporalChildren;
 	}
 
 	public boolean isHasParent() {
@@ -197,7 +183,7 @@ public class CacheCell {
 	
 	
 	public void incrementFreshness(float val) {
-		this.freshCount += val;
+		this.freshness += val;
 	}
 	
 	
@@ -223,6 +209,30 @@ public class CacheCell {
 
 	public void setTemporalNeighbors(List<String> temporalNeighbors) {
 		this.temporalNeighbors = temporalNeighbors;
+	}
+
+	public long getLastAccessed() {
+		return lastAccessed;
+	}
+
+	public void setLastAccessed(long lastAccessed) {
+		this.lastAccessed = lastAccessed;
+	}
+
+	public List<String> getSpatialChildren() {
+		return spatialChildren;
+	}
+
+	public void setSpatialChildren(List<String> spatialChildren) {
+		this.spatialChildren = spatialChildren;
+	}
+
+	public List<String> getTemporalChildren() {
+		return temporalChildren;
+	}
+
+	public void setTemporalChildren(List<String> temporalChildren) {
+		this.temporalChildren = temporalChildren;
 	}
 
 }
