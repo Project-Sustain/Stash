@@ -2155,7 +2155,7 @@ public class GeoHash {
 	 * THIS DOES NOT RETURN SPATIAL ID.
 	 * @author sapmitra
 	 * @param geoHash
-	 * @param level
+	 * @param level - how many levels above do you want to go?
 	 * @return
 	 */
 	public static String getSpatialParent(String geoHash, int level) {
@@ -2275,6 +2275,14 @@ public class GeoHash {
 			return bp;
 			
 		}
+		
+	}
+	
+	
+	public static void getRelatives(String geoHash, String timeString) {
+		
+		String parent = getSpatialParent(geoHash, 1);
+		getTemporalParent(timeString);
 		
 	}
 	
@@ -2715,6 +2723,11 @@ public class GeoHash {
 		
 	}
 	
+	public static String getTemporalString(String yr, String mon, String day, String hr) {
+		
+		return yr+"-"+mon+"-"+day+"-"+hr;
+	}
+	
 	/**
 	 * Getting temporal neighbors on the same level.
 	 * THIS DOES NOT RETURN TEMPORAL ID.
@@ -2723,18 +2736,24 @@ public class GeoHash {
 	 * @param temporalResolution
 	 * @return
 	 */
-	public static String[] getTemporalNeighbors(String dateString, int temporalResolution) {
+	public static List<String> getTemporalNeighbors(String dateString, int temporalResolution) {
 		
-		String[] neighbors = new String[2];
+		List<String> neighbors = new ArrayList<String>();
 		
 		String[] components = dateString.split("-");
 		
 		// year
 		if(temporalResolution == 1) {
+			
 			int yr = Integer.valueOf(components[0]);
 			
-			neighbors[0] = String.valueOf(yr-1);
-			neighbors[1] = String.valueOf(yr+1);
+			for(int i=0; i < GeospatialFileSystem.TEMPORAL_SPREAD*5; i++) {
+				
+				neighbors.add(getTemporalString(String.valueOf(yr-i+1), components[1], components[2], components[3]));
+				neighbors.add(getTemporalString(String.valueOf(yr+i+1), components[1], components[2], components[3]));
+				
+			}
+			
 			return neighbors;
 			
 		} else if(temporalResolution == 2) {
@@ -2742,14 +2761,19 @@ public class GeoHash {
 			int yr = Integer.valueOf(components[0]);
 			int mm = Integer.valueOf(components[1]);
 			
-			GregorianCalendar cal = new GregorianCalendar(yr, mm-1, 1);
 			
-			cal.add(Calendar.MONTH, -1);
-			neighbors[0] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1);
 			
-			cal.add(Calendar.MONTH, 2);
+			for(int i=0; i < GeospatialFileSystem.TEMPORAL_SPREAD*6; i++) {
+				GregorianCalendar cal1 = new GregorianCalendar(yr, mm-1, 1);
+				cal1.add(Calendar.MONTH, -1*(i+1));
+				neighbors.add(cal1.get(Calendar.YEAR)+"-"+(cal1.get(Calendar.MONTH)+1)+"-xx-xx");
+				
+				GregorianCalendar cal2 = new GregorianCalendar(yr, mm-1, 1);
+				cal2.add(Calendar.MONTH, (i+1));
+				neighbors.add(cal2.get(Calendar.YEAR)+"-"+(cal2.get(Calendar.MONTH)+1)+"-xx-xx");
+				
+			}
 			
-			neighbors[1] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1);
 			return neighbors;
 			
 		} else if(temporalResolution == 3) {
@@ -2758,14 +2782,19 @@ public class GeoHash {
 			int mm = Integer.valueOf(components[1]);
 			int dd = Integer.valueOf(components[2]);
 			
-			GregorianCalendar cal = new GregorianCalendar(yr, mm-1, dd);
 			
-			cal.add(Calendar.DATE, -1);
-			neighbors[0] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1)+"-"+cal.get(Calendar.DATE);
+			for(int i=0; i < GeospatialFileSystem.TEMPORAL_SPREAD*4; i++) {
+				
+				GregorianCalendar cal1 = new GregorianCalendar(yr, mm-1, dd);
+				cal1.add(Calendar.DATE, -1*(i+1));
+				neighbors.add(cal1.get(Calendar.YEAR)+"-"+(cal1.get(Calendar.MONTH)+1)+"-"+cal1.get(Calendar.DATE)+"-xx");
+				
+				GregorianCalendar cal2 = new GregorianCalendar(yr, mm-1, dd);
+				cal2.add(Calendar.DATE, (i+1));
+				neighbors.add(cal2.get(Calendar.YEAR)+"-"+(cal2.get(Calendar.MONTH)+1)+"-"+cal2.get(Calendar.DATE)+"-xx");
+				
+			}
 			
-			cal.add(Calendar.DATE, 2);
-			
-			neighbors[1] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1)+"-"+cal.get(Calendar.DATE);
 			return neighbors;
 			
 		} else if(temporalResolution == 4) {
@@ -2776,13 +2805,17 @@ public class GeoHash {
 			int dd = Integer.valueOf(components[2]);
 			int hh = Integer.valueOf(components[3]);
 			
-			GregorianCalendar cal = new GregorianCalendar(yr, mm-1, dd, hh, 0);
-			
-			cal.add(Calendar.HOUR_OF_DAY, -1);
-			neighbors[0] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1)+"-"+cal.get(Calendar.DATE)+"-"+cal.get(Calendar.HOUR_OF_DAY);
-			
-			cal.add(Calendar.HOUR_OF_DAY, 2);
-			neighbors[1] = cal.get(Calendar.YEAR)+"-"+(cal.get(Calendar.MONTH)+1)+"-"+cal.get(Calendar.DATE)+"-"+cal.get(Calendar.HOUR_OF_DAY);
+			for(int i=0; i < GeospatialFileSystem.TEMPORAL_SPREAD*3; i++) {
+				
+				GregorianCalendar cal1 = new GregorianCalendar(yr, mm-1, dd, hh, 0);
+				cal1.add(Calendar.HOUR_OF_DAY, -1*(i+1));
+				neighbors.add(cal1.get(Calendar.YEAR)+"-"+(cal1.get(Calendar.MONTH)+1)+"-"+cal1.get(Calendar.DATE)+"-"+cal1.get(Calendar.HOUR_OF_DAY));
+				
+				GregorianCalendar cal2 = new GregorianCalendar(yr, mm-1, dd, hh, 0);
+				cal2.add(Calendar.HOUR_OF_DAY, (i+1));
+				neighbors.add(cal2.get(Calendar.YEAR)+"-"+(cal2.get(Calendar.MONTH)+1)+"-"+cal2.get(Calendar.DATE)+"-"+cal2.get(Calendar.HOUR_OF_DAY));
+				
+			}
 			
 			return neighbors;
 			
@@ -2961,7 +2994,56 @@ public class GeoHash {
 		System.out.println(GeoHash.hashToLong("00p0"));
 	}
 	
-	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param geoHash
+	 * @param reqPrecision - This tells the number blocks of size geohashlength-1 to extend
+	 * @return
+	 */
+	public static List<String> getSpatialNeighboursSimplified(String geoHash, int reqPrecision) {
+		
+		List<String> spatialNeighbors = new ArrayList<String>();
+		
+		int numStepsSide = 0;
+		int numStepsUp = 0;
+		
+		if(geoHash.length() % 2 == 0) {
+			numStepsSide = 8*reqPrecision;
+			numStepsUp = 4*reqPrecision;
+		} else {
+			numStepsUp = 8*reqPrecision;
+			numStepsSide = 4*reqPrecision;
+		}
+		
+		List<String> startingLineup = new ArrayList<String>();
+		startingLineup.add(geoHash);
+		
+		for(int i = 0; i < numStepsUp; i++) {
+			
+			startingLineup.add(getNeighbour(geoHash, "n"));
+			
+			startingLineup.add(getNeighbour(geoHash, "s"));
+			
+			spatialNeighbors.add(getNeighbour(geoHash, "n"));
+			
+			spatialNeighbors.add(getNeighbour(geoHash, "s"));
+		}
+		
+		for(String s: startingLineup) {
+			
+			for(int i=0; i< numStepsSide; i++) {
+				
+				spatialNeighbors.add(getNeighbour(s, "e"));
+				
+				spatialNeighbors.add(getNeighbour(s, "w"));
+				
+			}
+		}
+		
+		return spatialNeighbors;
+		
+	}
 	
 	
 }

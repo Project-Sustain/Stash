@@ -14,6 +14,23 @@ public class SpatialBorder {
 	private String nw;
 	private String sw;
 	
+	public List<String> getListOfNeighbors() {
+		
+		List<String> neighbors = new ArrayList<String>();
+		
+		neighbors.add(nw);
+		neighbors.addAll(n);
+		neighbors.add(ne);
+		neighbors.addAll(e);
+		neighbors.add(se);
+		neighbors.addAll(s);
+		neighbors.add(sw);
+		neighbors.addAll(w);
+		
+		return neighbors;
+	}
+	
+	
 	public SpatialBorder() {
 		n = new ArrayList<String>();
 		s = new ArrayList<String>();

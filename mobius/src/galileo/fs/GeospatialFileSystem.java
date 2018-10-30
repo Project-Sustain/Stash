@@ -189,6 +189,25 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final String TEMPORAL_DAY_FEATURE = "x__day__x";
 	private static final String TEMPORAL_HOUR_FEATURE = "x__hour__x";
 	private static final String SPATIAL_FEATURE = "x__spatial__x";
+	
+	// HOW FAR SPATIAL NEIGHBORS ARE INFLUENCED
+	public static final int SPATIAL_SPREAD = 1;
+	// HOW FAR TEMPORAL NEIGHBORS ARE INFLUENCED
+	public static final int TEMPORAL_SPREAD = 1;
+	// HOW FAR UP SPATIAL PARENTS ARE INFLUENCED
+	public static final int SPATIAL_MOVE_UP = 1;
+	// HOW FAR UP SPATIAL PARENTS ARE INFLUENCED
+	public static final float SPATIAL_WANE = 0.5f;
+	// HOW FAR UP TEMPORAL PARENTS ARE INFLUENCED
+	public static final int TEMPORAL_MOVE_UP = 1;
+	// HOW FAR UP TEMPORAL PARENTS ARE INFLUENCED
+	public static final float TEMPORAL_WANE = 0.5f;
+	// HOW FAR DOWN SPATIAL CHILDREN ARE INFLUENCED
+	public static final int SPATIAL_MOVE_DOWN = 1;
+	// HOW FAR DOWN TEMPORAL CHILDREN ARE INFLUENCED
+	public static final int TEMPORAL_MOVE_DOWN = 1;
+	
+	
 
 	
 	/**
@@ -2956,8 +2975,11 @@ public class GeospatialFileSystem extends FileSystem {
 			SummaryWrapper sw = finalisedSummaries.get(key);
 			
 			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
-			if(sw.isNeedsInsertion())
+			if(sw.isNeedsInsertion()) {
+				
+				
 				stCache.addCell(sw.getStats(), key, cacheResolution);
+			}
 			
 		}
 		

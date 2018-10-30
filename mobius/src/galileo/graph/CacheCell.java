@@ -2,7 +2,9 @@ package galileo.graph;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 
+import galileo.fs.GeospatialFileSystem;
 import galileo.util.GeoHash;
 import galileo.util.SpatialBorder;
 
@@ -22,8 +24,8 @@ public class CacheCell {
 	private String[] spatialChildren;
 	private String[] temporalChildren;
 	
-	private SpatialBorder spatialNeighbors;
-	private String[] temporalNeighbors;
+	private List<String> spatialNeighbors;
+	private List<String> temporalNeighbors;
 
 	private boolean hasParent;
 	private boolean hasChildren;
@@ -52,13 +54,18 @@ public class CacheCell {
 		
 		String[] components = spatiotemporalInfo.split(",");
 		
-		this.spatialInfo = components[0];
-		this.temporalInfo = components[1];
+		this.temporalInfo = components[0];
+		this.spatialInfo = components[1];
+		
+		
+		spatialNeighbors = GeoHash.getSpatialNeighboursSimplified(spatialInfo, GeospatialFileSystem.SPATIAL_SPREAD);
+		temporalNeighbors = GeoHash.getTemporalNeighbors(temporalInfo, temporalResolution);
 		
 		if(spatialResolution > 1)
 			spatialParent = GeoHash.getSpatialParent(spatialInfo, 1);
 		else 
 			spatialParent = null;
+		
 		if(temporalResolution > 1)
 			temporalParent = GeoHash.getTemporalParent(temporalInfo);
 		else
@@ -84,9 +91,6 @@ public class CacheCell {
 		
 		if(spatialChildren == null && temporalChildren == null)
 			hasChildren = false;
-		
-		spatialNeighbors = GeoHash.getSpatialNeighbours(spatialInfo, spatialResolution);
-		temporalNeighbors = GeoHash.getTemporalNeighbors(temporalInfo, temporalResolution);
 		
 		this.freshCount = 1;
 		
@@ -190,21 +194,7 @@ public class CacheCell {
 		this.hasChildren = hasChildren;
 	}
 
-	public SpatialBorder getSpatialNeighbors() {
-		return spatialNeighbors;
-	}
-
-	public void setSpatialNeighbors(SpatialBorder spatialNeighbors) {
-		this.spatialNeighbors = spatialNeighbors;
-	}
-
-	public String[] getTemporalNeighbors() {
-		return temporalNeighbors;
-	}
-
-	public void setTemporalNeighbors(String[] temporalNeighbors) {
-		this.temporalNeighbors = temporalNeighbors;
-	}
+	
 	
 	public void incrementFreshness(float val) {
 		this.freshCount += val;
@@ -217,6 +207,22 @@ public class CacheCell {
 	    cal.add(Calendar.HOUR_OF_DAY, 280); // adds one hour
 	    System.out.println(cal.getTime()); 
 		
+	}
+
+	public List<String> getSpatialNeighbors() {
+		return spatialNeighbors;
+	}
+
+	public void setSpatialNeighbors(List<String> spatialNeighbors) {
+		this.spatialNeighbors = spatialNeighbors;
+	}
+
+	public List<String> getTemporalNeighbors() {
+		return temporalNeighbors;
+	}
+
+	public void setTemporalNeighbors(List<String> temporalNeighbors) {
+		this.temporalNeighbors = temporalNeighbors;
 	}
 
 }
