@@ -16,6 +16,8 @@ import galileo.serialization.SerializationOutputStream;
 
 public class VisualizationEvent implements Event{
 
+	// TIME$$RANDOM_NUM
+	private String eventId;
 	private String fsName;
 	private Query featureQuery;
 	private List<Coordinates> polygon;
@@ -208,6 +210,14 @@ public class VisualizationEvent implements Event{
 
 	public void setReqFeatures(List<String> reqFeatures) {
 		this.reqFeatures = reqFeatures;
+	}
+
+	public String getEventId() {
+		return eventId;
+	}
+
+	public void setEventId(String eventId) {
+		this.eventId = eventId;
 	}
 
 

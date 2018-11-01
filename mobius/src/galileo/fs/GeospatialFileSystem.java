@@ -2966,10 +2966,22 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 * @param string 
+	 * @param string 
 	 * @param list 
 	 */
 	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
 			List<Coordinates> polygon, String timeString) {
+		
+		String[] timeTokens = timeString.split("-");
+		
+		long qt1 = Long.valueOf(timeTokens[0]);
+		long qt2 = Long.valueOf(timeTokens[1]);
+		
+		// List of all unique parents, children and neighbors to be dispersed
+		// They lie outside the query region, for the level queried, since they cannot include the cells already updated with freshness of 1 
+		Map<Integer, Set<String>> parents = new HashMap<Integer, Set<String>>();
+		Map<Integer, Set<String>> children = new HashMap<Integer, Set<String>>();
+		Set<String> neighbors = new HashSet<String>();
 		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
 		
@@ -2979,9 +2991,11 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
 			if(sw.isNeedsInsertion()) {
-				
-				
-				stCache.addCell(sw.getStats(), key, cacheResolution);
+				// THIS IS A NEW CELL GETTING INSERTED
+				stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2);
+			} else {
+				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
+				stCache.incrementCell(key, cacheResolution, eventId);
 			}
 			
 		}

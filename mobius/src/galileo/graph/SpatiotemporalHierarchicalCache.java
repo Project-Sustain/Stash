@@ -1,5 +1,9 @@
 package galileo.graph;
 
+import java.util.List;
+
+import galileo.dataset.Coordinates;
+
 public class SpatiotemporalHierarchicalCache {
 	
 	// EACH LEVEL IS A 2D SPARSE MATRIX
@@ -48,17 +52,27 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 */
-	public void addCell(SummaryStatistics[] summ, String key, int spatialResolution, int temporalResolution) {
+	public void addCell(SummaryStatistics[] summ, String key, int spatialResolution, int temporalResolution, String eventId) {
 		
 		int id = getCacheLevel(spatialResolution, temporalResolution);
 		
 		if(id < totalSpatialLevels*totalTemporalLevels && cacheLevels[id] != null) {
-			cacheLevels[id].addCell(summ, key);
+			cacheLevels[id].addCell(summ, key, eventId);
 		}
 		
 	}
 	
-	public void addCell(SummaryStatistics[] summ, String key, int cacheLevel) {
+	/**
+	 * SAME AS THE PREVIOUS METHOD 
+	 * @author sapmitra
+	 * @param summ
+	 * @param key
+	 * @param cacheLevel
+	 * @param qt2 
+	 * @param qt1 
+	 * @param polygon 
+	 */
+	public void addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2) {
 		
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
 			cacheLevels[cacheLevel].addCell(summ, key);
@@ -66,6 +80,20 @@ public class SpatiotemporalHierarchicalCache {
 		
 	}
 	
+	/**
+	 * Adds 1 to a pre-existing cell if it gets accessed
+	 * 
+	 * @author sapmitra
+	 * @param key
+	 * @param cacheLevel
+	 */
+	public void incrementCell(String key, int cacheLevel, String eventId) {
+		
+		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
+			cacheLevels[cacheLevel].updateCellFreshness(key, eventId);
+		}
+		
+	}
 	
 	/**
 	 * GET THE PARTICULAR LEVEL/INDEX FOR THE MATRIX FOR A GIVEN SPATIAL AND TEMPORAL RESOLUTION

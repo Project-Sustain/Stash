@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -803,7 +804,12 @@ public class StorageNode implements RequestListener {
 		JSONObject resultJSON = new JSONObject();
 		Map<String, SummaryWrapper> finalSummaries;
 		
-		long processingTime = System.currentTimeMillis();
+		Random r = new Random();
+		int eventId = r.nextInt();
+		
+		long eventTime = System.currentTimeMillis();
+		
+		event.setEventId(eventTime+"$$"+eventId);
 		try {
 			logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
@@ -894,7 +900,7 @@ public class StorageNode implements RequestListener {
 					summaryJSONs.put(obj);
 				}
 				
-				totalProcessingTime = System.currentTimeMillis() - processingTime;
+				totalProcessingTime = System.currentTimeMillis() - eventTime;
 				
 				resultJSON.put("hostName", this.canonicalHostname);
 				resultJSON.put("hostPort", this.port);

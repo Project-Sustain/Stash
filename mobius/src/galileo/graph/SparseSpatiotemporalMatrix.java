@@ -61,6 +61,7 @@ public class SparseSpatiotemporalMatrix {
 	 * @author sapmitra
 	 * @param summ
 	 * @param key
+	 * @param eventId 
 	 * @param temporalResolution2 
 	 * @param spatialResolution2 
 	 */
@@ -71,10 +72,28 @@ public class SparseSpatiotemporalMatrix {
 		CacheCell c = cells.get(key);
 		
 		// This cell is empty
-		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution);
+		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId);
+		
+		c.getSpatialParent();
+		c.getTemporalParent();
+		
+		c.getSpatialNeighbors();
+		c.getTemporalNeighbors();
+		
+		c.getSpatialChildren();
+		c.getTemporalChildren();
+		
 		cells.put(key, c);
 			
 		
+		
+	}
+	
+	public void updateCellFreshness(String key, String eventId) {
+		
+		CacheCell c = cells.get(key);
+		c.incrementFreshness(1f);
+		c.setLastEvent(eventId);
 		
 	}
 	

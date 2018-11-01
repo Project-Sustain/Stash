@@ -4,6 +4,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import galileo.dataset.Coordinates;
 import galileo.fs.GeospatialFileSystem;
 import galileo.util.GeoHash;
 import galileo.util.SpatialBorder;
@@ -44,6 +45,7 @@ public class CacheCell {
 	 * @param spatiotemporalInfo The spatial and temporal strings that define this cell block
 	 * @param spatialResolution
 	 * @param temporalResolution
+	 * @param eventId 
 	 */
 	
 	public CacheCell(SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
@@ -152,6 +154,7 @@ public class CacheCell {
 		return spatialParent;
 	}
 
+	
 	public void setSpatialParent(String spatialParent) {
 		this.spatialParent = spatialParent;
 	}
@@ -203,6 +206,13 @@ public class CacheCell {
 		this.spatialNeighbors = spatialNeighbors;
 	}
 
+	public void getRefinedSpatialNeighbors() {
+		
+		for(String gh: spatialNeighbors) {
+			
+		}
+	}
+	
 	public List<String> getTemporalNeighbors() {
 		return temporalNeighbors;
 	}
@@ -234,5 +244,6 @@ public class CacheCell {
 	public void setTemporalChildren(List<String> temporalChildren) {
 		this.temporalChildren = temporalChildren;
 	}
+
 
 }
