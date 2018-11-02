@@ -1,6 +1,11 @@
 package galileo.graph;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+
+import galileo.dataset.Coordinates;
+import galileo.util.STRelatives;
 
 /**
  * 2D Sparse matrix maintained as a hashmap. 
@@ -61,39 +66,34 @@ public class SparseSpatiotemporalMatrix {
 	 * @author sapmitra
 	 * @param summ
 	 * @param key
+	 * @param eventTime 
+	 * @param eventId 
 	 * @param eventId 
 	 * @param temporalResolution2 
 	 * @param spatialResolution2 
 	 */
 	
-	public void addCell(SummaryStatistics[] summ, String key) {
+	public STRelatives addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
 		// The new summary replaces the old cache summary, whatever may be the case
 		CacheCell c = cells.get(key);
 		
 		// This cell is empty
-		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId);
-		
-		c.getSpatialParent();
-		c.getTemporalParent();
-		
-		c.getSpatialNeighbors();
-		c.getTemporalNeighbors();
-		
-		c.getSpatialChildren();
-		c.getTemporalChildren();
+		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId, eventTime);
 		
 		cells.put(key, c);
 			
+		STRelatives str = c.getRelativesForCell(polygon, qt1, qt2);
 		
+		return str;
 		
 	}
 	
-	public void updateCellFreshness(String key, String eventId) {
+	
+	public void updateCellFreshness(String key) {
 		
 		CacheCell c = cells.get(key);
 		c.incrementFreshness(1f);
-		c.setLastEvent(eventId);
 		
 	}
 	

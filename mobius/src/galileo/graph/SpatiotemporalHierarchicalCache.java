@@ -3,6 +3,7 @@ package galileo.graph;
 import java.util.List;
 
 import galileo.dataset.Coordinates;
+import galileo.util.STRelatives;
 
 public class SpatiotemporalHierarchicalCache {
 	
@@ -52,15 +53,15 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 */
-	public void addCell(SummaryStatistics[] summ, String key, int spatialResolution, int temporalResolution, String eventId) {
+	/*public void addCell(SummaryStatistics[] summ, String key, int spatialResolution, int temporalResolution, String eventId) {
 		
 		int id = getCacheLevel(spatialResolution, temporalResolution);
 		
 		if(id < totalSpatialLevels*totalTemporalLevels && cacheLevels[id] != null) {
-			cacheLevels[id].addCell(summ, key, eventId);
+			cacheLevels[id].addCell(summ, key);
 		}
 		
-	}
+	}*/
 	
 	/**
 	 * SAME AS THE PREVIOUS METHOD 
@@ -72,11 +73,14 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt1 
 	 * @param polygon 
 	 */
-	public void addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2) {
+	public STRelatives addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+		STRelatives str = null;
 		
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].addCell(summ, key);
+			str = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
 		}
+		
+		return str;
 		
 	}
 	
@@ -87,11 +91,14 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param key
 	 * @param cacheLevel
 	 */
-	public void incrementCell(String key, int cacheLevel, String eventId) {
+	public STRelatives incrementCell(String key, int cacheLevel) {
 		
+		STRelatives str = null;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].updateCellFreshness(key, eventId);
+			cacheLevels[cacheLevel].updateCellFreshness(key);
 		}
+		
+		return str;
 		
 	}
 	

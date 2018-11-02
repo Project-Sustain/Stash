@@ -1,5 +1,7 @@
 package galileo.graph;
 
+import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.List;
 import galileo.dataset.Coordinates;
 import galileo.fs.GeospatialFileSystem;
 import galileo.util.GeoHash;
+import galileo.util.STRelatives;
 import galileo.util.SpatialBorder;
 
 public class CacheCell {
@@ -34,6 +37,7 @@ public class CacheCell {
 	
 	private float freshness;
 	private long lastAccessed;
+	private String lastEvent;
 	
 	/**
 	 * CREATING A NEW CACHE CELL
@@ -45,11 +49,13 @@ public class CacheCell {
 	 * @param spatiotemporalInfo The spatial and temporal strings that define this cell block
 	 * @param spatialResolution
 	 * @param temporalResolution
+	 * @param eventTime 
+	 * @param eventId 
 	 * @param eventId 
 	 */
 	
 	public CacheCell(SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
-			int spatialResolution, int temporalResolution) {
+			int spatialResolution, int temporalResolution, String eventId, long eventTime) {
 		
 		this.stats = stats;
 		this.spatialResolution = spatialResolution;
@@ -97,6 +103,9 @@ public class CacheCell {
 			hasChildren = false;
 		
 		this.freshness = 1;
+		
+		this.lastEvent = eventId;
+		this.lastAccessed = eventTime;
 		
 	}
 
@@ -206,16 +215,80 @@ public class CacheCell {
 		this.spatialNeighbors = spatialNeighbors;
 	}
 
-	public void getRefinedSpatialNeighbors() {
+	/**
+	 * ONLY THE NEIGHBORS THAT NEED TO BE DISPERSED FRESHNESS
+	 * @author sapmitra
+	 * @param polygon
+	 * @return
+	 */
+	public List<String> getRefinedSpatialNeighbors(List<Coordinates> polygon) {
+		
+		List<String> refinedNeighbors = new ArrayList<String>();
 		
 		for(String gh: spatialNeighbors) {
+			boolean hasIntersection = GeoHash.checkIntersection(polygon, gh);
 			
+			if(!hasIntersection) {
+				refinedNeighbors.add(gh);
+			}
 		}
+		
+		return refinedNeighbors;
 	}
 	
 	public List<String> getTemporalNeighbors() {
 		return temporalNeighbors;
 	}
+	
+	
+	public List<String> getRefinedTemporalNeighbors(long qt1, long qt2) {
+		
+		List<String> refinedTemporalNeighbors = new ArrayList<String>();
+		
+		for(String ts : temporalNeighbors) {
+			try {
+				boolean temporalIntersection = GeoHash.checkTemporalIntersection(ts, qt1, qt2);
+				if(!temporalIntersection)
+					refinedTemporalNeighbors.add(ts);
+				
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+		}
+		return refinedTemporalNeighbors;
+	}
+	
+	
+	public STRelatives getRelativesForCell(List<Coordinates> polygon, long qt1, long qt2) {
+		
+		String sp = getSpatialParent();
+		String tp = getTemporalParent();
+		
+		
+		
+		// Only at the level of the current cell
+		List<String> refinedSpatialNeighbors = getRefinedSpatialNeighbors(polygon);
+		List<String> refinedTemporalNeighbors = getRefinedTemporalNeighbors(qt1, qt2);
+		
+		List<String> refinedNeighborCells = new ArrayList<String>();
+		
+		for(String s: refinedSpatialNeighbors) {
+			for(String t: refinedTemporalNeighbors) {
+				refinedNeighborCells.add(t+"$$"+s);
+			}
+		}
+		
+		getSpatialChildren();
+		getTemporalChildren();
+		return null;
+	}
+	
+	
+	
+	
 
 	public void setTemporalNeighbors(List<String> temporalNeighbors) {
 		this.temporalNeighbors = temporalNeighbors;
@@ -243,6 +316,14 @@ public class CacheCell {
 
 	public void setTemporalChildren(List<String> temporalChildren) {
 		this.temporalChildren = temporalChildren;
+	}
+
+	public String getLastEvent() {
+		return lastEvent;
+	}
+
+	public void setLastEvent(String lastEvent) {
+		this.lastEvent = lastEvent;
 	}
 
 

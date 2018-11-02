@@ -793,6 +793,7 @@ public class StorageNode implements RequestListener {
 	 * @param event
 	 * @param context
 	 */
+	
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
@@ -810,6 +811,7 @@ public class StorageNode implements RequestListener {
 		long eventTime = System.currentTimeMillis();
 		
 		event.setEventId(eventTime+"$$"+eventId);
+		
 		try {
 			logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
@@ -871,6 +873,7 @@ public class StorageNode implements RequestListener {
 					// SummaryWrapper has needsInsertion that saya if it needs to be populated in cache
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
+					
 					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);
 					
 				}

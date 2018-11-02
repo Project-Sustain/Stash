@@ -1926,6 +1926,26 @@ public class GeoHash {
 		return "ignore";
 	}
 	
+	/**
+	 * CHEKING TEMPORAL INTERSECTION
+	 * @author sapmitra
+	 * @param timeString
+	 * @param time2
+	 * @param t1
+	 * @param t2
+	 * @return
+	 * @throws ParseException
+	 */
+	public static boolean checkTemporalIntersection(String timeString, long qt1, long qt2) throws ParseException {
+		
+		long startTs = getStartTimeStamp(timeString, TemporalType.HOUR_OF_DAY);
+		
+		if(startTs >= qt1 && startTs <= qt2)
+			return true;
+		
+		return false;
+	}
+	
 	
 	/**
 	 * 

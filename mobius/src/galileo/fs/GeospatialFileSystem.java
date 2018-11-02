@@ -123,6 +123,7 @@ import galileo.util.OrientationManager;
 import galileo.util.Pair;
 import galileo.util.PathsAndOrientations;
 import galileo.util.Requirements;
+import galileo.util.STRelatives;
 import galileo.util.SuperCube;
 
 /**
@@ -2960,22 +2961,28 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 
 	/**
-	 * NEWLY EXTRACTED SUMMARIES BEING PUT INTO THE TREE
+	 * NEWLY EXTRACTED SUMMARIES BEING PUT INTO THE TREE FOR THIS NODE, FOR THIS EVENT
 	 * @author sapmitra
 	 * @param finalisedSummaries
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 * @param string 
 	 * @param string 
+	 * @param string 
 	 * @param list 
 	 */
 	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
-			List<Coordinates> polygon, String timeString) {
+			List<Coordinates> polygon, String timeString, String eventId) {
+		
+		String eventTokens[] = eventId.split("\\$\\$");
+		
+		long eventTime = Long.valueOf(eventTokens[0]);
 		
 		String[] timeTokens = timeString.split("-");
 		
 		long qt1 = Long.valueOf(timeTokens[0]);
 		long qt2 = Long.valueOf(timeTokens[1]);
+		
 		
 		// List of all unique parents, children and neighbors to be dispersed
 		// They lie outside the query region, for the level queried, since they cannot include the cells already updated with freshness of 1 
@@ -2985,20 +2992,29 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
 		
+		
+		// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
 		for(String key: finalisedSummaries.keySet()) {
 			
 			SummaryWrapper sw = finalisedSummaries.get(key);
 			
+			STRelatives str = null;
 			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
+			// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
 			if(sw.isNeedsInsertion()) {
 				// THIS IS A NEW CELL GETTING INSERTED
-				stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2);
+				str = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 			} else {
 				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
-				stCache.incrementCell(key, cacheResolution, eventId);
+				str = stCache.incrementCell(key, cacheResolution);
 			}
 			
+			
+			
 		}
+			
+		
+		
 		
 	}
 
@@ -3056,6 +3072,7 @@ public class GeospatialFileSystem extends FileSystem {
 				}
 				executor.shutdown();
 				boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+				
 				if (!status)
 					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
 				
@@ -3067,6 +3084,7 @@ public class GeospatialFileSystem extends FileSystem {
 					finalisedSummaries.put(k, sw);
 					
 				}
+				
 				// Sum up the output from query processors
 				for (VisualizationQueryProcessor qp : queryProcessors) {
 					
@@ -3092,9 +3110,10 @@ public class GeospatialFileSystem extends FileSystem {
 				}
 			} 
 		}
+		
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), event.getTimeString());
+		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), event.getTimeString(), event.getEventId());
 		
 		return finalisedSummaries;
 	}
