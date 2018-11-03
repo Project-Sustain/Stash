@@ -73,14 +73,11 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt1 
 	 * @param polygon 
 	 */
-	public STRelatives addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
-		STRelatives str = null;
+	public void addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			str = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
+			cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
 		}
-		
-		return str;
 		
 	}
 	
@@ -90,17 +87,44 @@ public class SpatiotemporalHierarchicalCache {
 	 * @author sapmitra
 	 * @param key
 	 * @param cacheLevel
+	 * @param eventTime 
+	 * @param eventId 
+	 * @param qt2 
+	 * @param qt1 
+	 * @param polygon 
 	 */
-	public STRelatives incrementCell(String key, int cacheLevel) {
+	public void incrementCell(String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
-		STRelatives str = null;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].updateCellFreshness(key);
+			cacheLevels[cacheLevel].updateCellFreshness(key, polygon, qt1, qt2, eventId, eventTime);
 		}
 		
-		return str;
+	}
+	
+	/**
+	 * This is second hand dispersion for cell that was not actually accessed.
+	 * 
+	 * @author sapmitra
+	 * @param key
+	 * @param cacheLevel
+	 * @param eventTime 
+	 * @param eventId 
+	 * @param polygon
+	 * @param qt1
+	 * @param qt2
+	 * @param eventId
+	 * @param eventTime
+	 */
+	
+	public void disperseToCell(String key, int cacheLevel, String eventId, long eventTime) {
+		
+		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
+			cacheLevels[cacheLevel].disperseCellFreshness(key, eventId, eventTime);
+		}
 		
 	}
+	
+	
 	
 	/**
 	 * GET THE PARTICULAR LEVEL/INDEX FOR THE MATRIX FOR A GIVEN SPATIAL AND TEMPORAL RESOLUTION

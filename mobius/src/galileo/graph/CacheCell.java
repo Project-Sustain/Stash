@@ -14,6 +14,7 @@ import galileo.util.SpatialBorder;
 
 public class CacheCell {
 	
+	private SpatiotemporalHierarchicalCache cache;
 	private String spatialInfo;
 	private String temporalInfo;
 	
@@ -42,6 +43,7 @@ public class CacheCell {
 	/**
 	 * CREATING A NEW CACHE CELL
 	 * UPDATE THE NEIGHBOR INFO AND OBJECT REFERENCES
+	 * @param cache 
 	 * @param stats
 	 * @param numChildren
 	 * @param numNeighbors
@@ -54,9 +56,10 @@ public class CacheCell {
 	 * @param eventId 
 	 */
 	
-	public CacheCell(SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
+	public CacheCell(SpatiotemporalHierarchicalCache cache, SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
 			int spatialResolution, int temporalResolution, String eventId, long eventTime) {
 		
+		this.cache = cache;
 		this.stats = stats;
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
@@ -194,8 +197,10 @@ public class CacheCell {
 
 	
 	
-	public void incrementFreshness(float val) {
+	public void incrementFreshness(float val, String eventId, long eventTime) {
 		this.freshness += val;
+		this.lastAccessed = eventTime;
+		this.lastEvent = eventId;
 	}
 	
 	
@@ -261,29 +266,120 @@ public class CacheCell {
 		return refinedTemporalNeighbors;
 	}
 	
+	/**
+	 * DISPERSING FRESHNESS VALUE TO A CELL'S RELATIVES
+	 * 
+	 * @author sapmitra
+	 * @param polygon
+	 * @param qt1
+	 * @param qt2
+	 * @param eventTime 
+	 * @param eventId 
+	 * @return
+	 */
+	public void freshenUpRelativesForCell(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+		
+		freshenUpParents(eventId, eventTime);
+		freshenUpChildren(eventId, eventTime);
+		freshenUpNeighbors(polygon, qt1, qt2, eventId, eventTime);
+		
+		
+	}
+
+	/**
+	 * DISPERSE FRESHNESS AMONG NEIGHBORS
+	 * @author sapmitra
+	 * @param polygon
+	 * @param qt1
+	 * @param qt2
+	 * @param eventTime 
+	 * @param eventId 
+	 */
 	
-	public STRelatives getRelativesForCell(List<Coordinates> polygon, long qt1, long qt2) {
+	private void freshenUpNeighbors(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
-		String sp = getSpatialParent();
-		String tp = getTemporalParent();
-		
-		
-		
+		int cacheLevel = cache.getCacheLevel(spatialResolution, temporalResolution);
 		// Only at the level of the current cell
 		List<String> refinedSpatialNeighbors = getRefinedSpatialNeighbors(polygon);
 		List<String> refinedTemporalNeighbors = getRefinedTemporalNeighbors(qt1, qt2);
 		
-		List<String> refinedNeighborCells = new ArrayList<String>();
-		
 		for(String s: refinedSpatialNeighbors) {
 			for(String t: refinedTemporalNeighbors) {
-				refinedNeighborCells.add(t+"$$"+s);
+				
+				cache.disperseToCell(t+"$$"+s, cacheLevel, eventId, eventTime);
 			}
 		}
+	}
+	
+	/**
+	 * CHILDREN ARE CONSIDERED ONE SPATIAL/TEMPORAL LEVEL ABOVE, NOT BOTH
+	 * DISPERSE FRESHNESS TO CHILDREN
+	 * @author sapmitra
+	 * @param eventId
+	 * @param eventTime
+	 */
+	private void freshenUpChildren(String eventId, long eventTime) {
 		
-		getSpatialChildren();
-		getTemporalChildren();
-		return null;
+		if(spatialChildren != null) {
+			
+			int cacheLevel = cache.getCacheLevel(spatialResolution+1, temporalResolution);
+			
+			for(String sc : spatialChildren) {
+				
+				cache.disperseToCell(temporalInfo+"$$"+sc, cacheLevel, eventId, eventTime);
+				
+			}
+			
+			
+		} 
+		
+		if(temporalChildren != null) {
+			
+			int cacheLevel = cache.getCacheLevel(spatialResolution, temporalResolution+1);
+			
+			for(String tc: temporalChildren) {
+				
+				cache.disperseToCell(tc+"$$"+spatialInfo, cacheLevel, eventId, eventTime);
+				
+			}
+			
+		}
+		
+	}
+
+	/**
+	 * PARENTS ARE CONSIDERED ONE SPATIAL/TEMPORAL LEVEL ABOVE, NOT BOTH
+	 * @author sapmitra
+	 * @param eventTime 
+	 * @param eventId 
+	 * @return
+	 */
+	public void freshenUpParents(String eventId, long eventTime) {
+		
+		String sp = getSpatialParent();
+		String tp = getTemporalParent();
+		
+		if(sp != null) {
+			
+			int cacheLevel = cache.getCacheLevel(spatialResolution-1, temporalResolution);
+			
+			cache.disperseToCell(temporalInfo+"$$"+sp, cacheLevel, eventId, eventTime);
+			
+		} 
+		
+		if(tp != null) {
+			
+			int cacheLevel = cache.getCacheLevel(spatialResolution, temporalResolution-1);
+			cache.disperseToCell(tp+"$$"+spatialInfo, cacheLevel, eventId, eventTime);
+			
+		}
+		
+		/*if(sp != null && tp != null) {
+			
+			parentKeys.add(tp+"$$"+sp);
+			
+		}*/
+		
 	}
 	
 	

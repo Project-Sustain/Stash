@@ -859,12 +859,12 @@ public class StorageNode implements RequestListener {
 					// NOT SUB-BLOCK LEVEL
 					Map<String, List<String>> refinedBlockMap = null;
 					
-					Map<String,SummaryStatistics[]> extractedSummaries = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
+					List<String> cacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
 					boolean cacheIsEmpty = false;
 					
-					if(extractedSummaries == null) {
+					if(cacheKeys == null) {
 						cacheIsEmpty = true;
 					}
 					
@@ -874,7 +874,7 @@ public class StorageNode implements RequestListener {
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
 					
-					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, extractedSummaries, event);
+					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, cacheKeys, event);
 					
 				}
 				

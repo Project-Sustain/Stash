@@ -1565,15 +1565,16 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param cells
 	 * @return
 	 */
-	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingKeys(List<String> cacheKeys, HashMap<String, CacheCell> cells) {
+	private Map<String, SummaryWrapper> fetchCacheEntriesUsingKeys(List<String> cacheKeys, HashMap<String, CacheCell> cells) {
 		
-		Map<String, SummaryStatistics[]> summariesFound = new HashMap<String, SummaryStatistics[]>();
+		Map<String, SummaryWrapper> summariesFound = new HashMap<String, SummaryWrapper>();
 		
 		for(String cacheCellKey : cacheKeys) {
 			
 			if(cells.get(cacheCellKey) != null) {
 				SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
-				summariesFound.put(cacheCellKey, stats);
+				SummaryWrapper sw = new SummaryWrapper(false, stats);
+				summariesFound.put(cacheCellKey, sw);
 			}
 			
 		}
@@ -1596,7 +1597,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
-	public Map<String, SummaryStatistics[]> listMatchingCellsForSuperResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public List<String> listMatchingCellsForSuperResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			String queryTimeString, List<Coordinates> polygon, Map<String, List<String>> refinedBlockMap) throws InterruptedException, ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
@@ -1628,15 +1629,12 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		
 		// FETCH WHATEVER IS ALREADY IN CACHE
-		Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+		//Map<String, SummaryStatistics[]> cacheSummariesFound = null;
 		
-		if(!cacheIsEmpty) {
-			cacheSummariesFound = fetchCacheEntriesUsingKeys(matchingCacheKeys, cache.getCells());
-			
-		} else {
+		if(cacheIsEmpty) {
 			// NOTHING OF IMPORTANCE FOUND IN CACHE, ALL FILES NEED TO BE PROCESSED
 			refinedBlockMap = blockMap;
-			return cacheSummariesFound;
+			return null;
 		}
 		
 		refinedBlockMap = new HashMap<String, List<String>>();
@@ -1650,7 +1648,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		}
 		
-		return cacheSummariesFound;
+		return matchingCacheKeys;
 	}
 	
 	
@@ -2983,13 +2981,6 @@ public class GeospatialFileSystem extends FileSystem {
 		long qt1 = Long.valueOf(timeTokens[0]);
 		long qt2 = Long.valueOf(timeTokens[1]);
 		
-		
-		// List of all unique parents, children and neighbors to be dispersed
-		// They lie outside the query region, for the level queried, since they cannot include the cells already updated with freshness of 1 
-		Map<Integer, Set<String>> parents = new HashMap<Integer, Set<String>>();
-		Map<Integer, Set<String>> children = new HashMap<Integer, Set<String>>();
-		Set<String> neighbors = new HashSet<String>();
-		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
 		
 		
@@ -2998,23 +2989,17 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			SummaryWrapper sw = finalisedSummaries.get(key);
 			
-			STRelatives str = null;
 			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
 			// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
 			if(sw.isNeedsInsertion()) {
 				// THIS IS A NEW CELL GETTING INSERTED
-				str = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 			} else {
 				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
-				str = stCache.incrementCell(key, cacheResolution);
+				stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 			}
 			
-			
-			
 		}
-			
-		
-		
 		
 	}
 
@@ -3033,11 +3018,10 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param fetchedSummaries 
 	 * @throws InterruptedException 
 	 */
-	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, Map<String, SummaryStatistics[]> extractedSummaries, VisualizationEvent event) throws InterruptedException {
+	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, VisualizationEvent event) throws InterruptedException {
 		
+		int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
-		if(extractedSummaries == null)
-			extractedSummaries = new HashMap<String, SummaryStatistics[]>();
 			
 		if (blockMap.keySet().size() > 0) {
 			
@@ -3077,12 +3061,12 @@ public class GeospatialFileSystem extends FileSystem {
 					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
 				
 				
-				for(String k : extractedSummaries.keySet()) {
-					
-					SummaryStatistics[] sts = extractedSummaries.get(k);
-					SummaryWrapper sw = new SummaryWrapper(false, sts);
-					finalisedSummaries.put(k, sw);
-					
+				/* USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE */
+				if(existingCacheKeys == null ) {
+					finalisedSummaries = new HashMap<>();
+				} else {
+					SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(level);
+					finalisedSummaries = fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells());
 				}
 				
 				// Sum up the output from query processors

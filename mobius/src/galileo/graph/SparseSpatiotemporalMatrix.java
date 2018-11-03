@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import galileo.dataset.Coordinates;
+import galileo.fs.GeospatialFileSystem;
 import galileo.util.STRelatives;
 
 /**
@@ -73,27 +74,43 @@ public class SparseSpatiotemporalMatrix {
 	 * @param spatialResolution2 
 	 */
 	
-	public STRelatives addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public void addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
 		// The new summary replaces the old cache summary, whatever may be the case
 		CacheCell c = cells.get(key);
 		
 		// This cell is empty
-		c = new CacheCell(summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId, eventTime);
+		c = new CacheCell(cache, summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId, eventTime);
 		
 		cells.put(key, c);
 			
-		STRelatives str = c.getRelativesForCell(polygon, qt1, qt2);
-		
-		return str;
+		// THIS IS WHERE ALL RELEVANT RELATIVES ARE DISPERSED WITH FRESHNESS VALUE
+		c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime);
 		
 	}
 	
 	
-	public void updateCellFreshness(String key) {
+	/**
+	 * CASE WHERE NEW CELL DOES NOT NEED TO BE CREATED
+	 * 
+	 * @author sapmitra
+	 * @param key
+	 * @param polygon
+	 * @param qt1
+	 * @param qt2
+	 * @param eventId
+	 * @param eventTime
+	 */
+	public void updateCellFreshness(String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
 		CacheCell c = cells.get(key);
-		c.incrementFreshness(1f);
+		
+		if(c != null && !c.getLastEvent().equals(eventId)) {
+			c.incrementFreshness(1f, eventId, eventTime);
+			c.setLastEvent(eventId);
+			c.setLastAccessed(eventTime);
+			c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime);
+		}
 		
 	}
 	
@@ -141,6 +158,24 @@ public class SparseSpatiotemporalMatrix {
 
 	public void setTemporalResolution(int temporalResolution) {
 		this.temporalResolution = temporalResolution;
+	}
+
+	/**
+	 * DISPERSING FRESHNESS TO A CELL THAT WAS NOT ACTUALLY ACCESSED
+	 * @author sapmitra
+	 * @param key
+	 * @param eventId
+	 * @param eventTime
+	 */
+	public void disperseCellFreshness(String key, String eventId, long eventTime) {
+		CacheCell c = cells.get(key);
+		
+		if(c != null && !c.getLastEvent().equals(eventId)) {
+			c.incrementFreshness(1f*GeospatialFileSystem.SPATIAL_WANE, eventId, eventTime);
+			c.setLastEvent(eventId);
+			c.setLastAccessed(eventTime);
+		}
+		
 	}
 
 	
