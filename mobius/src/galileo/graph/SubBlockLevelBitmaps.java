@@ -111,16 +111,18 @@ public class SubBlockLevelBitmaps {
 			
 		}
 		
-		// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
-		for(int i = 0; i< temporaryBitmaps.length; i++) {
-			
-			if(spatioTemporalBitmaps[i] == null) {
-				temporaryBitmaps[i].applyUpdates();
-				spatioTemporalBitmaps[i] = temporaryBitmaps[i];
-			} else {
-				temporaryBitmaps[i].applyUpdates();
-				spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
-			}
+		synchronized(spatioTemporalBitmaps) {
+			// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
+			for(int i = 0; i< temporaryBitmaps.length; i++) {
+				
+				if(spatioTemporalBitmaps[i] == null) {
+					temporaryBitmaps[i].applyUpdates();
+					spatioTemporalBitmaps[i] = temporaryBitmaps[i];
+				} else {
+					temporaryBitmaps[i].applyUpdates();
+					spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
+				}
+		}
 		}
 	}
 	

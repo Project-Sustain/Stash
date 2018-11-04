@@ -859,14 +859,9 @@ public class StorageNode implements RequestListener {
 					// NOT SUB-BLOCK LEVEL
 					Map<String, List<String>> refinedBlockMap = null;
 					
+					// KEYS ALREADY EXISTING IN CACHE
 					List<String> cacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
-					
-					boolean cacheIsEmpty = false;
-					
-					if(cacheKeys == null) {
-						cacheIsEmpty = true;
-					}
 					
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
 					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES

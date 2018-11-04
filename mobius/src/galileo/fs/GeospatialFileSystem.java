@@ -1559,22 +1559,38 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	/**
-	 * 
+	 * FETCHING FROM ACTUAL CACHE THE CELLS THAT ARE ALREADY RESIDENT IN MEMORY
 	 * @author sapmitra
 	 * @param cacheKeys
 	 * @param cells
+	 * @param finalisedSummaries 
 	 * @return
 	 */
-	private Map<String, SummaryWrapper> fetchCacheEntriesUsingKeys(List<String> cacheKeys, HashMap<String, CacheCell> cells) {
-		
-		Map<String, SummaryWrapper> summariesFound = new HashMap<String, SummaryWrapper>();
+	private Map<String, SummaryWrapper> fetchCacheEntriesUsingKeys(List<String> cacheKeys, HashMap<String, CacheCell> cells, 
+			Map<String, SummaryWrapper> summariesFound) {
 		
 		for(String cacheCellKey : cacheKeys) {
 			
 			if(cells.get(cacheCellKey) != null) {
-				SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
-				SummaryWrapper sw = new SummaryWrapper(false, stats);
-				summariesFound.put(cacheCellKey, sw);
+				
+				if(!summariesFound.containsKey(cacheCellKey)) {
+				
+					SummaryStatistics[] stats = cells.get(cacheCellKey).getStats();
+					SummaryWrapper sw = new SummaryWrapper(false, stats);
+					summariesFound.put(cacheCellKey, sw);
+					
+				} else {
+					// IF THE CELL IS ALREADY FETCHED
+					
+					// NO MERGING BETWEEN EXISTING CACHE ENTRIES
+					
+					/*SummaryStatistics[] oldStats = summariesFound.get(cacheCellKey).getStats();
+					SummaryStatistics[] statsUpdate = cells.get(cacheCellKey).getStats();
+					
+					SummaryStatistics[] mergedSummaries = SummaryStatistics.preMergeSummaries(oldStats, statsUpdate);
+					SummaryWrapper sw = new SummaryWrapper(true, mergedSummaries);
+					summariesFound.put(cacheCellKey, sw);*/
+				}
 			}
 			
 		}
@@ -2964,13 +2980,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param finalisedSummaries
 	 * @param spatialResolution
 	 * @param temporalResolution
+	 * @param existingCacheKeys 
 	 * @param string 
 	 * @param string 
 	 * @param string 
 	 * @param list 
 	 */
-	public void populateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
-			List<Coordinates> polygon, String timeString, String eventId) {
+	public synchronized void fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
+			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys) {
 		
 		String eventTokens[] = eventId.split("\\$\\$");
 		
@@ -2982,6 +2999,18 @@ public class GeospatialFileSystem extends FileSystem {
 		long qt2 = Long.valueOf(timeTokens[1]);
 		
 		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
+		
+		
+		// GET ALL THE CACHE LEVELS
+		/**** USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE ****/
+		
+		/* ACTUAL EXTRACTION OF EXISTING CACHE ENTRIES USING KEYS */
+		if(existingCacheKeys != null ) {
+			
+			SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(cacheResolution);
+			fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells(), finalisedSummaries);
+			
+		}
 		
 		
 		// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
@@ -3020,7 +3049,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, VisualizationEvent event) throws InterruptedException {
 		
-		int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		//int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
 			
 		if (blockMap.keySet().size() > 0) {
@@ -3061,15 +3090,7 @@ public class GeospatialFileSystem extends FileSystem {
 					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
 				
 				
-				/* USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE */
-				if(existingCacheKeys == null ) {
-					finalisedSummaries = new HashMap<>();
-				} else {
-					SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(level);
-					finalisedSummaries = fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells());
-				}
-				
-				// Sum up the output from query processors
+				// OUTPUTS FROM FILE PROCESSING ARE ROUNDED UP HERE, CACHE IS NOT TOUCHED
 				for (VisualizationQueryProcessor qp : queryProcessors) {
 					
 					if (qp.getResultSummaries().size() > 0) {
@@ -3077,27 +3098,22 @@ public class GeospatialFileSystem extends FileSystem {
 						
 						for(String key: localSummary.keySet()) {
 							
-							if(!finalisedSummaries.containsKey(key)) {
-								SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
-								finalisedSummaries.put(key, sw);
-							} else {
-								SummaryStatistics[] oldStats = finalisedSummaries.get(key).getStats();
-								SummaryStatistics[] statsUpdate = localSummary.get(key);
-								
-								SummaryStatistics[] mergedSummaries = SummaryStatistics.preMergeSummaries(oldStats, statsUpdate);
-								SummaryWrapper sw = new SummaryWrapper(true, mergedSummaries);
-								finalisedSummaries.put(key, sw);
-							}
-							
+							SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
+							finalisedSummaries.put(key, sw);
+
 						}
 					}
 				}
 			} 
 		}
 		
+
+		/***THE FOLLOWING SECTION SHOULD BE SYNCHRONIZED TO ENSURE PROPER LOCKS ON ALL CACHE LEVELS BEING UPDATED***/
+		
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		populateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), event.getTimeString(), event.getEventId());
+		fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
+				event.getTimeString(), event.getEventId(), existingCacheKeys);
 		
 		return finalisedSummaries;
 	}
