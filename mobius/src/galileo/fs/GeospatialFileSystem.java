@@ -1104,7 +1104,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
-	public Map<String, PathRequirements> listMatchingCellsForSubBlockResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
+	public Map<String, PathRequirements> listMatchingCellsForSUBBlockResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
 			String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
