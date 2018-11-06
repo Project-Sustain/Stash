@@ -853,6 +853,13 @@ public class StorageNode implements RequestListener {
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
 					
+					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event);
+					
+					// ONCE SUMMARIES HAVE BEEN FETCHED FROM FS,
+					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
+					// LOAD EXISTING CACHE CELLS USING CELL KEY
+					
+					
 					
 				} else {
 					
@@ -860,16 +867,16 @@ public class StorageNode implements RequestListener {
 					Map<String, List<String>> refinedBlockMap = null;
 					
 					// KEYS ALREADY EXISTING IN CACHE
-					List<String> cacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
+					List<String> existingCacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
 					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES
-					// SummaryWrapper has needsInsertion that saya if it needs to be populated in cache
+					// SummaryWrapper has needsInsertion that says if it needs to be populated in cache
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
 					
-					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, cacheKeys, event);
+					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event);
 					
 				}
 				

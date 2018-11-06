@@ -1163,13 +1163,14 @@ public class GeospatialFileSystem extends FileSystem {
 				cacheIsEmpty = true;
 			}
 			
-			// FETCH WHATEVER IS ALREADY IN CACHE
-			Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+			// FIND WHATEVER CELLS ARE ALREADY IN CACHE AND STORE THEIR KEYS
+			List<String> cachekeysFound = null;
 			
 			if(!cacheIsEmpty) {
-				cacheSummariesFound = fetchCacheEntriesUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
-						temporalLevel, blockBitmapResolutionTemporal, cache.getCells(), tokens[1], blockTimeStamp);
-				req.setSummariesFoundInCache(cacheSummariesFound);
+				
+				cachekeysFound = fetchCacheKeysUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
+						temporalLevel, blockBitmapResolutionTemporal, tokens[1], blockTimeStamp);
+				req.setCacheCellKeys(cachekeysFound);
 			}
 				
 			
@@ -1558,6 +1559,36 @@ public class GeospatialFileSystem extends FileSystem {
 		return summariesFound;
 	}
 	
+	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param bmap
+	 * @param fsSpatialLevel
+	 * @param bitmapSpatialLevel
+	 * @param fsTemporalLevel
+	 * @param bitmapTemporalLevel
+	 * @param cells
+	 * @param blockGeoHash
+	 * @param startTimestamp
+	 * @return
+	 * @throws ParseException
+	 */
+	private List<String> fetchCacheKeysUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
+			String blockGeoHash, long startTimestamp) throws ParseException {
+		
+		List<String> keysFound = new ArrayList<String>();
+		
+		for(int indx : bmap.toArray()) {
+			
+			String cacheCellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(indx, blockGeoHash, bitmapSpatialLevel, bitmapTemporalLevel, fsSpatialLevel, startTimestamp);
+			
+			keysFound.add(cacheCellKey);
+			
+		}
+		return keysFound;
+	}
+	
 	/**
 	 * FETCHING FROM ACTUAL CACHE THE CELLS THAT ARE ALREADY RESIDENT IN MEMORY
 	 * @author sapmitra
@@ -1609,7 +1640,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param savedSummaries
 	 * @param queryTimeString
 	 * @param polygon
-	 * @return
+	 * @return - all matching cacheKeys already in the memory
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
@@ -2348,25 +2379,43 @@ public class GeospatialFileSystem extends FileSystem {
 		return paths;
 	}
 	
-	private void getFeaturePathsWithSpecificIndex(String blockPath, int latInd, int lonInd, int temporalInd, int featureInd,
-			List<Integer> recordsToRead, List<String[]> featurePathsA, List<String[]> featurePathsB) throws IOException {
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param blockPath
+	 * @param cellsToConsider
+	 * @param reqSpatialLevel
+	 * @param reqTemporalLevel
+	 * @return
+	 * @throws IOException
+	 */
+	private List<String[]> getFilteredFeaturePaths(String blockPath, List<String> cellsToConsider, int reqSpatialLevel, int reqTemporalLevel) throws IOException {
 		
 		byte[] blockBytes = Files.readAllBytes(Paths.get(blockPath));
 		String blockData = new String(blockBytes, "UTF-8");
+		List<String[]> paths = new ArrayList<String[]>();
 		String[] lines = blockData.split("\\r?\\n");
 		int splitLimit = this.featureList.size();
-		int lineNum = 0;
 		for (String line : lines) {
-			String[] tokens = line.split(",", splitLimit);
-			String[] choppedFeatures = {tokens[latInd],tokens[lonInd],tokens[temporalInd],tokens[featureInd]};
-			if(recordsToRead.contains(lineNum))
-				featurePathsA.add(choppedFeatures);
-			else
-				featurePathsB.add(choppedFeatures);
-			lineNum++;
+			
+			String[] features = line.split(",", splitLimit);
+			
+			float lat = Float.valueOf(features[spatialPosn1]);
+			float lon = Float.valueOf(features[spatialPosn2]);
+			long timestamp = Long.valueOf(features[temporalPosn]);
+			
+			String recKey = SubBlockLevelBitmaps.getKeyFromFeatures(lat, lon, timestamp, reqSpatialLevel, reqTemporalLevel);
+			
+			if(cellsToConsider.contains(recKey)) {
+			
+				paths.add(features);
+			}
 		}
 		blockBytes = null;
 		blockData = null;
+		
+		return paths;
+		
 	}
 
 	private boolean isGridInsidePolygon(GeoavailabilityGrid grid, GeoavailabilityQuery geoQuery) {
@@ -2519,6 +2568,46 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			/* Getting all the records of this particular block */
 			List<String[]> record = getFeaturePaths(blockPath);
+			
+			if(record != null && record.size() > 0) {
+			
+				records.addAll(record);
+			
+			}
+			
+		}
+		return records;
+	}
+	
+	
+	/**
+	 * FOR SUB BLOCK LEVEL
+	 * @author sapmitra
+	 * @param pathReq
+	 * @return
+	 * @throws IOException
+	 */
+	private List<String[]> getFeaturePathsLocal(PathRequirements pathReq) throws IOException {
+		
+		/* Records is all possible 27 chunks + one slot for the full block if only the full block is required */
+		List<String[]> records = new ArrayList<String[]>();
+		
+		/* Reading each blocks that may lie in a path */
+		for(CellRequirements cellReq : pathReq.getPerBlockRequirementInfo()) {
+			
+			/* If only the whole block is needed */
+			
+			/* Getting all the records of this particular block */
+			
+			List<String[]> record = null;
+			
+			if(cellReq.getRequirementMode() == 1) {
+				continue;
+			} else if(cellReq.getRequirementMode() == 3) {
+				record = getFeaturePaths(cellReq.getBlockPath());
+			} else if(cellReq.getRequirementMode() == 2) {
+				record = getFilteredFeaturePaths(cellReq.getBlockPath(), cellReq.getCellsMissing());
+			}
 			
 			if(record != null && record.size() > 0) {
 			
@@ -2740,7 +2829,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	public Map<String,SummaryStatistics[]> queryLocalSummary(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
+	public Map<String,SummaryStatistics[]> queryLocalSummaryForSuperResolution(List<String> blocks, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
 			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
 			throws IOException, InterruptedException {
 		
@@ -2762,6 +2851,124 @@ public class GeospatialFileSystem extends FileSystem {
 			featurePaths = getFeaturePathsLocal(blocks);
 		} else if (geoQuery.getQuery() != null) {
 			featurePaths = getFeaturePathsLocal(blocks);
+		} 
+		
+		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
+		int size = featurePaths.size();
+		int partition = java.lang.Math.max(size / numCores, MIN_GRID_POINTS);
+		int parallelism = java.lang.Math.min(size / partition, numCores);
+		
+		/* ALL THE RECORDS TO BE QUERIED ARE NOW INSIDE featurePaths */
+		
+		// FURTHER FILTERING OF FEATUREPATHS
+		
+		queryBitmap = skipGridProcessing ? null : queryBitmap;
+		if(parallelism <=0 ) {
+			//logger.log(Level.INFO, "RIKI: THIS HAPPENED");
+			parallelism = 1;
+		}
+		
+		if (parallelism > 0) {
+			
+			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+			
+			List<VisualizationSummaryProcessor> queryProcessors = new ArrayList<VisualizationSummaryProcessor>();
+			
+			for (int i = 0; i < parallelism; i++) {
+				int from = i * partition;
+				int to = (i + 1 != parallelism) ? (i + 1) * partition : size;
+				List<String[]> subset = new ArrayList<>(featurePaths.subList(from, to));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND2: "+Arrays.asList(featurePaths));
+				//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND3: "+Arrays.asList(subset));
+				if(subset != null) {
+					
+					VisualizationSummaryProcessor pqp = new VisualizationSummaryProcessor(this, subset, geoQuery.getQuery(), grid, queryBitmap, summaryPosns,
+							spatialResolution, temporalResolution, needMoreGrouping, blocksKey);
+					
+					queryProcessors.add(pqp);
+					executor.execute(pqp);
+				}
+			}
+			
+			executor.shutdown();
+			boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+			if (!status)
+				logger.log(Level.WARNING, "queryFragments: Executor terminated because of the specified timeout=10minutes");
+			
+			for(VisualizationSummaryProcessor vqp : queryProcessors) {
+				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS6"+nqp.getFeaturePaths());
+				if(vqp.getLocalSummary().size() > 0) {
+					
+					Map<String, SummaryStatistics[]> localSummary = vqp.getLocalSummary();
+					
+					for(String key: localSummary.keySet()) {
+						
+						if(!allSummaries.containsKey(key)) {
+							allSummaries.put(key, localSummary.get(key));
+						} else {
+							SummaryStatistics[] oldStats = allSummaries.get(key);
+							SummaryStatistics[] statsUpdate = localSummary.get(key);
+							
+							SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+							allSummaries.put(key, mergedSummaries);
+						}
+						
+					}
+					
+				}
+				
+			}
+			
+		} 
+
+		return allSummaries;
+	}
+	
+	
+	
+	
+	/**
+	 * THIS IS FOR SUB RESOLUTION.
+	 * EXECUTED PER PATH.
+	 * THIS METHOD IS FOR A PARTICULAR PATH IN THE BLOCKMAP.
+	 * 
+	 * @author sapmitra
+	 * @param pathReqs
+	 * @param geoQuery
+	 * @param grid
+	 * @param queryBitmap
+	 * @param spatialResolution
+	 * @param temporalResolution
+	 * @param summaryPosns
+	 * @param needMoreGrouping
+	 * @param blocksKey
+	 * @return
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	public Map<String,SummaryStatistics[]> queryLocalSummaryForSubResolution(PathRequirements pathReqs, GeoavailabilityQuery geoQuery, GeoavailabilityGrid grid,
+			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
+			throws IOException, InterruptedException {
+		
+		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
+		
+		List<String[]> featurePaths = new ArrayList<String[]>();
+		
+		// THIS READS THE ACTUAL BLOCKS
+		
+		boolean skipGridProcessing = false;
+		if (geoQuery.getPolygon() != null && geoQuery.getQuery() != null) {
+			/* If polygon complete encompasses geohash */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			
+			featurePaths = getFeaturePathsLocal(pathReqs);
+		} else if (geoQuery.getPolygon() != null) {
+			/* If grid lies completely inside polygon */
+			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
+			if(!skipGridProcessing)
+				featurePaths = getFeaturePathsLocal(pathReqs);
+		} else if (geoQuery.getQuery() != null) {
+			featurePaths = getFeaturePathsLocal(pathReqs);
 		} 
 		
 		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
@@ -3117,27 +3324,92 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		return finalisedSummaries;
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param blockRequirements
+	 * @param event
+	 * @return
+	 */
+	public Map<String, SummaryWrapper> fetchRemainingSUBCellsFromFilesystem(
+			Map<String, PathRequirements> blockRequirements, VisualizationEvent event) throws InterruptedException {
+		// TODO Auto-generated method stub
+
+		int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		List<String> existingCacheKeys = new ArrayList<String>();
+		// int level = stCache.getCacheLevel(event.getSpatialResolution(),
+		// event.getTemporalResolution());
+		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
+
+		if (blockRequirements.keySet().size() > 0) {
+
+			if (event.getFeatureQuery() != null || event.getPolygon() != null) {
+
+				// maximum parallelism = 64
+				ExecutorService executor = Executors.newFixedThreadPool(java.lang.Math.min(blockRequirements.keySet().size(), 2 * numCores));
+
+				List<VisualizationQueryProcessor> queryProcessors = new ArrayList<VisualizationQueryProcessor>();
+
+				GeoavailabilityQuery geoQuery = new GeoavailabilityQuery(event.getFeatureQuery(), event.getPolygon());
+
+				
+				for (String blockKey : blockRequirements.keySet()) {
+
+					/* Converts the bounds of geohash into a 1024x1024 region */
+					String[] tokens = blockKey.split("\\$\\$");
+					GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
+
+					Bitmap queryBitmap = null;
+
+					if (geoQuery.getPolygon() != null)
+						queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
+
+					PathRequirements pathReqs = blockRequirements.get(blockKey);
+					
+					existingCacheKeys.addAll(pathReqs.getCacheCellKeys());
+					
+					VisualizationQueryProcessor qp = new VisualizationQueryProcessor(this, pathReqs, geoQuery, blockGrid, queryBitmap, event.getSpatialResolution(),
+							event.getTemporalResolution(), getSummaryPosns(), true, blockKey);
+
+					queryProcessors.add(qp);
+					executor.execute(qp);
+
+				}
+				executor.shutdown();
+				boolean status = executor.awaitTermination(10, TimeUnit.MINUTES);
+
+				if (!status)
+					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
+
+				// OUTPUTS FROM FILE PROCESSING ARE ROUNDED UP HERE, CACHE IS NOT TOUCHED
+				for (VisualizationQueryProcessor qp : queryProcessors) {
+
+					if (qp.getResultSummaries().size() > 0) {
+						Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
+
+						for (String key : localSummary.keySet()) {
+
+							SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
+							finalisedSummaries.put(key, sw);
+
+						}
+					}
+				}
+			}
+		}
+
+		/***
+		 * THE FOLLOWING SECTION SHOULD BE SYNCHRONIZED TO ENSURE PROPER LOCKS ON ALL
+		 * CACHE LEVELS BEING UPDATED
+		 ***/
+
+		// POPULATE THE CACHE TREE
+		// ALSO POPULATE FILE BITMAPS
+		fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
+				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
+
+		return finalisedSummaries;
+	}
 	
 }

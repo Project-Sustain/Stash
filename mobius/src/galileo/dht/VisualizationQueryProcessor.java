@@ -11,6 +11,7 @@ import galileo.bmp.GeoavailabilityGrid;
 import galileo.bmp.GeoavailabilityQuery;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.SummaryStatistics;
+import galileo.util.PathRequirements;
 
 /**
  * 
@@ -29,23 +30,24 @@ private static final Logger logger = Logger.getLogger("galileo");
 	private List<String> blocks;
 	private GeoavailabilityQuery geoQuery;
 	private GeoavailabilityGrid grid;
-	private GeospatialFileSystem fs1;
+	private GeospatialFileSystem fs;
 	private Bitmap queryBitmap;
 	private int spatialResolution;
 	private int temporalResolution;
 	private List<Integer> summaryPosns;
 	private boolean needMoreGrouping;
 	private String blocksKey;
+	private PathRequirements pathReqs;
 	
 	// BLOCK KEY WITH A LIST OF SUMMARIES - ONE FOR EACH REQUESTED FEATURES
 	private Map<String,SummaryStatistics[]> resultSummaries;
 	
-	
+	// FOR SUPER RESOLUTION
 	public VisualizationQueryProcessor(GeospatialFileSystem fs1, List<String> blocks, GeoavailabilityQuery gQuery,
 			GeoavailabilityGrid grid, Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, 
 			boolean needMoreGrouping, String blockKey) {
 		
-		this.fs1 = fs1;
+		this.fs = fs1;
 		this.geoQuery = gQuery;
 		this.grid = grid;
 		this.queryBitmap = queryBitmap;
@@ -58,14 +60,44 @@ private static final Logger logger = Logger.getLogger("galileo");
 		
 	}
 
+	// FOR SUB RESOLUTION
+	public VisualizationQueryProcessor(GeospatialFileSystem fs, PathRequirements pathReqs,
+			GeoavailabilityQuery geoQuery, GeoavailabilityGrid blockGrid, Bitmap queryBitmap, int spatialResolution,
+			int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blockKey) {
+		
+		this.fs = fs;
+		this.geoQuery = geoQuery;
+		this.grid = blockGrid;
+		this.queryBitmap = queryBitmap;
+		this.pathReqs = pathReqs;
+		this.spatialResolution = spatialResolution;
+		this.temporalResolution = temporalResolution;
+		this.summaryPosns = summaryPosns;
+		this.needMoreGrouping = needMoreGrouping;
+		this.blocksKey = blockKey;
+		
+		
+	}
+
 	@Override
 	public void run() {
 		
 		try {
 			
-			/* This thread is created one for each path */
-			this.resultSummaries = this.fs1.queryLocalSummary(this.blocks, this.geoQuery, this.grid, this.queryBitmap,
-					spatialResolution, temporalResolution, summaryPosns, needMoreGrouping, blocksKey);
+			
+			if(!needMoreGrouping) {
+				// SUPER-BLOCK LEVEL
+				
+				/* This thread is created one for each path */
+				this.resultSummaries = this.fs.queryLocalSummaryForSuperResolution(this.blocks, this.geoQuery, this.grid, this.queryBitmap,
+						spatialResolution, temporalResolution, summaryPosns, needMoreGrouping, blocksKey);
+			} else {
+				// SUB-BLOCK LEVEL
+				
+				/* This thread is created one for each path */
+				this.resultSummaries = this.fs.queryLocalSummaryForSubResolution(this.pathReqs, this.geoQuery, this.grid, this.queryBitmap,
+						spatialResolution, temporalResolution, summaryPosns, needMoreGrouping, blocksKey);
+			}
 			
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block
@@ -108,11 +140,11 @@ private static final Logger logger = Logger.getLogger("galileo");
 	}
 
 	public GeospatialFileSystem getFs1() {
-		return fs1;
+		return fs;
 	}
 
 	public void setFs1(GeospatialFileSystem fs1) {
-		this.fs1 = fs1;
+		this.fs = fs1;
 	}
 
 	public Bitmap getQueryBitmap() {

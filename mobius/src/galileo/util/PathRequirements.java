@@ -7,15 +7,17 @@ import java.util.Map;
 import galileo.graph.SummaryStatistics;
 
 /**
- * ONE FOR EACH PATH
- * KEEPS INFORMATION OF WHAT CELLS FOR EACH BLOCK NEEDS PROCESSING
- * USED ONLY IN SUB_BLOCK SCENARIO
+ * ONE FOR EACH PATH.
+ * KEEPS INFORMATION OF WHAT CELLS FOR EACH BLOCK NEEDS PROCESSING.
+ * USED ONLY IN SUB_BLOCK SCENARIO.
  * 
  * @author sapmitra
  *
  */
 public class PathRequirements {
-	
+	// List of all the cache cells needed
+	private List<String> cacheCellKeys;
+	// The contents of "cacheCells" once fetched
 	private Map<String, SummaryStatistics[]> summariesFoundInCache;
 	private List<CellRequirements> perBlockRequirementInfo;
 	
@@ -24,12 +26,6 @@ public class PathRequirements {
 	}
 	public void setSummariesFoundInCache(Map<String, SummaryStatistics[]> summariesFoundInCache) {
 		this.summariesFoundInCache = summariesFoundInCache;
-	}
-	public List<CellRequirements> getPerBlockRequirements() {
-		return perBlockRequirementInfo;
-	}
-	public void setPerBlockRequirements(List<CellRequirements> perBlockRequirements) {
-		this.perBlockRequirementInfo = perBlockRequirements;
 	}
 	
 	public void addCellrequirements (CellRequirements cr) {
@@ -40,6 +36,18 @@ public class PathRequirements {
 		
 		perBlockRequirementInfo.add(cr);
 		
+	}
+	public List<String> getCacheCellKeys() {
+		return cacheCellKeys;
+	}
+	public void setCacheCellKeys(List<String> cacheCells) {
+		this.cacheCellKeys = cacheCells;
+	}
+	public List<CellRequirements> getPerBlockRequirementInfo() {
+		return perBlockRequirementInfo;
+	}
+	public void setPerBlockRequirementInfo(List<CellRequirements> perBlockRequirementInfo) {
+		this.perBlockRequirementInfo = perBlockRequirementInfo;
 	}
 
 }
