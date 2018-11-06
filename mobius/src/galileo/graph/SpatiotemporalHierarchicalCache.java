@@ -10,6 +10,8 @@ public class SpatiotemporalHierarchicalCache {
 	// EACH LEVEL IS A 2D SPARSE MATRIX
 	private SparseSpatiotemporalMatrix[] cacheLevels;
 	
+	private int totalRooms = 0;
+	
 	// spatial level 1 means geohash of length 1
 	// temporal levels are year, month, day, hr
 	public static int totalSpatialLevels = 6;
@@ -73,12 +75,13 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt1 
 	 * @param polygon 
 	 */
-	public void addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public boolean addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
+		boolean newEntry = false;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
+			newEntry = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
 		}
-		
+		return newEntry;
 	}
 	
 	/**
@@ -175,6 +178,11 @@ public class SpatiotemporalHierarchicalCache {
 
 	public void setTotalTemporalLevels(int totalTemporalLevels) {
 		this.totalTemporalLevels = totalTemporalLevels;
+	}
+
+	public void addEntryCount(int totalInserted) {
+		totalRooms+=totalInserted;
+		
 	}
 
 }

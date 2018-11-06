@@ -74,10 +74,14 @@ public class SparseSpatiotemporalMatrix {
 	 * @param spatialResolution2 
 	 */
 	
-	public void addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public boolean addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
 		
+		boolean newEntry = false;
 		// The new summary replaces the old cache summary, whatever may be the case
 		CacheCell c = cells.get(key);
+		
+		if(c == null)
+			newEntry = true;
 		
 		// This cell is empty
 		c = new CacheCell(cache, summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId, eventTime);
@@ -86,6 +90,8 @@ public class SparseSpatiotemporalMatrix {
 			
 		// THIS IS WHERE ALL RELEVANT RELATIVES ARE DISPERSED WITH FRESHNESS VALUE
 		c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime);
+		
+		return newEntry;
 		
 	}
 	

@@ -2404,7 +2404,7 @@ public class GeospatialFileSystem extends FileSystem {
 			float lon = Float.valueOf(features[spatialPosn2]);
 			long timestamp = Long.valueOf(features[temporalPosn]);
 			
-			String recKey = SubBlockLevelBitmaps.getKeyFromFeatures(lat, lon, timestamp, reqSpatialLevel, reqTemporalLevel);
+			String recKey = GeoHash.getSummaryKey(lat, lon, timestamp, reqSpatialLevel, reqTemporalLevel);
 			
 			if(cellsToConsider.contains(recKey)) {
 			
@@ -2587,7 +2587,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws IOException
 	 */
-	private List<String[]> getFeaturePathsLocal(PathRequirements pathReq) throws IOException {
+	private List<String[]> getFeaturePathsLocal(PathRequirements pathReq, int spatialResolution, int temporalResolution) throws IOException {
 		
 		/* Records is all possible 27 chunks + one slot for the full block if only the full block is required */
 		List<String[]> records = new ArrayList<String[]>();
@@ -2606,7 +2606,7 @@ public class GeospatialFileSystem extends FileSystem {
 			} else if(cellReq.getRequirementMode() == 3) {
 				record = getFeaturePaths(cellReq.getBlockPath());
 			} else if(cellReq.getRequirementMode() == 2) {
-				record = getFilteredFeaturePaths(cellReq.getBlockPath(), cellReq.getCellsMissing());
+				record = getFilteredFeaturePaths(cellReq.getBlockPath(), cellReq.getCellsMissing(), spatialResolution, temporalResolution);
 			}
 			
 			if(record != null && record.size() > 0) {
@@ -2961,14 +2961,14 @@ public class GeospatialFileSystem extends FileSystem {
 			/* If polygon complete encompasses geohash */
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
 			
-			featurePaths = getFeaturePathsLocal(pathReqs);
+			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getPolygon() != null) {
 			/* If grid lies completely inside polygon */
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
 			if(!skipGridProcessing)
-				featurePaths = getFeaturePathsLocal(pathReqs);
+				featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getQuery() != null) {
-			featurePaths = getFeaturePathsLocal(pathReqs);
+			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} 
 		
 		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
@@ -3219,7 +3219,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		
-		
+		int totalInserted = 0;
 		// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
 		for(String key: finalisedSummaries.keySet()) {
 			
@@ -3229,13 +3229,19 @@ public class GeospatialFileSystem extends FileSystem {
 			// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
 			if(sw.isNeedsInsertion()) {
 				// THIS IS A NEW CELL GETTING INSERTED
-				stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				
+				if(newEntry)
+					totalInserted++;
 			} else {
 				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
 				stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 			}
 			
 		}
+		
+		if(totalInserted > 0)
+			stCache.addEntryCount(totalInserted);
 		
 	}
 
@@ -3337,9 +3343,10 @@ public class GeospatialFileSystem extends FileSystem {
 		// TODO Auto-generated method stub
 
 		int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		
+		/* LIST OF ALL CACHE KEYS THAT ARE PRE_EXISTING IN CACHE */
 		List<String> existingCacheKeys = new ArrayList<String>();
-		// int level = stCache.getCacheLevel(event.getSpatialResolution(),
-		// event.getTemporalResolution());
+		
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
 
 		if (blockRequirements.keySet().size() > 0) {

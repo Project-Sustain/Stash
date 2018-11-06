@@ -236,7 +236,7 @@ public class SubBlockLevelBitmaps {
 	}
 	
 	
-	
+	/*
 	public static String getKeyFromFeatures(float lat, float lon, long timestamp, int spLevel, int tLevel) {
 		
 		String temporalString = getTemporalString(timestamp, tLevel);
@@ -246,7 +246,7 @@ public class SubBlockLevelBitmaps {
 		
 		return temporalString+"$$"+geohash;
 		
-	}
+	}*/
 	
 	/**
 	 * Create a temporal string with xx for missing fields

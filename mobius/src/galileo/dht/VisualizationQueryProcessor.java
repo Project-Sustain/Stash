@@ -76,7 +76,6 @@ private static final Logger logger = Logger.getLogger("galileo");
 		this.needMoreGrouping = needMoreGrouping;
 		this.blocksKey = blockKey;
 		
-		
 	}
 
 	@Override
