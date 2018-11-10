@@ -1151,13 +1151,18 @@ public class GeospatialFileSystem extends FileSystem {
 			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 			DateTime blockTime = new DateTime(blockTimeStamp);
 			
+			CorrectedBitmap cacheBitmap = null;
+			
 			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
-			CorrectedBitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-					reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
+			synchronized(cache) {
+				cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
+						reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
+			}
+			
 			
 			boolean cacheIsEmpty = false;
 			
-			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
+			if(cacheBitmap == null || cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
 				// NOTHING IN CACHE
 				// LOOK INTO THE ENTIRE BLOCKS
 				cacheIsEmpty = true;
@@ -1653,7 +1658,6 @@ public class GeospatialFileSystem extends FileSystem {
 
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
 		
-		
 		// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
 
 		// The level of stcache we need to look at
@@ -1663,9 +1667,12 @@ public class GeospatialFileSystem extends FileSystem {
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
 		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
 		
-		
 		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
-		List<String> matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
+		List<String> matchingCacheKeys = null;
+		
+		synchronized(cache) {
+			matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
+		}
 		
 		boolean cacheIsEmpty = false;
 		
@@ -3342,7 +3349,7 @@ public class GeospatialFileSystem extends FileSystem {
 			Map<String, PathRequirements> blockRequirements, VisualizationEvent event) throws InterruptedException {
 		// TODO Auto-generated method stub
 
-		int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		// int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		
 		/* LIST OF ALL CACHE KEYS THAT ARE PRE_EXISTING IN CACHE */
 		List<String> existingCacheKeys = new ArrayList<String>();

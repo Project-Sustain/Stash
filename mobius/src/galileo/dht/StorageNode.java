@@ -115,7 +115,10 @@ import galileo.event.EventHandler;
 import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
+import galileo.graph.CacheCell;
 import galileo.graph.Path;
+import galileo.graph.SparseSpatiotemporalMatrix;
+import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
 import galileo.net.ClientConnectionPool;
@@ -172,6 +175,8 @@ public class StorageNode implements RequestListener {
 	/* My addition */
 	private List<NeighborRequestHandler> rikiHandlers;
 	private List<SurveyRequestHandler> surveyHandlers;
+	private List<String> fsToBePruned;
+	private boolean pruningNeeded;
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
 
@@ -206,6 +211,8 @@ public class StorageNode implements RequestListener {
 		this.requestHandlers = new CopyOnWriteArrayList<ClientRequestHandler>();
 		this.rikiHandlers = new CopyOnWriteArrayList<NeighborRequestHandler>();
 		this.surveyHandlers = new CopyOnWriteArrayList<SurveyRequestHandler>();
+		this.fsToBePruned = new ArrayList<String>();
+		this.pruningNeeded = false;
 	}
 
 	/**
@@ -2085,4 +2092,42 @@ public class StorageNode implements RequestListener {
 			logger.log(Level.SEVERE, "Could not start StorageNode.", e);
 		}
 	}
+	
+
+	/**
+	 * Handles pruning for a single FS
+	 * @author sapmitra
+	 * @param targetFS
+	 */
+	private void handleCachePruning(GeospatialFileSystem targetFS) {
+		
+		SpatiotemporalHierarchicalCache stCache = targetFS.getStCache();
+		
+		Map<String, Float> keyValues = new HashMap<String, Float>();
+		
+		synchronized(stCache) {
+			
+			SparseSpatiotemporalMatrix[] cacheLevels = stCache.getCacheLevels();
+			
+			for(int i=0; i< cacheLevels.length; i++) {
+				
+				SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
+				HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
+				
+				for(String key : currentFloor.keySet()) {
+					
+					CacheCell cacheCell = currentFloor.get(key);
+					float fr = cacheCell.getFreshness();
+					
+					keyValues.put(i+"$$"+key, fr);
+					
+				}
+				
+				
+			}
+			
+		}
+		
+	}
+	
 }
