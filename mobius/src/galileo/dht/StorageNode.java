@@ -44,6 +44,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -53,6 +55,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -2099,6 +2102,7 @@ public class StorageNode implements RequestListener {
 	 * @author sapmitra
 	 * @param targetFS
 	 */
+	
 	private void handleCachePruning(GeospatialFileSystem targetFS) {
 		
 		SpatiotemporalHierarchicalCache stCache = targetFS.getStCache();
@@ -2112,22 +2116,100 @@ public class StorageNode implements RequestListener {
 			for(int i=0; i< cacheLevels.length; i++) {
 				
 				SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
-				HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
 				
-				for(String key : currentFloor.keySet()) {
+				if(currentLevel != null) {
+					HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
 					
-					CacheCell cacheCell = currentFloor.get(key);
-					float fr = cacheCell.getFreshness();
-					
-					keyValues.put(i+"$$"+key, fr);
-					
+					for(String key : currentFloor.keySet()) {
+						
+						CacheCell cacheCell = currentFloor.get(key);
+						float fr = cacheCell.getFreshness();
+						
+						keyValues.put(i+"@"+key, fr);
+						
+					}
 				}
 				
+			}
+			
+			Map<Integer, List<String>> elementsToTrim = getElementsToTrim(keyValues, targetFS.getTotal_cache_entry_allowed());
+			
+			// REMOVING UNWANTED STALE ENTRIES
+			for(int i=0; i< cacheLevels.length; i++) {
+				
+				if(elementsToTrim.get(i) != null) {
+					
+					SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
+					
+					if(currentLevel != null) {
+						HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
+						
+						for(String key : elementsToTrim.get(i)) {
+							
+							currentFloor.remove(key);
+							
+						}
+					}
+					
+				}
 				
 			}
 			
 		}
 		
+	}
+	
+	/**
+	 * FIGURING OUT WHICH CACHE ENTRIES TO REMOVE BASED ON FRESHNES VALUES
+	 * 
+	 * @author sapmitra
+	 * @param cacheEntries
+	 * @param entriesAllowed - The number of entries allowed in the cache
+	 */
+	public Map<Integer, List<String>> getElementsToTrim(Map<String, Float> cacheEntries, int entriesAllowed) {
+		
+		// SORTING BASED ON VALUES
+		Set<Entry<String, Float>> set = cacheEntries.entrySet();
+        List<Entry<String, Float>> list = new ArrayList<Entry<String, Float>>(set);
+        Collections.sort( list, new Comparator<Map.Entry<String, Float>>()
+        {
+            public int compare( Map.Entry<String, Float> o1, Map.Entry<String, Float> o2 )
+            {
+                return (o2.getValue()).compareTo( o1.getValue() );
+            }
+        } );
+        
+        int i=0;
+        
+        Map<Integer, List<String>> entriesToRemove = new HashMap<Integer, List<String>>();
+        
+        for(Map.Entry<String, Float> entry:list){
+        	
+        	i++;
+        	
+        	if(i > entriesAllowed) {
+        		String key = entry.getKey();
+        		
+        		String[] tokens = key.split("@");
+        		
+        		int level = Integer.valueOf(tokens[0]);
+        		String stKey = tokens[1];
+        		
+        		List<String> keys = entriesToRemove.get(level);
+        		
+        		if(keys == null) {
+        			keys = new ArrayList<String>();
+        			entriesToRemove.put(level, keys);
+        		}
+        		
+        		keys.add(stKey);
+        		
+        	}
+        }
+        
+        //System.out.println(entriesToRemove);
+		
+		return entriesToRemove;
 	}
 	
 }

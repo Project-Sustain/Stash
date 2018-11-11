@@ -142,6 +142,7 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final int DEFAULT_GEOHASH_PRECISION = 4;
 	private static final int MIN_GRID_POINTS = 5000;
 	private int numCores;
+	private int total_cache_entry_allowed = 200;
 
 	private static final String pathStore = "metadata.paths";
 
@@ -3424,6 +3425,14 @@ public class GeospatialFileSystem extends FileSystem {
 				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
 
 		return finalisedSummaries;
+	}
+
+	public int getTotal_cache_entry_allowed() {
+		return total_cache_entry_allowed;
+	}
+
+	public void setTotal_cache_entry_allowed(int total_cache_entry_allowed) {
+		this.total_cache_entry_allowed = total_cache_entry_allowed;
 	}
 	
 }
