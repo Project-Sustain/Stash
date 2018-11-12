@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +49,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -208,6 +210,9 @@ public class GeospatialFileSystem extends FileSystem {
 	public static final int SPATIAL_MOVE_DOWN = 1;
 	// HOW FAR DOWN TEMPORAL CHILDREN ARE INFLUENCED
 	public static final int TEMPORAL_MOVE_DOWN = 1;
+	
+	
+	public volatile boolean cleanUpNeeded = false;
 	
 	
 
@@ -3201,55 +3206,59 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param string 
 	 * @param list 
 	 */
-	public synchronized void fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
+	public void fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
 			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys) {
 		
-		String eventTokens[] = eventId.split("\\$\\$");
-		
-		long eventTime = Long.valueOf(eventTokens[0]);
-		
-		String[] timeTokens = timeString.split("-");
-		
-		long qt1 = Long.valueOf(timeTokens[0]);
-		long qt2 = Long.valueOf(timeTokens[1]);
-		
-		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
-		
-		
-		// GET ALL THE CACHE LEVELS
-		/**** USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE ****/
-		
-		/* ACTUAL EXTRACTION OF EXISTING CACHE ENTRIES USING KEYS */
-		if(existingCacheKeys != null ) {
+		synchronized(stCache) {
 			
-			SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(cacheResolution);
-			fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells(), finalisedSummaries);
+			String eventTokens[] = eventId.split("\\$\\$");
 			
-		}
-		
-		int totalInserted = 0;
-		// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
-		for(String key: finalisedSummaries.keySet()) {
+			long eventTime = Long.valueOf(eventTokens[0]);
 			
-			SummaryWrapper sw = finalisedSummaries.get(key);
+			String[] timeTokens = timeString.split("-");
 			
-			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
-			// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
-			if(sw.isNeedsInsertion()) {
-				// THIS IS A NEW CELL GETTING INSERTED
-				boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+			long qt1 = Long.valueOf(timeTokens[0]);
+			long qt2 = Long.valueOf(timeTokens[1]);
+			
+			int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
+			
+			
+			// GET ALL THE CACHE LEVELS
+			/**** USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE ****/
+			
+			/* ACTUAL EXTRACTION OF EXISTING CACHE ENTRIES USING KEYS */
+			if(existingCacheKeys != null ) {
 				
-				if(newEntry)
-					totalInserted++;
-			} else {
-				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
-				stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(cacheResolution);
+				fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells(), finalisedSummaries);
+				
 			}
 			
+			int totalInserted = 0;
+			// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
+			for(String key: finalisedSummaries.keySet()) {
+				
+				SummaryWrapper sw = finalisedSummaries.get(key);
+				
+				// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
+				// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
+				if(sw.isNeedsInsertion()) {
+					// THIS IS A NEW CELL GETTING INSERTED
+					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+					
+					if(newEntry)
+						totalInserted++;
+				} else {
+					// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
+					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				}
+				
+			}
+			
+			if(totalInserted > 0)
+				stCache.addEntryCount(totalInserted);
+			
 		}
-		
-		if(totalInserted > 0)
-			stCache.addEntryCount(totalInserted);
 		
 	}
 
@@ -3433,6 +3442,120 @@ public class GeospatialFileSystem extends FileSystem {
 
 	public void setTotal_cache_entry_allowed(int total_cache_entry_allowed) {
 		this.total_cache_entry_allowed = total_cache_entry_allowed;
+	}
+	
+	
+	/**
+	 * Handles pruning for a single FS
+	 * @author sapmitra
+	 * @param targetFS
+	 */
+	
+	private void handleCachePruning() {
+		
+		Map<String, Float> keyValues = new HashMap<String, Float>();
+		
+		synchronized(stCache) {
+			
+			SparseSpatiotemporalMatrix[] cacheLevels = stCache.getCacheLevels();
+			
+			for(int i=0; i< cacheLevels.length; i++) {
+				
+				SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
+				
+				if(currentLevel != null) {
+					HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
+					
+					for(String key : currentFloor.keySet()) {
+						
+						CacheCell cacheCell = currentFloor.get(key);
+						float fr = cacheCell.getCorrectedFreshness();
+						
+						keyValues.put(i+"@"+key, fr);
+						
+					}
+				}
+				
+			}
+			
+			Map<Integer, List<String>> elementsToTrim = getElementsToTrim(keyValues, getTotal_cache_entry_allowed());
+			
+			// REMOVING UNWANTED STALE ENTRIES
+			for(int i=0; i< cacheLevels.length; i++) {
+				
+				if(elementsToTrim.get(i) != null) {
+					
+					SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
+					
+					if(currentLevel != null) {
+						HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
+						
+						for(String key : elementsToTrim.get(i)) {
+							
+							currentFloor.remove(key);
+							
+						}
+					}
+					
+				}
+				
+			}
+			
+		}
+		
+	}
+	
+	/**
+	 * FIGURING OUT WHICH CACHE ENTRIES TO REMOVE BASED ON FRESHNES VALUES
+	 * 
+	 * @author sapmitra
+	 * @param cacheEntries
+	 * @param entriesAllowed - The number of entries allowed in the cache
+	 */
+	public Map<Integer, List<String>> getElementsToTrim(Map<String, Float> cacheEntries, int entriesAllowed) {
+		
+		// SORTING BASED ON VALUES
+		Set<Entry<String, Float>> set = cacheEntries.entrySet();
+        List<Entry<String, Float>> list = new ArrayList<Entry<String, Float>>(set);
+        Collections.sort( list, new Comparator<Map.Entry<String, Float>>()
+        {
+            public int compare( Map.Entry<String, Float> o1, Map.Entry<String, Float> o2 )
+            {
+                return (o2.getValue()).compareTo( o1.getValue() );
+            }
+        } );
+        
+        int i=0;
+        
+        Map<Integer, List<String>> entriesToRemove = new HashMap<Integer, List<String>>();
+        
+        for(Map.Entry<String, Float> entry:list){
+        	
+        	i++;
+        	
+        	if(i > entriesAllowed) {
+        		String key = entry.getKey();
+        		
+        		String[] tokens = key.split("@");
+        		
+        		int level = Integer.valueOf(tokens[0]);
+        		String stKey = tokens[1];
+        		
+        		List<String> keys = entriesToRemove.get(level);
+        		
+        		if(keys == null) {
+        			keys = new ArrayList<String>();
+        			entriesToRemove.put(level, keys);
+        		}
+        		
+        		keys.add(stKey);
+        		
+        	}
+        }
+        
+        //System.out.println(entriesToRemove);
+		
+		return entriesToRemove;
 	}
 	
 }
