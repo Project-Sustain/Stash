@@ -343,9 +343,11 @@ public class StorageNode implements RequestListener {
 
 	@EventHandler
 	public void handleFileSystem(FilesystemEvent event, EventContext context) {
+		
 		logger.info("FORWARDED CREATE FS REQUEST");
 		logger.log(Level.INFO,
 				"Performing action " + event.getAction().getAction() + " for file system " + event.getName());
+		
 		if (event.getAction() == FilesystemAction.CREATE) {
 			GeospatialFileSystem fs = fsMap.get(event.getName());
 			if (fs == null) {

@@ -60,7 +60,7 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 	private static final Logger logger = Logger.getLogger("galileo");
 
 	private ConstrainedGeohash nodeHash;
-	private BalancedHashRing nodeHashRing;
+	private BalancedHashRing<Metadata> nodeHashRing;
 	private Map<BigInteger, BalancedHashRing<byte[]>> nodeHashRings = new HashMap<>();
 	private Map<BigInteger, NodeInfo> nodePositions = new HashMap<>();
 	private int spatialpartitioningType;

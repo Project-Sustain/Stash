@@ -48,8 +48,8 @@ public class VisualizationInsertTest {
 			featureList1.add(new Pair<>("epoch_time", FeatureType.FLOAT));
 			featureList1.add(new Pair<>("gps_abs_lat", FeatureType.FLOAT));
 			featureList1.add(new Pair<>("gps_abs_lon", FeatureType.FLOAT));
-			featureList1.add(new Pair<>("fs_feature1", FeatureType.FLOAT));
-			featureList1.add(new Pair<>("fs_feature2", FeatureType.FLOAT));
+			featureList1.add(new Pair<>("fsa_feature", FeatureType.FLOAT));
+			
 			
 			SpatialHint sp1 = new SpatialHint("gps_abs_lat", "gps_abs_lon");
 			String temporalHint1 = "epoch_time";

@@ -20,6 +20,9 @@ public class SpatiotemporalHierarchicalCache {
 	
 	public SpatiotemporalHierarchicalCache(int totalSpatialLevels, int totalTemporalLevels) {
 		
+		SpatiotemporalHierarchicalCache.totalSpatialLevels = totalSpatialLevels;
+		SpatiotemporalHierarchicalCache.totalTemporalLevels = totalTemporalLevels;
+		
 		cacheLevels = new SparseSpatiotemporalMatrix[totalSpatialLevels*totalTemporalLevels];
 		
 		for(int i=0; i < totalSpatialLevels; i++) {
