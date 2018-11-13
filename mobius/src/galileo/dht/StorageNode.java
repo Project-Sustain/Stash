@@ -819,8 +819,8 @@ public class StorageNode implements RequestListener {
 		int eventId = r.nextInt();
 		
 		long eventTime = System.currentTimeMillis();
-		
-		event.setEventId(eventTime+"$$"+eventId);
+		String eventString = eventTime+"$$"+eventId;
+		event.setEventId(eventString);
 		
 		try {
 			logger.info(event.getFeatureQueryString());
@@ -847,6 +847,14 @@ public class StorageNode implements RequestListener {
 				if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
 					subBlockLevel = false;
 				}
+				
+				/*************** NO ENTRY WHILE CACHE CLEANING IN PROGRESS *****************/
+				blockEntryIfCleaningInitiated(fs);
+				/*************** ENTRY ALLOWED *****************/
+				
+				
+				/*************** EVENT ADDED TO ENRY LIST************/
+				fs.addEvent(eventString);
 				
 				/* Feature Query is not needed to list blocks */
 				
@@ -890,6 +898,9 @@ public class StorageNode implements RequestListener {
 					
 				}
 				
+				/*************** EVENT REMOVED FROM ENRY LIST************/
+				fs.removeEvent(eventString);
+				
 				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS */
 				JSONArray summaryJSONs = new JSONArray();
 				
@@ -911,6 +922,8 @@ public class StorageNode implements RequestListener {
 					}
 					
 					obj.put("summary", summaryString);
+					
+					logger.info(key+":::"+summaryString);
 					
 					summaryJSONs.put(obj);
 				}
@@ -937,15 +950,23 @@ public class StorageNode implements RequestListener {
 		responseJSON.put("totalProcessingTime", totalProcessingTime);
 		
 		
-		QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
+		/*QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
 		try {
 			context.sendReply(response);
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
-		}
+		}*/
 	}
 	
 	
+	private void blockEntryIfCleaningInitiated(GeospatialFileSystem fs) {
+		
+		while(fs.cleanUpInitiated.get()) {
+			// blocking
+		}
+		
+	}
+
 	/**
 	 * Handles a query request from a client. Query requests result in a number
 	 * of subqueries being performed across the Galileo network.

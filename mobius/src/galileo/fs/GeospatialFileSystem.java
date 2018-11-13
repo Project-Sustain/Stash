@@ -53,6 +53,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -83,6 +84,7 @@ import galileo.dataset.TemporalProperties;
 import galileo.dataset.feature.Feature;
 import galileo.dataset.feature.FeatureSet;
 import galileo.dataset.feature.FeatureType;
+import galileo.dht.CacheCleanupService;
 import galileo.dht.GroupInfo;
 import galileo.dht.LocalParallelQueryProcessor;
 import galileo.dht.NeighborDataParallelQueryProcessor;
@@ -211,8 +213,11 @@ public class GeospatialFileSystem extends FileSystem {
 	// HOW FAR DOWN TEMPORAL CHILDREN ARE INFLUENCED
 	public static final int TEMPORAL_MOVE_DOWN = 1;
 	
+	public AtomicBoolean cleanUpInitiated = new AtomicBoolean(false);
+	public AtomicBoolean peListEmpty = new AtomicBoolean(true);
 	
-	public volatile boolean cleanUpNeeded = false;
+	// LIST OF PROCESSES ENTERED
+	public List<String> peList = new ArrayList<String>();
 	
 	
 
@@ -3206,7 +3211,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param string 
 	 * @param list 
 	 */
-	public void fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
+	public boolean fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
 			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys) {
 		
 		synchronized(stCache) {
@@ -3256,7 +3261,9 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 			if(totalInserted > 0)
-				stCache.addEntryCount(totalInserted);
+				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
+			
+			return false;
 			
 		}
 		
@@ -3342,11 +3349,28 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
+		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
 				event.getTimeString(), event.getEventId(), existingCacheKeys);
+		
+		if(cleanUpNeeded)
+			handleCacheCleaning();
 		
 		return finalisedSummaries;
 	}
+	
+	
+	/**
+	 * CLEANING CACHE. THIS HAS TO BE IN A SEPARATE THREAD.
+	 * @author sapmitra
+	 */
+	public void handleCacheCleaning() {
+		
+		ExecutorService executor = Executors.newFixedThreadPool(1);
+		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, getTotal_cache_entry_allowed());
+		executor.execute(c);
+		
+	}
+	
 
 	/**
 	 * 
@@ -3430,11 +3454,16 @@ public class GeospatialFileSystem extends FileSystem {
 
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
+		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
 				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
+		
+		if(cleanUpNeeded)
+			handleCacheCleaning();
 
 		return finalisedSummaries;
 	}
+	
+	
 
 	public int getTotal_cache_entry_allowed() {
 		return total_cache_entry_allowed;
@@ -3444,118 +3473,18 @@ public class GeospatialFileSystem extends FileSystem {
 		this.total_cache_entry_allowed = total_cache_entry_allowed;
 	}
 	
-	
-	/**
-	 * Handles pruning for a single FS
-	 * @author sapmitra
-	 * @param targetFS
-	 */
-	
-	private void handleCachePruning() {
+	public void addEvent(String eventId) {
 		
-		Map<String, Float> keyValues = new HashMap<String, Float>();
-		
-		synchronized(stCache) {
-			
-			SparseSpatiotemporalMatrix[] cacheLevels = stCache.getCacheLevels();
-			
-			for(int i=0; i< cacheLevels.length; i++) {
-				
-				SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
-				
-				if(currentLevel != null) {
-					HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
-					
-					for(String key : currentFloor.keySet()) {
-						
-						CacheCell cacheCell = currentFloor.get(key);
-						float fr = cacheCell.getCorrectedFreshness();
-						
-						keyValues.put(i+"@"+key, fr);
-						
-					}
-				}
-				
-			}
-			
-			Map<Integer, List<String>> elementsToTrim = getElementsToTrim(keyValues, getTotal_cache_entry_allowed());
-			
-			// REMOVING UNWANTED STALE ENTRIES
-			for(int i=0; i< cacheLevels.length; i++) {
-				
-				if(elementsToTrim.get(i) != null) {
-					
-					SparseSpatiotemporalMatrix currentLevel = cacheLevels[i];
-					
-					if(currentLevel != null) {
-						HashMap<String, CacheCell> currentFloor = currentLevel.getCells();
-						
-						for(String key : elementsToTrim.get(i)) {
-							
-							currentFloor.remove(key);
-							
-						}
-					}
-					
-				}
-				
-			}
-			
+		synchronized(peList) {
+			peList.add(eventId);
 		}
-		
 	}
 	
-	/**
-	 * FIGURING OUT WHICH CACHE ENTRIES TO REMOVE BASED ON FRESHNES VALUES
-	 * 
-	 * @author sapmitra
-	 * @param cacheEntries
-	 * @param entriesAllowed - The number of entries allowed in the cache
-	 */
-	public Map<Integer, List<String>> getElementsToTrim(Map<String, Float> cacheEntries, int entriesAllowed) {
+	public void removeEvent(String eventId) {
 		
-		// SORTING BASED ON VALUES
-		Set<Entry<String, Float>> set = cacheEntries.entrySet();
-        List<Entry<String, Float>> list = new ArrayList<Entry<String, Float>>(set);
-        Collections.sort( list, new Comparator<Map.Entry<String, Float>>()
-        {
-            public int compare( Map.Entry<String, Float> o1, Map.Entry<String, Float> o2 )
-            {
-                return (o2.getValue()).compareTo( o1.getValue() );
-            }
-        } );
-        
-        int i=0;
-        
-        Map<Integer, List<String>> entriesToRemove = new HashMap<Integer, List<String>>();
-        
-        for(Map.Entry<String, Float> entry:list){
-        	
-        	i++;
-        	
-        	if(i > entriesAllowed) {
-        		String key = entry.getKey();
-        		
-        		String[] tokens = key.split("@");
-        		
-        		int level = Integer.valueOf(tokens[0]);
-        		String stKey = tokens[1];
-        		
-        		List<String> keys = entriesToRemove.get(level);
-        		
-        		if(keys == null) {
-        			keys = new ArrayList<String>();
-        			entriesToRemove.put(level, keys);
-        		}
-        		
-        		keys.add(stKey);
-        		
-        	}
-        }
-        
-        //System.out.println(entriesToRemove);
-		
-		return entriesToRemove;
+		synchronized(peList) {
+			peList.remove(eventId);
+		}
 	}
 	
 }

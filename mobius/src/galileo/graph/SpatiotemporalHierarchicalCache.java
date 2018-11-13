@@ -3,6 +3,7 @@ package galileo.graph;
 import java.util.List;
 
 import galileo.dataset.Coordinates;
+import galileo.fs.GeospatialFileSystem;
 import galileo.util.STRelatives;
 
 public class SpatiotemporalHierarchicalCache {
@@ -180,9 +181,29 @@ public class SpatiotemporalHierarchicalCache {
 		this.totalTemporalLevels = totalTemporalLevels;
 	}
 
-	public void addEntryCount(int totalInserted) {
+	/**
+	 * INCREMENT ENTRY COUNT AND RETURN TRUE IF OVERFLOW
+	 * @author sapmitra
+	 * @param totalInserted
+	 * @return
+	 */
+	public boolean addEntryCount(int totalInserted, int totalAllowed) {
 		totalRooms+=totalInserted;
 		
+		if(totalRooms > totalAllowed) {
+			return true;
+		} else {
+			return false;
+		}
+		
+	}
+
+	public int getTotalRooms() {
+		return totalRooms;
+	}
+
+	public void setTotalRooms(int totalRooms) {
+		this.totalRooms = totalRooms;
 	}
 
 }
