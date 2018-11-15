@@ -103,6 +103,27 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		for (NodeInfo node : nodes) {
 			placeNode(node);
 		}
+		
+		Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
+		for(String g : geohashes) {
+			BigInteger pos = nodeHash.getHashMappings().get(g);
+			
+			List<String> ghs = geohashMap.get(pos);
+			
+			if(ghs == null) {
+				ghs = new ArrayList<String>();
+				geohashMap.put(pos, ghs);
+			}
+			
+			ghs.add(g);
+		}
+		
+		
+		logger.info("THE GEOHASH PARTITIONING IS AS FOLLOWS: \n");
+		
+		for(BigInteger b: geohashMap.keySet()) {
+			logger.info(b + "::" + geohashMap.get(b));
+		}
 	}
 	
 	private static String[] generateGeohashes(String[] geohashes_2char, int spatialHashType) {

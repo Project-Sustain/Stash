@@ -114,4 +114,12 @@ public class ConstrainedGeohash implements HashFunction<Metadata> {
 		int idx = random.nextInt(geohashes.length);
 		return hashMappings.get(geohashes[idx]);
 	}
+
+	public Map<String, BigInteger> getHashMappings() {
+		return hashMappings;
+	}
+
+	public void setHashMappings(Map<String, BigInteger> hashMappings) {
+		this.hashMappings = hashMappings;
+	}
 }
