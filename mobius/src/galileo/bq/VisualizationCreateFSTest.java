@@ -9,21 +9,12 @@ package galileo.bq;
  * This program read a csv-formatted file and send each line to the galileo server
  */
 
-import galileo.dataset.Block;
+import java.util.ArrayList;
+import java.util.List;
+
 import galileo.dataset.SpatialHint;
 import galileo.dataset.feature.FeatureType;
 import galileo.util.Pair;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Scanner;
-import java.util.TimeZone;
 
 public class VisualizationCreateFSTest {
 
@@ -39,7 +30,7 @@ public class VisualizationCreateFSTest {
 	 */
 	private static boolean FS_CREATED = false;
 	
-	private static void processFile(String filepath, GalileoConnector gc) throws Exception {
+	private static void processFile(GalileoConnector gc) throws Exception {
 		
 		// CREATING FS1
 		if( ! FS_CREATED ) {
@@ -55,13 +46,12 @@ public class VisualizationCreateFSTest {
 			sumHints.add("fs_feature1");
 			sumHints.add("fs_feature2");
 			
-			SpatialHint sp1 = new SpatialHint("gps_abs_lat", "gps_abs_lon");
+			SpatialHint spHint = new SpatialHint("gps_abs_lat", "gps_abs_lon");
 			String temporalHint1 = "epoch_time";
 			
-			gc.createFSViz("testfs1", sp1, featureList1, temporalHint1, 1, sumHints);
+			gc.createFSViz("testfs1", spHint, featureList1, temporalHint1, sumHints);
 			
 			FS_CREATED = true;
-			
 			
 		}
 		
@@ -75,31 +65,18 @@ public class VisualizationCreateFSTest {
 		String args[] = new String[3];
 		args[0] = "phoenix.cs.colostate.edu";
 		args[1] = "5634";
-		args[2] = "/s/chopin/b/grad/sapmitra/Documents/Conflux/fs1.csv";
 		
 		System.out.println(args.length);
-		if (args.length != 3) {
-			System.out.println(
-					"Usage: ConvertCSVFileToGalileo [galileo-hostname] [galileo-port-number] [path-to-csv-file]");
+		if (args.length != 2) {
+			System.out.println("Usage: ConvertCSVFileToGalileo [galileo-hostname] [galileo-port-number]");
 			System.exit(0);
 		} else {
 			try {
-				GalileoConnector gc = new GalileoConnector("phoenix.cs.colostate.edu", 5634);
+				GalileoConnector gc = new GalileoConnector(args[0], 5634);
 				System.out.println(args[0] + "," + Integer.parseInt(args[1]));
-				File file = new File(args[2]);
-				if (file.isFile()) {
-					System.out.println("processing - " + args[2]);
-					processFile(args[2], gc);
-				} /*else {
-					if (file.isDirectory()) {
-						File[] files = file.listFiles();
-						for (File f : files) {
-							if (f.isFile())
-								System.out.println("processing - " + f);
-							processFile(f.getAbsolutePath(), gc);
-						}
-					}
-				}*/
+				
+				processFile(gc);
+				
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -107,5 +84,6 @@ public class VisualizationCreateFSTest {
 		System.out.println("Data successfully inserted into galileo");
 		System.exit(0);
 	}
-	// [END Main]
+	
+	
 }

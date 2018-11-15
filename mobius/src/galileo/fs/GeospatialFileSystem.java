@@ -147,7 +147,7 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final int MIN_GRID_POINTS = 5000;
 	private int numCores;
 	private int total_cache_entry_allowed = 200;
-
+	private int total_reduced_entries = 100;
 	private static final String pathStore = "metadata.paths";
 
 	private NetworkInfo network;
@@ -3366,7 +3366,7 @@ public class GeospatialFileSystem extends FileSystem {
 	public void handleCacheCleaning() {
 		
 		ExecutorService executor = Executors.newFixedThreadPool(1);
-		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, getTotal_cache_entry_allowed());
+		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, total_reduced_entries);
 		executor.execute(c);
 		
 	}
