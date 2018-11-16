@@ -900,7 +900,7 @@ public class StorageNode implements RequestListener {
 					
 				}
 				
-				/*************** EVENT REMOVED FROM ENRY LIST************/
+				/*************** EVENT REMOVED FROM ENTRY LIST************/
 				fs.removeEvent(eventString);
 				
 				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS */

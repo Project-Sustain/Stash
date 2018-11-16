@@ -200,6 +200,22 @@ public class GeoHash {
 		
 	}
 	
+	
+	/**
+	 * GET STARTIMESTAMP FROM A TEMPORAL STRING
+	 * @author sapmitra
+	 * @param temporalString
+	 * @param temporalType
+	 * @return
+	 * @throws ParseException
+	 */
+	public static long getEndTimeStamp(String temporalString, TemporalType temporalType) throws ParseException {
+		
+		String timeTokens[] = temporalString.split("-");
+		return getEndTimeStamp(timeTokens[0],timeTokens[1],timeTokens[2],timeTokens[3], temporalType);
+		
+	}
+	
 	/**
 	 * 
 	 * @author sapmitra

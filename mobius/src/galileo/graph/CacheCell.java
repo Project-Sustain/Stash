@@ -64,7 +64,7 @@ public class CacheCell {
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
 		
-		String[] components = spatiotemporalInfo.split(",");
+		String[] components = spatiotemporalInfo.split("\\$\\$");
 		
 		this.temporalInfo = components[0];
 		this.spatialInfo = components[1];

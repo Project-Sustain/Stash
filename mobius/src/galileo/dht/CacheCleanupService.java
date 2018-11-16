@@ -73,7 +73,7 @@ public class CacheCleanupService implements Runnable{
 	 * @param targetFS
 	 */
 	
-	private void pruneCache() {
+	public void pruneCache() {
 		
 		
 		synchronized(stCache) {

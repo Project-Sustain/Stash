@@ -109,6 +109,15 @@ public class SerializationOutputStream extends DataOutputStream {
             writeSerializable(item);
         }
     }
+    
+    
+    
+    public void writeSerializableArray(ByteSerializable[] objects) throws IOException {
+        writeInt(objects.length);
+        for (ByteSerializable item : objects) {
+            writeSerializable(item);
+        }
+    }
 
     public void writeStringCollection(Collection<String> collection)
     throws IOException {
