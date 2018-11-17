@@ -21,6 +21,8 @@ import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
 import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
+import galileo.comm.VisualizationEventResponse;
+import galileo.comm.VisualizationResponse;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
@@ -299,7 +301,65 @@ public class ClientRequestHandler implements MessageListener {
 								}
 							}
 						}
-					}
+					} else if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
+						VisualizationResponse actualResponse = (VisualizationResponse) this.response;
+						
+						VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
+						JSONObject responseJSON = actualResponse.getJSONResults();
+						JSONObject eventJSON = eventResponse.getJSONResults();
+						if (responseJSON.length() == 0) {
+							for (String name : JSONObject.getNames(eventJSON))
+								responseJSON.put(name, eventJSON.get(name));
+						} else {
+							if (responseJSON.has("queryId") && eventJSON.has("queryId")
+									&& responseJSON.getString("queryId").equalsIgnoreCase(eventJSON.getString("queryId"))) {
+								if (actualResponse.isDryRun()) {
+									JSONObject actualResults = responseJSON.getJSONObject("result");
+									JSONObject eventResults = eventJSON.getJSONObject("result");
+									if (null != JSONObject.getNames(eventResults)) {
+										for (String name : JSONObject.getNames(eventResults)) {
+											if (actualResults.has(name)) {
+												JSONArray ar = actualResults.getJSONArray(name);
+												JSONArray er = eventResults.getJSONArray(name);
+												for (int i = 0; i < er.length(); i++) {
+													ar.put(er.get(i));
+												}
+											} else {
+												actualResults.put(name, eventResults.getJSONArray(name));
+											}
+										}
+									}
+								} else {
+									JSONArray actualResults = responseJSON.getJSONArray("result");
+									JSONArray eventResults = eventJSON.getJSONArray("result");
+									for (int i = 0; i < eventResults.length(); i++)
+										actualResults.put(eventResults.getJSONObject(i));
+								}
+								if (responseJSON.has("hostProcessingTime")) {
+									JSONObject aHostProcessingTime = responseJSON.getJSONObject("hostProcessingTime");
+									JSONObject eHostProcessingTime = eventJSON.getJSONObject("hostProcessingTime");
+
+									JSONObject aHostFileSize = responseJSON.getJSONObject("hostFileSize");
+									JSONObject eHostFileSize = eventJSON.getJSONObject("hostFileSize");
+
+									for (String key : eHostProcessingTime.keySet())
+										aHostProcessingTime.put(key, eHostProcessingTime.getLong(key));
+									for (String key : eHostFileSize.keySet())
+										aHostFileSize.put(key, eHostFileSize.getLong(key));
+
+									responseJSON.put("totalFileSize",
+											responseJSON.getLong("totalFileSize") + eventJSON.getLong("totalFileSize"));
+									responseJSON.put("totalNumPaths",
+											responseJSON.getLong("totalNumPaths") + eventJSON.getLong("totalNumPaths"));
+									responseJSON.put("totalProcessingTime",
+											java.lang.Math.max(responseJSON.getLong("totalProcessingTime"),
+													eventJSON.getLong("totalProcessingTime")));
+									responseJSON.put("totalBlocksProcessed", responseJSON.getLong("totalBlocksProcessed")
+											+ eventJSON.getLong("totalBlocksProcessed"));
+								}
+							}
+						}
+					} 
 				}
 			} catch (IOException | SerializationException e) {
 				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
@@ -317,7 +377,7 @@ public class ClientRequestHandler implements MessageListener {
 
 	@Override
 	public void onMessage(GalileoMessage message) {
-		Event event;
+		/*Event event;
 		try {
 			event = this.eventWrapper.unwrap(message);
 			DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
@@ -330,7 +390,7 @@ public class ClientRequestHandler implements MessageListener {
 			e.printStackTrace();
 		}
 		
-		
+		*/
 		
 		
 		if (null != message)

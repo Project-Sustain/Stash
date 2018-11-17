@@ -99,6 +99,7 @@ import galileo.comm.TemporalType;
 import galileo.comm.TrainingDataEvent;
 import galileo.comm.TrainingDataResponse;
 import galileo.comm.VisualizationEvent;
+import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
@@ -809,13 +810,8 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
-		long hostFileSize = 0;
-		long totalProcessingTime = 0;
-		long blocksProcessed = 0;
-		int totalNumPaths = 0;
-		
 		JSONObject resultJSON = new JSONObject();
-		Map<String, SummaryWrapper> finalSummaries;
+		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
 		int eventId = r.nextInt();
@@ -903,7 +899,7 @@ public class StorageNode implements RequestListener {
 				/*************** EVENT REMOVED FROM ENTRY LIST************/
 				fs.removeEvent(eventString);
 				
-				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS */
+				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS 
 				JSONArray summaryJSONs = new JSONArray();
 				
 				for(String key: finalSummaries.keySet()) {
@@ -934,7 +930,7 @@ public class StorageNode implements RequestListener {
 				
 				resultJSON.put("hostName", this.canonicalHostname);
 				resultJSON.put("hostPort", this.port);
-				resultJSON.put("summaries", summaryJSONs);
+				resultJSON.put("summaries", summaryJSONs);*/
 			} else {
 				logger.log(Level.SEVERE, "Requested file system(" + fsName
 						+ ") not found. Ignoring the query and returning empty results.");
@@ -945,19 +941,13 @@ public class StorageNode implements RequestListener {
 					e);
 		}
 
-		JSONObject responseJSON = new JSONObject();
-		responseJSON.put("filesystem", event.getFilesystemName());
+		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet()));
 		
-		responseJSON.put("result", resultJSON);
-		responseJSON.put("totalProcessingTime", totalProcessingTime);
-		
-		
-		/*QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
 		try {
 			context.sendReply(response);
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
-		}*/
+		}
 	}
 	
 	
