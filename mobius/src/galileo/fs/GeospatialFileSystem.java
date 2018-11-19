@@ -318,12 +318,20 @@ public class GeospatialFileSystem extends FileSystem {
 		switch (this.temporalType) {
 		case HOUR_OF_DAY:
 			temporalLevel = 4;
+			break;
 		case DAY_OF_MONTH:
 			temporalLevel = 3;
+			break;
 		case MONTH:
 			temporalLevel = 2;
+			break;
 		case YEAR:
 			temporalLevel = 1;
+			break;
+		default:
+			temporalLevel = 1;
+			break;
+			
 		}
 		
 		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;

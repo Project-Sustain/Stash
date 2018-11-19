@@ -14,11 +14,15 @@ public class VisualizationEventResponse implements Event{
 
 	private List<SummaryWrapper> summaries;
 	private List<String> keys;
+	private String hostName;
+	private int hostPort;
 	
-	public VisualizationEventResponse(List<SummaryWrapper> summaries, List<String> keys) {
+	public VisualizationEventResponse(List<SummaryWrapper> summaries, List<String> keys, String hostname, int port) {
 		
 		this.summaries = summaries;
 		this.keys = keys;
+		this.hostName = hostname;
+		this.hostPort = port;
 		
 	}
 	
@@ -27,6 +31,8 @@ public class VisualizationEventResponse implements Event{
 		// TODO Auto-generated method stub
 		out.writeSerializableCollection(summaries);
 		out.writeStringCollection(keys);
+		out.writeString(hostName);
+		out.writeInt(hostPort);
 	}
 	
 	@Deserialize
@@ -34,6 +40,8 @@ public class VisualizationEventResponse implements Event{
 		summaries = new ArrayList<SummaryWrapper>();
 		in.readSerializableCollection(SummaryWrapper.class, summaries);
 		in.readStringCollection(keys);
+		this.hostName = in.readString();
+		this.hostPort = in.readInt();
 	}
 
 	public List<SummaryWrapper> getSummaries() {
@@ -50,6 +58,22 @@ public class VisualizationEventResponse implements Event{
 
 	public void setKeys(List<String> keys) {
 		this.keys = keys;
+	}
+
+	public String getHostName() {
+		return hostName;
+	}
+
+	public void setHostName(String hostName) {
+		this.hostName = hostName;
+	}
+
+	public int getHostPort() {
+		return hostPort;
+	}
+
+	public void setHostPort(int hostPort) {
+		this.hostPort = hostPort;
 	}
 
 	

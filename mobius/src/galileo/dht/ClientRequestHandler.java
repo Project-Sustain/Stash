@@ -309,6 +309,8 @@ public class ClientRequestHandler implements MessageListener {
 						
 						VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
 						
+						logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+						
 						if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
 							
 							List<String> keys = eventResponse.getKeys();
@@ -346,8 +348,7 @@ public class ClientRequestHandler implements MessageListener {
 			}
 		}
 		
-		
-		// COMBINE HERE
+		// COMBINE HERE INTO A SINGLE JSON STRING
 		if (this.response instanceof VisualizationResponse) {
 			
 			VisualizationResponse finalResponse = (VisualizationResponse) this.response;
@@ -359,8 +360,6 @@ public class ClientRequestHandler implements MessageListener {
 				JSONObject obj = new JSONObject();
 				obj.put("key", key);
 				String summaryString = "";
-				
-				JSONArray summarystats = new JSONArray();
 				
 				int i=0;
 				
@@ -437,7 +436,7 @@ public class ClientRequestHandler implements MessageListener {
 	public void handleRequest(Event request, Event response) {
 		try {
 			reqId = System.currentTimeMillis();
-			logger.info("RIKI: DATA INTEGRATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
+			logger.info("RIKI: VISUALIZATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
 			this.response = response;
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);
 			for (NetworkDestination node : nodes) {

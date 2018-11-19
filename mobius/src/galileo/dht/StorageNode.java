@@ -941,7 +941,8 @@ public class StorageNode implements RequestListener {
 					e);
 		}
 
-		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet()));
+		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
+				,hostname, port);
 		
 		try {
 			context.sendReply(response);

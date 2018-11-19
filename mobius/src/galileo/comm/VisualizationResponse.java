@@ -1,18 +1,19 @@
 package galileo.comm;
 
 import java.io.IOException;
-import java.util.Map;
 
 import galileo.event.Event;
-import galileo.graph.SummaryWrapper;
+import galileo.serialization.SerializationException;
+import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
 
 public class VisualizationResponse implements Event {
 
 	private String summariesJSON;
+	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
-		// TODO Auto-generated method stub
+		out.writeString(summariesJSON);
 		
 	}
 	
@@ -29,6 +30,10 @@ public class VisualizationResponse implements Event {
 
 	public void setSummariesJSON(String summariesJSON) {
 		this.summariesJSON = summariesJSON;
+	}
+	
+	public VisualizationResponse(SerializationInputStream in) throws IOException, SerializationException {
+		this.summariesJSON = in.readString();
 	}
 
 }
