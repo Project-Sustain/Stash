@@ -36,5 +36,21 @@ public class VisualizationEventResponse implements Event{
 		in.readStringCollection(keys);
 	}
 
+	public List<SummaryWrapper> getSummaries() {
+		return summaries;
+	}
+
+	public void setSummaries(List<SummaryWrapper> summaries) {
+		this.summaries = summaries;
+	}
+
+	public List<String> getKeys() {
+		return keys;
+	}
+
+	public void setKeys(List<String> keys) {
+		this.keys = keys;
+	}
+
 	
 }

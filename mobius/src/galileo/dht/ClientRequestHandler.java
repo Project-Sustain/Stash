@@ -26,6 +26,8 @@ import galileo.comm.VisualizationResponse;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
+import galileo.graph.SummaryStatistics;
+import galileo.graph.SummaryWrapper;
 import galileo.net.ClientMessageRouter;
 import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
@@ -105,6 +107,8 @@ public class ClientRequestHandler implements MessageListener {
 		}
 		Map<String, Set<LocalFeature>> resultMap = new HashMap<String, Set<LocalFeature>>();
 		int responseCount = 0;
+		
+		Map<String, SummaryWrapper> accumulatedSummaries = new HashMap<String, SummaryWrapper>();
 
 		for (GalileoMessage gresponse : this.responses) {
 			responseCount++;
@@ -302,62 +306,33 @@ public class ClientRequestHandler implements MessageListener {
 							}
 						}
 					} else if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
-						VisualizationResponse actualResponse = (VisualizationResponse) this.response;
 						
 						VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
-						JSONObject responseJSON = actualResponse.getJSONResults();
-						JSONObject eventJSON = eventResponse.getJSONResults();
-						if (responseJSON.length() == 0) {
-							for (String name : JSONObject.getNames(eventJSON))
-								responseJSON.put(name, eventJSON.get(name));
-						} else {
-							if (responseJSON.has("queryId") && eventJSON.has("queryId")
-									&& responseJSON.getString("queryId").equalsIgnoreCase(eventJSON.getString("queryId"))) {
-								if (actualResponse.isDryRun()) {
-									JSONObject actualResults = responseJSON.getJSONObject("result");
-									JSONObject eventResults = eventJSON.getJSONObject("result");
-									if (null != JSONObject.getNames(eventResults)) {
-										for (String name : JSONObject.getNames(eventResults)) {
-											if (actualResults.has(name)) {
-												JSONArray ar = actualResults.getJSONArray(name);
-												JSONArray er = eventResults.getJSONArray(name);
-												for (int i = 0; i < er.length(); i++) {
-													ar.put(er.get(i));
-												}
-											} else {
-												actualResults.put(name, eventResults.getJSONArray(name));
-											}
-										}
-									}
+						
+						if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
+							
+							List<String> keys = eventResponse.getKeys();
+							List<SummaryWrapper> summaries = eventResponse.getSummaries();
+							
+							int num = 0;
+							for(String key : keys) {
+								
+								SummaryWrapper eventSumm = summaries.get(num);
+								
+								if(accumulatedSummaries.containsKey(key)) {
+									SummaryWrapper oldSumm = accumulatedSummaries.get(key);
+									
+									SummaryStatistics[] mergeSummaries = SummaryStatistics.mergeSummaries(oldSumm.getStats(), eventSumm.getStats());
+									oldSumm.setStats(mergeSummaries);
+									
 								} else {
-									JSONArray actualResults = responseJSON.getJSONArray("result");
-									JSONArray eventResults = eventJSON.getJSONArray("result");
-									for (int i = 0; i < eventResults.length(); i++)
-										actualResults.put(eventResults.getJSONObject(i));
+									accumulatedSummaries.put(key, eventSumm);
 								}
-								if (responseJSON.has("hostProcessingTime")) {
-									JSONObject aHostProcessingTime = responseJSON.getJSONObject("hostProcessingTime");
-									JSONObject eHostProcessingTime = eventJSON.getJSONObject("hostProcessingTime");
-
-									JSONObject aHostFileSize = responseJSON.getJSONObject("hostFileSize");
-									JSONObject eHostFileSize = eventJSON.getJSONObject("hostFileSize");
-
-									for (String key : eHostProcessingTime.keySet())
-										aHostProcessingTime.put(key, eHostProcessingTime.getLong(key));
-									for (String key : eHostFileSize.keySet())
-										aHostFileSize.put(key, eHostFileSize.getLong(key));
-
-									responseJSON.put("totalFileSize",
-											responseJSON.getLong("totalFileSize") + eventJSON.getLong("totalFileSize"));
-									responseJSON.put("totalNumPaths",
-											responseJSON.getLong("totalNumPaths") + eventJSON.getLong("totalNumPaths"));
-									responseJSON.put("totalProcessingTime",
-											java.lang.Math.max(responseJSON.getLong("totalProcessingTime"),
-													eventJSON.getLong("totalProcessingTime")));
-									responseJSON.put("totalBlocksProcessed", responseJSON.getLong("totalBlocksProcessed")
-											+ eventJSON.getLong("totalBlocksProcessed"));
-								}
+								
+								
+								num++;
 							}
+							
 						}
 					} 
 				}
@@ -370,6 +345,48 @@ public class ClientRequestHandler implements MessageListener {
 								+ e.getMessage(), e);
 			}
 		}
+		
+		
+		// COMBINE HERE
+		if (this.response instanceof VisualizationResponse) {
+			
+			VisualizationResponse finalResponse = (VisualizationResponse) this.response;
+			
+			JSONArray summaryJSONs = new JSONArray();
+			
+			for(String key: accumulatedSummaries.keySet()) {
+				
+				JSONObject obj = new JSONObject();
+				obj.put("key", key);
+				String summaryString = "";
+				
+				JSONArray summarystats = new JSONArray();
+				
+				int i=0;
+				
+				for(SummaryStatistics ss : accumulatedSummaries.get(key).getStats()) {
+					if(i==0)
+						summaryString = ss.toString();
+					else 
+						summaryString += ","+ss.toString();
+				}
+				
+				obj.put("summary", summaryString);
+				
+				logger.info(key+":::"+summaryString);
+				
+				summaryJSONs.put(obj);
+			}
+			
+			JSONObject response = new JSONObject();
+			response.put("summaries", summaryJSONs);
+			
+			finalResponse.setSummariesJSON(response.toString());
+			
+			
+		}
+		
+		
 		long diff = System.currentTimeMillis() - reqId;
 		logger.info("RIKI: ENTIRE THING FINISHED IN: "+ diff);
 		this.requestListener.onRequestCompleted(this.response, clientContext, this);
