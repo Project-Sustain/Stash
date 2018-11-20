@@ -336,7 +336,14 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
 		
+		logger.info("TOTAL TEMPORAL LEVELS: "+ stCache.getTotalTemporalLevels());
+		logger.info("TOTAL SPATIAL LEVELS: " + stCache.getTotalSpatialLevels());
+		logger.info("TOTAL TEMPORAL SUBLEVELS: "+ temporalSubLevels);
+		logger.info("TOTAL SPATIAL SUBLEVELS: " + spatialSubLevels);
+		
+		
 		this.needSublevelBitmaps = true;
+		
 		if(temporalSubLevels <= 0 && spatialSubLevels <=0) {
 			this.needSublevelBitmaps = false;
 		}

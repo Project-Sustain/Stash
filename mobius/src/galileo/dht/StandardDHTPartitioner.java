@@ -104,8 +104,12 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 			placeNode(node);
 		}
 		
+		
+		// THIS IS FOR LOGGING, COMMENT OTHERWISE
 		Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
+		
 		for(String g : geohashes) {
+			
 			BigInteger pos = nodeHash.getHashMappings().get(g);
 			
 			List<String> ghs = geohashMap.get(pos);
@@ -117,7 +121,6 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 			
 			ghs.add(g);
 		}
-		
 		
 		logger.info("THE GEOHASH PARTITIONING IS AS FOLLOWS: \n");
 		

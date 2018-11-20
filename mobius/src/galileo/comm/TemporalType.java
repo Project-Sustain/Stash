@@ -1,8 +1,6 @@
 package galileo.comm;
 
-import java.time.Period;
 import java.util.Calendar;
-import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.Days;
