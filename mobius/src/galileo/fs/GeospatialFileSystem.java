@@ -727,7 +727,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		int removeLength = fileGeohash.length();
 		
-		// Creates a temporary bitmap using the records and then old to the old bitmap
+		// Creates a temporary bitmap using the records and then append to the old bitmap
 		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
 		
 	}

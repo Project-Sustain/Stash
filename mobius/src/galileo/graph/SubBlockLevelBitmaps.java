@@ -21,18 +21,19 @@ public class SubBlockLevelBitmaps {
 	private int temporalFSLevel;
 	
 	// Number of sub block spatial levels
-	private int spatialLevels;
+	private int spatialSubLevels;
 	// Number of sub block level temporalLevels
-	private int temporalLevels;
+	private int temporalSubLevels;
 	private CorrectedBitmap[] spatioTemporalBitmaps;
 	
 	public SubBlockLevelBitmaps(int spatialSubLevels, int temporalSubLevels, int geohashPrecision, int temporalFSLevel) {
 		
-		this.spatialLevels = spatialSubLevels;
-		this.temporalLevels = temporalSubLevels;
+		// +1 for when either spatial or temporal level is same as FSLEVEL
+		this.spatialSubLevels = spatialSubLevels+1;
+		this.temporalSubLevels = temporalSubLevels+1;
 		this.spatialFSLevel = geohashPrecision;
 		this.temporalFSLevel = temporalFSLevel;
-		this.spatioTemporalBitmaps = new CorrectedBitmap[(spatialLevels+1)*(temporalLevels+1)];
+		this.spatioTemporalBitmaps = new CorrectedBitmap[(spatialSubLevels)*(temporalSubLevels)];
 		
 	}
 	
@@ -72,11 +73,11 @@ public class SubBlockLevelBitmaps {
 	 */
 	
 	public int getMapIndex(int spatialLevel, int temporalLevel) {
-		
+		// The following are relative level numbers
 		int spLvl = spatialLevel - spatialFSLevel;
 		int tLvl = temporalLevel - temporalFSLevel;
 		
-		int indx = (tLvl)*spatialLevels + spLvl;
+		int indx = (spLvl)*spatialSubLevels + tLvl;
 		return indx;
 	}
 	
@@ -92,7 +93,7 @@ public class SubBlockLevelBitmaps {
 	 */
 	public void populateTemporaryBitmapUsingRecords (String[] records, int spatialPosn1, int spatialPosn2, int temporalPosn, int removeLength, DateTime startDate) {
 		
-		CorrectedBitmap[] temporaryBitmaps  = new CorrectedBitmap[(spatialLevels+1)*(temporalLevels+1)];
+		CorrectedBitmap[] temporaryBitmaps  = new CorrectedBitmap[(spatialSubLevels)*(temporalSubLevels)];
 		
 		for(String record: records) {
 			
@@ -100,7 +101,7 @@ public class SubBlockLevelBitmaps {
 			
 			// Highest resolution geohash allowed by visualization application
 			String geoHash = GeoHash.encode(GeospatialFileSystem.parseFloat(fields[spatialPosn1]),
-					GeospatialFileSystem.parseFloat(fields[spatialPosn2]), spatialFSLevel+spatialLevels);
+					GeospatialFileSystem.parseFloat(fields[spatialPosn2]), spatialFSLevel+spatialSubLevels-1);
 			
 			long timestamp = GeospatialFileSystem.reformatDatetime(fields[temporalPosn]);
 			
@@ -137,18 +138,18 @@ public class SubBlockLevelBitmaps {
 		
 		
 		// Update each bitmap corresponding to a record
-		for(int i=0; i<= spatialLevels; i++) {
+		for(int i = 0; i < spatialSubLevels; i++) {
 			
-			for(int j=0; j <= temporalLevels; j++) {
+			for(int j = 0; j < temporalSubLevels; j++) {
 				
-				if(i==0 && j == 0) {
+				if(i == 0 && j == 0) {
 					continue;
 				}
 				
 				int currentSpatialLevel = spatialFSLevel+i;
 				int currentTemporalLevel = temporalFSLevel+j;
 				
-				int indx = getMapIndex(currentSpatialLevel, currentTemporalLevel);
+				int bitmapArrayIndx = getMapIndex(currentSpatialLevel, currentTemporalLevel);
 				
 				long spatialIndex = 0;
 				
@@ -167,40 +168,22 @@ public class SubBlockLevelBitmaps {
 				if(j > 0)
 					temporalIndex = TemporalType.getTemporalIndex(startTime, recordTimestamp, currentTemporalLevel);
 				
-				CorrectedBitmap bm = temporaryBitmaps[indx];
+				CorrectedBitmap bm = temporaryBitmaps[bitmapArrayIndx];
 				
 				if(bm == null) {
 					bm = new CorrectedBitmap();
-					temporaryBitmaps[indx] = bm;
+					temporaryBitmaps[bitmapArrayIndx] = bm;
 				}
 				
 				int spatialSize = (int)java.lang.Math.pow(32, i);
 				
-				int spatiotemporalIndex = (int)(temporalIndex*spatialSize + spatialIndex);
 				
-				bm.set(spatiotemporalIndex);
+				int bitIndex = (int)(spatialIndex*spatialSize + temporalIndex);
+				
+				bm.set(bitIndex);
 				
 			}
 		}
-		
-	}
-	
-	public static int getBitmapIndexFromKey(int fsSpatialLevel, int fsTemporalLevel, int relativeSpatialLevel,
-			int relativeTemporalLevel, String key) {
-		
-		
-		String[] tokens = key.split("\\$\\$");
-		String temporalString = tokens[0];
-		String spatialString  = tokens[1];
-		
-		String choppedGeohash = spatialString.substring(fsTemporalLevel);
-		
-		int spatialIndex = (int)GeoHash.hashToLong(choppedGeohash);
-		
-		
-		
-		
-		return 0;
 		
 	}
 	
@@ -219,9 +202,9 @@ public class SubBlockLevelBitmaps {
 		
 		int spatialSize = (int)java.lang.Math.pow(32, sresolution - sFSLevel);
 		
-		int spatialIndex = bitmapIndex%spatialSize;
+		int spatialIndex = bitmapIndex/spatialSize;
 		
-		int temporalIndex = bitmapIndex/spatialSize;
+		int temporalIndex = bitmapIndex%spatialSize;
 		
 		//GeoHash.hashToLong(hash);
 		
@@ -235,18 +218,6 @@ public class SubBlockLevelBitmaps {
 		return temporalString+"$$"+geohashString;
 	}
 	
-	
-	/*
-	public static String getKeyFromFeatures(float lat, float lon, long timestamp, int spLevel, int tLevel) {
-		
-		String temporalString = getTemporalString(timestamp, tLevel);
-		
-		String geohash = GeoHash.encode(lat, lon, spLevel);
-		
-		
-		return temporalString+"$$"+geohash;
-		
-	}*/
 	
 	/**
 	 * Create a temporal string with xx for missing fields
@@ -311,19 +282,19 @@ public class SubBlockLevelBitmaps {
 	}
 
 	public int getSpatialLevels() {
-		return spatialLevels;
+		return spatialSubLevels;
 	}
 
 	public void setSpatialLevels(int spatialLevels) {
-		this.spatialLevels = spatialLevels;
+		this.spatialSubLevels = spatialLevels;
 	}
 
 	public int getTemporalLevels() {
-		return temporalLevels;
+		return temporalSubLevels;
 	}
 
 	public void setTemporalLevels(int temporalLevels) {
-		this.temporalLevels = temporalLevels;
+		this.temporalSubLevels = temporalLevels;
 	}
 
 	public CorrectedBitmap[] getSpatioTemporalBitmaps() {
