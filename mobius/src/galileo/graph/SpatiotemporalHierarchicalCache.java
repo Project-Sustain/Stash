@@ -26,7 +26,7 @@ public class SpatiotemporalHierarchicalCache {
 		cacheLevels = new SparseSpatiotemporalMatrix[totalSpatialLevels*totalTemporalLevels];
 		
 		for(int i=0; i < totalSpatialLevels; i++) {
-			for(int j=0; j < totalTemporalLevels; i++) {
+			for(int j=0; j < totalTemporalLevels; j++) {
 				
 				int levelNum = (j)*totalSpatialLevels + i;
 				cacheLevels[levelNum] = new SparseSpatiotemporalMatrix(j+1, i+1, this);

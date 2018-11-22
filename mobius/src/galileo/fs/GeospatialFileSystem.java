@@ -250,8 +250,10 @@ public class GeospatialFileSystem extends FileSystem {
 			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution, List<String> summaryHints)
 			throws FileSystemException, IOException, SerializationException, PartitionException, HashException,
 			HashTopologyException {
+		
 		super(storageDirectory, name, ignoreIfPresent);
 		
+		logger.info("REACHED HERE 1");
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
@@ -311,7 +313,8 @@ public class GeospatialFileSystem extends FileSystem {
 		this.pathJournal = new PathJournal(this.storageDirectory + File.separator + pathStore);
 		
 		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
-		
+		this.blockBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
+				
 		this.spatialSubLevels = stCache.getTotalSpatialLevels()-geohashPrecision;
 		
 		temporalLevel = 1;
@@ -336,10 +339,14 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
 		
+		logger.info("REACHED HERE 2");
 		logger.info("TOTAL TEMPORAL LEVELS: "+ stCache.getTotalTemporalLevels());
 		logger.info("TOTAL SPATIAL LEVELS: " + stCache.getTotalSpatialLevels());
 		logger.info("TOTAL TEMPORAL SUBLEVELS: "+ temporalSubLevels);
 		logger.info("TOTAL SPATIAL SUBLEVELS: " + spatialSubLevels);
+		
+		logger.info("SUMMARY_HINTS: " + summaryHints);
+		logger.info("SUMMARY POSITIONS: " + summaryPosns);
 		
 		
 		this.needSublevelBitmaps = true;

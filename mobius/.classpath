@@ -8,5 +8,5 @@
 	<classpathentry kind="lib" path="/s/chopin/b/grad/sapmitra/git/mobius/mobius/lib/javaGeom-0.11.2.jar"/>
 	<classpathentry kind="lib" path="/s/chopin/b/grad/sapmitra/git/mobius/mobius/lib/netcdfAll-4.6.jar"/>
 	<classpathentry kind="lib" path="/s/chopin/b/grad/sapmitra/git/mobius/mobius/lib/org.json.jar"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="output" path="classes"/>
 </classpath>

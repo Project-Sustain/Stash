@@ -418,6 +418,7 @@ public class StorageNode implements RequestListener {
 				Partitioner<Metadata> partitioner = gfs.getPartitioner();
 				NodeInfo node = partitioner.locateData(metadata);
 				
+				logger.info("DATA BEING STORED IN "+node.getHostname());
 				/*if(System.currentTimeMillis() % 3 == 0)
 					logger.log(Level.INFO, file.getMetadata().getName());*/
 				

@@ -166,7 +166,7 @@ public class GalileoConnector extends GalileoConnectorInterface {
 		features.put(new Feature("gps_abs_long", values[2]));
 			
 		Metadata metadata = new Metadata();
-		metadata.setName(GeoHash.encode(parseFloat(values[1]), parseFloat(values[2]), 7));
+		metadata.setName(GeoHash.encode(parseFloat(values[1]), parseFloat(values[2]), 4));
 		metadata.setTemporalProperties(temporalProperties);
 		//metadata.setsIndex(new SearchIndex("24","25","7"));
 		metadata.setSpatialProperties(spatialProperties);

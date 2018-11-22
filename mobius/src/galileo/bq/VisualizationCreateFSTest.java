@@ -30,7 +30,7 @@ public class VisualizationCreateFSTest {
 	 */
 	private static boolean FS_CREATED = false;
 	
-	private static void processFile(GalileoConnector gc) throws Exception {
+	private static void createFileSystem(GalileoConnector gc) throws Exception {
 		
 		// CREATING FS1
 		if( ! FS_CREATED ) {
@@ -51,8 +51,11 @@ public class VisualizationCreateFSTest {
 			
 			gc.createFSViz("testfs1", spHint, featureList1, temporalHint1, sumHints);
 			
+			
+			System.out.println("CREATION INITIATED");
 			FS_CREATED = true;
 			
+			Thread.sleep(2000);
 		}
 		
 		gc.disconnect();
@@ -62,8 +65,8 @@ public class VisualizationCreateFSTest {
 	
 	
 	public static void main(String[] args1) {
-		String args[] = new String[3];
-		args[0] = "phoenix.cs.colostate.edu";
+		String args[] = new String[2];
+		args[0] = "lattice-1.cs.colostate.edu";
 		args[1] = "5634";
 		
 		System.out.println(args.length);
@@ -75,7 +78,7 @@ public class VisualizationCreateFSTest {
 				GalileoConnector gc = new GalileoConnector(args[0], 5634);
 				System.out.println(args[0] + "," + Integer.parseInt(args[1]));
 				
-				processFile(gc);
+				createFileSystem(gc);
 				
 			} catch (Exception e) {
 				e.printStackTrace();

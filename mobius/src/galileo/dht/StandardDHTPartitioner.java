@@ -106,7 +106,7 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		
 		
 		// THIS IS FOR LOGGING, COMMENT OTHERWISE
-		Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
+		/*Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
 		
 		for(String g : geohashes) {
 			
@@ -126,7 +126,7 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		
 		for(BigInteger b: geohashMap.keySet()) {
 			logger.info(b + "::" + geohashMap.get(b));
-		}
+		}*/
 	}
 	
 	private static String[] generateGeohashes(String[] geohashes_2char, int spatialHashType) {

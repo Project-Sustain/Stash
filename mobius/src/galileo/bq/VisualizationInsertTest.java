@@ -122,9 +122,9 @@ public class VisualizationInsertTest {
 	
 	public static void main(String[] args1) {
 		String args[] = new String[3];
-		args[0] = "phoenix.cs.colostate.edu";
+		args[0] = "lattice-1.cs.colostate.edu";
 		args[1] = "5634";
-		args[2] = "/s/chopin/b/grad/sapmitra/Documents/Conflux/fs1.csv";
+		args[2] = "/s/chopin/b/grad/sapmitra/Documents/Prophecy/fs1.csv";
 		
 		System.out.println(args.length);
 		if (args.length != 3) {
@@ -134,7 +134,7 @@ public class VisualizationInsertTest {
 		} else {
 			try {
 				
-				GalileoConnector gc = new GalileoConnector("phoenix.cs.colostate.edu", 5634);
+				GalileoConnector gc = new GalileoConnector(args[0], 5634);
 				System.out.println(args[0] + "," + Integer.parseInt(args[1]));
 				File file = new File(args[2]);
 				if (file.isFile()) {
