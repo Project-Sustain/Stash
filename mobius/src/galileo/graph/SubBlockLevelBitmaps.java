@@ -1,6 +1,7 @@
 package galileo.graph;
 
 import java.util.Calendar;
+import java.util.logging.Logger;
 
 import org.joda.time.DateTime;
 
@@ -15,6 +16,7 @@ import galileo.fs.GeospatialFileSystem;
 import galileo.util.GeoHash;
 
 public class SubBlockLevelBitmaps {
+	private static final Logger logger = Logger.getLogger("galileo");
 	
 	// FS block level 
 	private int spatialFSLevel;
@@ -77,7 +79,7 @@ public class SubBlockLevelBitmaps {
 		int spLvl = spatialLevel - spatialFSLevel;
 		int tLvl = temporalLevel - temporalFSLevel;
 		
-		int indx = (spLvl)*spatialSubLevels + tLvl;
+		int indx = (tLvl)*spatialSubLevels + spLvl;
 		return indx;
 	}
 	
@@ -115,12 +117,14 @@ public class SubBlockLevelBitmaps {
 		synchronized(spatioTemporalBitmaps) {
 			// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
 			for(int i = 0; i < temporaryBitmaps.length; i++) {
+				temporaryBitmaps[i].applyUpdates();
+				
+				//RIKI-REMOVE
+				logger.info("BITMAP FOR LEVEL "+i+" IS "+temporaryBitmaps[i].toString());
 				
 				if(spatioTemporalBitmaps[i] == null) {
-					temporaryBitmaps[i].applyUpdates();
 					spatioTemporalBitmaps[i] = temporaryBitmaps[i];
 				} else {
-					temporaryBitmaps[i].applyUpdates();
 					spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
 				}
 		}
@@ -151,6 +155,8 @@ public class SubBlockLevelBitmaps {
 				
 				int bitmapArrayIndx = getMapIndex(currentSpatialLevel, currentTemporalLevel);
 				
+				// THIS SPATIAL INDEX IS THE INDEX WITHIN AN INDIVIDUAL BITMAP 
+				// AND SHOULD NOT BE CONFUSED WITH BITMAP ARRAY INDEX
 				long spatialIndex = 0;
 				
 				// if we do not go down the spatial resolution but only in temporal resolution
@@ -178,7 +184,7 @@ public class SubBlockLevelBitmaps {
 				int spatialSize = (int)java.lang.Math.pow(32, i);
 				
 				
-				int bitIndex = (int)(spatialIndex*spatialSize + temporalIndex);
+				int bitIndex = (int)(temporalIndex*spatialSize + spatialIndex);
 				
 				bm.set(bitIndex);
 				

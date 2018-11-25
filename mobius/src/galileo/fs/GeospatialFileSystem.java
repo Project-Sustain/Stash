@@ -670,7 +670,8 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN S BLOCK
 		if(needSublevelBitmaps) {
-			
+			// RIKI-REMOVE
+			logger.info("THIS FILE SYSTEM NEEDS BITMAP");
 			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
 			if(bitmaps == null) {
 				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
@@ -728,6 +729,8 @@ public class GeospatialFileSystem extends FileSystem {
 		int removeLength = fileGeohash.length();
 		
 		// Creates a temporary bitmap using the records and then append to the old bitmap
+		// RIKI-REMOVE
+		logger.info("ABOUT TO POPULATE BITMAP");
 		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
 		
 	}

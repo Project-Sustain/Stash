@@ -139,6 +139,14 @@ public class CorrectedBitmap implements Iterable<Integer> {
         return bmp.toArray();
     }
     
+    public String toString() {
+    	String retStr = "[";
+    	for(int i : bmp.toArray()) {
+    		retStr+=i+",";
+    	}
+    	return retStr+"]";
+    }
+    
     
     public static CorrectedBitmap fromBytes(byte[] bytes, int x, int y,
             int width, int height,

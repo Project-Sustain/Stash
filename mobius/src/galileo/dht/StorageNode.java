@@ -811,7 +811,6 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
-		JSONObject resultJSON = new JSONObject();
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
@@ -870,13 +869,11 @@ public class StorageNode implements RequestListener {
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
 					
-					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event);
-					
 					// ONCE SUMMARIES HAVE BEEN FETCHED FROM FS,
 					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
 					// LOAD EXISTING CACHE CELLS USING CELL KEY
 					
-					
+					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event);
 					
 				} else {
 					
