@@ -21,9 +21,13 @@ import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
 import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
+import galileo.comm.VisualizationEventResponse;
+import galileo.comm.VisualizationResponse;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
+import galileo.graph.SummaryStatistics;
+import galileo.graph.SummaryWrapper;
 import galileo.net.ClientMessageRouter;
 import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
@@ -103,6 +107,8 @@ public class ClientRequestHandler implements MessageListener {
 		}
 		Map<String, Set<LocalFeature>> resultMap = new HashMap<String, Set<LocalFeature>>();
 		int responseCount = 0;
+		
+		Map<String, SummaryWrapper> accumulatedSummaries = new HashMap<String, SummaryWrapper>();
 
 		for (GalileoMessage gresponse : this.responses) {
 			responseCount++;
@@ -299,7 +305,38 @@ public class ClientRequestHandler implements MessageListener {
 								}
 							}
 						}
-					}
+					} else if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
+						
+						VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
+						
+						logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+						
+						if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
+							
+							List<String> keys = eventResponse.getKeys();
+							List<SummaryWrapper> summaries = eventResponse.getSummaries();
+							
+							int num = 0;
+							for(String key : keys) {
+								
+								SummaryWrapper eventSumm = summaries.get(num);
+								
+								if(accumulatedSummaries.containsKey(key)) {
+									SummaryWrapper oldSumm = accumulatedSummaries.get(key);
+									
+									SummaryStatistics[] mergeSummaries = SummaryStatistics.mergeSummaries(oldSumm.getStats(), eventSumm.getStats());
+									oldSumm.setStats(mergeSummaries);
+									
+								} else {
+									accumulatedSummaries.put(key, eventSumm);
+								}
+								
+								
+								num++;
+							}
+							
+						}
+					} 
 				}
 			} catch (IOException | SerializationException e) {
 				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
@@ -310,6 +347,45 @@ public class ClientRequestHandler implements MessageListener {
 								+ e.getMessage(), e);
 			}
 		}
+		
+		// COMBINE HERE INTO A SINGLE JSON STRING
+		if (this.response instanceof VisualizationResponse) {
+			
+			VisualizationResponse finalResponse = (VisualizationResponse) this.response;
+			
+			JSONArray summaryJSONs = new JSONArray();
+			
+			for(String key: accumulatedSummaries.keySet()) {
+				
+				JSONObject obj = new JSONObject();
+				obj.put("key", key);
+				String summaryString = "";
+				
+				int i=0;
+				
+				for(SummaryStatistics ss : accumulatedSummaries.get(key).getStats()) {
+					if(i==0)
+						summaryString = ss.toString();
+					else 
+						summaryString += ","+ss.toString();
+				}
+				
+				obj.put("summary", summaryString);
+				
+				logger.info(key+":::"+summaryString);
+				
+				summaryJSONs.put(obj);
+			}
+			
+			JSONObject response = new JSONObject();
+			response.put("summaries", summaryJSONs);
+			
+			finalResponse.setSummariesJSON(response.toString());
+			
+			
+		}
+		
+		
 		long diff = System.currentTimeMillis() - reqId;
 		logger.info("RIKI: ENTIRE THING FINISHED IN: "+ diff);
 		this.requestListener.onRequestCompleted(this.response, clientContext, this);
@@ -317,7 +393,7 @@ public class ClientRequestHandler implements MessageListener {
 
 	@Override
 	public void onMessage(GalileoMessage message) {
-		Event event;
+		/*Event event;
 		try {
 			event = this.eventWrapper.unwrap(message);
 			DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
@@ -330,7 +406,7 @@ public class ClientRequestHandler implements MessageListener {
 			e.printStackTrace();
 		}
 		
-		
+		*/
 		
 		
 		if (null != message)
@@ -360,7 +436,7 @@ public class ClientRequestHandler implements MessageListener {
 	public void handleRequest(Event request, Event response) {
 		try {
 			reqId = System.currentTimeMillis();
-			logger.info("RIKI: DATA INTEGRATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
+			logger.info("RIKI: VISUALIZATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
 			this.response = response;
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);
 			for (NetworkDestination node : nodes) {

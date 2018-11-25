@@ -60,7 +60,7 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 	private static final Logger logger = Logger.getLogger("galileo");
 
 	private ConstrainedGeohash nodeHash;
-	private BalancedHashRing nodeHashRing;
+	private BalancedHashRing<Metadata> nodeHashRing;
 	private Map<BigInteger, BalancedHashRing<byte[]>> nodeHashRings = new HashMap<>();
 	private Map<BigInteger, NodeInfo> nodePositions = new HashMap<>();
 	private int spatialpartitioningType;
@@ -103,6 +103,30 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		for (NodeInfo node : nodes) {
 			placeNode(node);
 		}
+		
+		
+		// THIS IS FOR LOGGING, COMMENT OTHERWISE
+		/*Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
+		
+		for(String g : geohashes) {
+			
+			BigInteger pos = nodeHash.getHashMappings().get(g);
+			
+			List<String> ghs = geohashMap.get(pos);
+			
+			if(ghs == null) {
+				ghs = new ArrayList<String>();
+				geohashMap.put(pos, ghs);
+			}
+			
+			ghs.add(g);
+		}
+		
+		logger.info("THE GEOHASH PARTITIONING IS AS FOLLOWS: \n");
+		
+		for(BigInteger b: geohashMap.keySet()) {
+			logger.info(b + "::" + geohashMap.get(b));
+		}*/
 	}
 	
 	private static String[] generateGeohashes(String[] geohashes_2char, int spatialHashType) {

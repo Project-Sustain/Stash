@@ -276,6 +276,8 @@ public class FilesystemRequest implements Event {
 		
 		boolean hasSummaryHints = in.readBoolean();
 		
+		
+		this.summaryHints = new ArrayList<String>();
 		if(hasSummaryHints)
 			in.readStringCollection(this.summaryHints);
 		

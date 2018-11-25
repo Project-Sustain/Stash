@@ -1,6 +1,13 @@
 package galileo.graph;
 
-public class SummaryStatistics {
+import java.io.IOException;
+
+import galileo.serialization.ByteSerializable;
+import galileo.serialization.SerializationException;
+import galileo.serialization.SerializationInputStream;
+import galileo.serialization.SerializationOutputStream;
+
+public class SummaryStatistics implements ByteSerializable{
 	
 	private int count;
 	private float max;
@@ -153,12 +160,28 @@ public class SummaryStatistics {
 		String retStr = "{"+min+","+max+","+avg+","+count+"}";
 		return retStr;
 	}
+
 	
+	@Override
+	public void serialize(SerializationOutputStream out) throws IOException {
+		
+		out.writeInt(count);
+		out.writeFloat(max);
+		out.writeFloat(min);
+		out.writeFloat(avg);
+		out.writeFloat(tmpSum);
+		
+	}
 	
-	
-	
-	
-	
-	
+	@Deserialize
+	public SummaryStatistics(SerializationInputStream in) throws IOException, SerializationException {
+		
+		this.count = in.readInt();
+		this.max = in.readFloat();
+		this.min = in.readFloat();
+		this.avg = in.readFloat();
+		this.tmpSum = in.readFloat();
+		
+	}
 
 }

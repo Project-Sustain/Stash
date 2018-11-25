@@ -3,6 +3,7 @@ package galileo.graph;
 import java.util.List;
 
 import galileo.dataset.Coordinates;
+import galileo.fs.GeospatialFileSystem;
 import galileo.util.STRelatives;
 
 public class SpatiotemporalHierarchicalCache {
@@ -19,11 +20,16 @@ public class SpatiotemporalHierarchicalCache {
 	
 	public SpatiotemporalHierarchicalCache(int totalSpatialLevels, int totalTemporalLevels) {
 		
+		SpatiotemporalHierarchicalCache.totalSpatialLevels = totalSpatialLevels;
+		SpatiotemporalHierarchicalCache.totalTemporalLevels = totalTemporalLevels;
+		
 		cacheLevels = new SparseSpatiotemporalMatrix[totalSpatialLevels*totalTemporalLevels];
 		
 		for(int i=0; i < totalSpatialLevels; i++) {
-			for(int j=0; j < totalTemporalLevels; i++) {
-				cacheLevels[i] = new SparseSpatiotemporalMatrix(j+1, i+1, this);
+			for(int j=0; j < totalTemporalLevels; j++) {
+				
+				int levelNum = (j)*totalSpatialLevels + i;
+				cacheLevels[levelNum] = new SparseSpatiotemporalMatrix(j+1, i+1, this);
 			}
 		}
 	}
@@ -33,10 +39,29 @@ public class SpatiotemporalHierarchicalCache {
 		cacheLevels = new SparseSpatiotemporalMatrix[totalSpatialLevels*totalTemporalLevels];
 		
 		for(int i=0; i < totalSpatialLevels; i++) {
-			for(int j=0; j < totalTemporalLevels; i++) {
-				cacheLevels[i] = new SparseSpatiotemporalMatrix(j+1, i+1, this);
+			for(int j=0; j < totalTemporalLevels; j++) {
+				
+				int levelNum = j*totalSpatialLevels + i;
+				cacheLevels[levelNum] = new SparseSpatiotemporalMatrix(j+1, i+1, this);
 			}
 		}
+	}
+	
+
+	
+	/**
+	 * GET THE PARTICULAR LEVEL/INDEX FOR THE MATRIX FOR A GIVEN SPATIAL AND TEMPORAL RESOLUTION
+	 * 
+	 * @author sapmitra
+	 * @param spatialResolution geohash length
+	 * @param temporalResolution numbered as yr,month,day,hr
+	 * @return
+	 */
+	public int getCacheLevel(int spatialResolution, int temporalResolution) {
+		
+		int levelNum = (temporalResolution-1)*totalSpatialLevels + (spatialResolution-1);
+		
+		return levelNum;
 	}
 
 	public SparseSpatiotemporalMatrix[] getCacheLevels() {
@@ -130,21 +155,6 @@ public class SpatiotemporalHierarchicalCache {
 	
 	
 	/**
-	 * GET THE PARTICULAR LEVEL/INDEX FOR THE MATRIX FOR A GIVEN SPATIAL AND TEMPORAL RESOLUTION
-	 * 
-	 * @author sapmitra
-	 * @param spatialResolution geohash length
-	 * @param temporalResolution numbered as yr,month,day,hr
-	 * @return
-	 */
-	public int getCacheLevel(int spatialResolution, int temporalResolution) {
-		
-		int levelNum = (temporalResolution-1)*totalSpatialLevels + (spatialResolution-1);
-		
-		return levelNum;
-	}
-	
-	/**
 	 * RETURNS THE EXACT SPARSE SPATIOTEMPORAL MATRIX/CACHE FOR A GIVEN LEVEL
 	 * @author sapmitra
 	 * @param level - spatiotemporal level
@@ -180,9 +190,29 @@ public class SpatiotemporalHierarchicalCache {
 		this.totalTemporalLevels = totalTemporalLevels;
 	}
 
-	public void addEntryCount(int totalInserted) {
+	/**
+	 * INCREMENT ENTRY COUNT AND RETURN TRUE IF OVERFLOW
+	 * @author sapmitra
+	 * @param totalInserted
+	 * @return
+	 */
+	public boolean addEntryCount(int totalInserted, int totalAllowed) {
 		totalRooms+=totalInserted;
 		
+		if(totalRooms > totalAllowed) {
+			return true;
+		} else {
+			return false;
+		}
+		
+	}
+
+	public int getTotalRooms() {
+		return totalRooms;
+	}
+
+	public void setTotalRooms(int totalRooms) {
+		this.totalRooms = totalRooms;
 	}
 
 }

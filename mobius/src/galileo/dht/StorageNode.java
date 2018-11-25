@@ -44,6 +44,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -53,6 +55,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -96,6 +99,7 @@ import galileo.comm.TemporalType;
 import galileo.comm.TrainingDataEvent;
 import galileo.comm.TrainingDataResponse;
 import galileo.comm.VisualizationEvent;
+import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
@@ -115,7 +119,10 @@ import galileo.event.EventHandler;
 import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
+import galileo.graph.CacheCell;
 import galileo.graph.Path;
+import galileo.graph.SparseSpatiotemporalMatrix;
+import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
 import galileo.net.ClientConnectionPool;
@@ -172,6 +179,8 @@ public class StorageNode implements RequestListener {
 	/* My addition */
 	private List<NeighborRequestHandler> rikiHandlers;
 	private List<SurveyRequestHandler> surveyHandlers;
+	private List<String> fsToBePruned;
+	private boolean pruningNeeded;
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
 
@@ -206,6 +215,8 @@ public class StorageNode implements RequestListener {
 		this.requestHandlers = new CopyOnWriteArrayList<ClientRequestHandler>();
 		this.rikiHandlers = new CopyOnWriteArrayList<NeighborRequestHandler>();
 		this.surveyHandlers = new CopyOnWriteArrayList<SurveyRequestHandler>();
+		this.fsToBePruned = new ArrayList<String>();
+		this.pruningNeeded = false;
 	}
 
 	/**
@@ -333,9 +344,11 @@ public class StorageNode implements RequestListener {
 
 	@EventHandler
 	public void handleFileSystem(FilesystemEvent event, EventContext context) {
+		
 		logger.info("FORWARDED CREATE FS REQUEST");
 		logger.log(Level.INFO,
 				"Performing action " + event.getAction().getAction() + " for file system " + event.getName());
+		
 		if (event.getAction() == FilesystemAction.CREATE) {
 			GeospatialFileSystem fs = fsMap.get(event.getName());
 			if (fs == null) {
@@ -405,6 +418,7 @@ public class StorageNode implements RequestListener {
 				Partitioner<Metadata> partitioner = gfs.getPartitioner();
 				NodeInfo node = partitioner.locateData(metadata);
 				
+				logger.info("DATA BEING STORED IN "+node.getHostname());
 				/*if(System.currentTimeMillis() % 3 == 0)
 					logger.log(Level.INFO, file.getMetadata().getName());*/
 				
@@ -797,20 +811,15 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
-		long hostFileSize = 0;
-		long totalProcessingTime = 0;
-		long blocksProcessed = 0;
-		int totalNumPaths = 0;
-		
 		JSONObject resultJSON = new JSONObject();
-		Map<String, SummaryWrapper> finalSummaries;
+		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
 		int eventId = r.nextInt();
 		
 		long eventTime = System.currentTimeMillis();
-		
-		event.setEventId(eventTime+"$$"+eventId);
+		String eventString = eventTime+"$$"+eventId;
+		event.setEventId(eventString);
 		
 		try {
 			logger.info(event.getFeatureQueryString());
@@ -837,6 +846,14 @@ public class StorageNode implements RequestListener {
 				if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
 					subBlockLevel = false;
 				}
+				
+				/*************** NO ENTRY WHILE CACHE CLEANING IN PROGRESS *****************/
+				blockEntryIfCleaningInitiated(fs);
+				/*************** ENTRY ALLOWED *****************/
+				
+				
+				/*************** EVENT ADDED TO ENRY LIST************/
+				fs.addEvent(eventString);
 				
 				/* Feature Query is not needed to list blocks */
 				
@@ -880,7 +897,10 @@ public class StorageNode implements RequestListener {
 					
 				}
 				
-				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS */
+				/*************** EVENT REMOVED FROM ENTRY LIST************/
+				fs.removeEvent(eventString);
+				
+				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS 
 				JSONArray summaryJSONs = new JSONArray();
 				
 				for(String key: finalSummaries.keySet()) {
@@ -902,6 +922,8 @@ public class StorageNode implements RequestListener {
 					
 					obj.put("summary", summaryString);
 					
+					logger.info(key+":::"+summaryString);
+					
 					summaryJSONs.put(obj);
 				}
 				
@@ -909,7 +931,7 @@ public class StorageNode implements RequestListener {
 				
 				resultJSON.put("hostName", this.canonicalHostname);
 				resultJSON.put("hostPort", this.port);
-				resultJSON.put("summaries", summaryJSONs);
+				resultJSON.put("summaries", summaryJSONs);*/
 			} else {
 				logger.log(Level.SEVERE, "Requested file system(" + fsName
 						+ ") not found. Ignoring the query and returning empty results.");
@@ -920,14 +942,9 @@ public class StorageNode implements RequestListener {
 					e);
 		}
 
-		JSONObject responseJSON = new JSONObject();
-		responseJSON.put("filesystem", event.getFilesystemName());
+		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
+				,hostname, port);
 		
-		responseJSON.put("result", resultJSON);
-		responseJSON.put("totalProcessingTime", totalProcessingTime);
-		
-		
-		QueryResponse response = new QueryResponse(event.getQueryId(), header, responseJSON);
 		try {
 			context.sendReply(response);
 		} catch (IOException ioe) {
@@ -936,6 +953,14 @@ public class StorageNode implements RequestListener {
 	}
 	
 	
+	private void blockEntryIfCleaningInitiated(GeospatialFileSystem fs) {
+		
+		while(fs.cleanUpInitiated.get()) {
+			// blocking
+		}
+		
+	}
+
 	/**
 	 * Handles a query request from a client. Query requests result in a number
 	 * of subqueries being performed across the Galileo network.
@@ -2085,4 +2110,6 @@ public class StorageNode implements RequestListener {
 			logger.log(Level.SEVERE, "Could not start StorageNode.", e);
 		}
 	}
+	
+
 }

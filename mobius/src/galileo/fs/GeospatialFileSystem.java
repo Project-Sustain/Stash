@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,9 +49,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,6 +84,7 @@ import galileo.dataset.TemporalProperties;
 import galileo.dataset.feature.Feature;
 import galileo.dataset.feature.FeatureSet;
 import galileo.dataset.feature.FeatureType;
+import galileo.dht.CacheCleanupService;
 import galileo.dht.GroupInfo;
 import galileo.dht.LocalParallelQueryProcessor;
 import galileo.dht.NeighborDataParallelQueryProcessor;
@@ -142,7 +146,8 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final int DEFAULT_GEOHASH_PRECISION = 4;
 	private static final int MIN_GRID_POINTS = 5000;
 	private int numCores;
-
+	private int total_cache_entry_allowed = 200;
+	private int total_reduced_entries = 100;
 	private static final String pathStore = "metadata.paths";
 
 	private NetworkInfo network;
@@ -208,6 +213,12 @@ public class GeospatialFileSystem extends FileSystem {
 	// HOW FAR DOWN TEMPORAL CHILDREN ARE INFLUENCED
 	public static final int TEMPORAL_MOVE_DOWN = 1;
 	
+	public AtomicBoolean cleanUpInitiated = new AtomicBoolean(false);
+	public AtomicBoolean peListEmpty = new AtomicBoolean(true);
+	
+	// LIST OF PROCESSES ENTERED
+	public List<String> peList = new ArrayList<String>();
+	
 	
 
 	
@@ -239,8 +250,10 @@ public class GeospatialFileSystem extends FileSystem {
 			boolean ignoreIfPresent, int spatialPartitioningType, int spatialResolution, int temporalResolution, List<String> summaryHints)
 			throws FileSystemException, IOException, SerializationException, PartitionException, HashException,
 			HashTopologyException {
+		
 		super(storageDirectory, name, ignoreIfPresent);
 		
+		logger.info("REACHED HERE 1");
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
@@ -300,24 +313,44 @@ public class GeospatialFileSystem extends FileSystem {
 		this.pathJournal = new PathJournal(this.storageDirectory + File.separator + pathStore);
 		
 		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
-		
+		this.blockBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
+				
 		this.spatialSubLevels = stCache.getTotalSpatialLevels()-geohashPrecision;
 		
 		temporalLevel = 1;
 		switch (this.temporalType) {
 		case HOUR_OF_DAY:
 			temporalLevel = 4;
+			break;
 		case DAY_OF_MONTH:
 			temporalLevel = 3;
+			break;
 		case MONTH:
 			temporalLevel = 2;
+			break;
 		case YEAR:
 			temporalLevel = 1;
+			break;
+		default:
+			temporalLevel = 1;
+			break;
+			
 		}
 		
 		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
 		
+		logger.info("REACHED HERE 2");
+		logger.info("TOTAL TEMPORAL LEVELS: "+ stCache.getTotalTemporalLevels());
+		logger.info("TOTAL SPATIAL LEVELS: " + stCache.getTotalSpatialLevels());
+		logger.info("TOTAL TEMPORAL SUBLEVELS: "+ temporalSubLevels);
+		logger.info("TOTAL SPATIAL SUBLEVELS: " + spatialSubLevels);
+		
+		logger.info("SUMMARY_HINTS: " + summaryHints);
+		logger.info("SUMMARY POSITIONS: " + summaryPosns);
+		
+		
 		this.needSublevelBitmaps = true;
+		
 		if(temporalSubLevels <= 0 && spatialSubLevels <=0) {
 			this.needSublevelBitmaps = false;
 		}
@@ -694,7 +727,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		int removeLength = fileGeohash.length();
 		
-		// Creates a temporary bitmap using the records and then old to the old bitmap
+		// Creates a temporary bitmap using the records and then append to the old bitmap
 		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
 		
 	}
@@ -1151,13 +1184,18 @@ public class GeospatialFileSystem extends FileSystem {
 			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 			DateTime blockTime = new DateTime(blockTimeStamp);
 			
+			CorrectedBitmap cacheBitmap = null;
+			
 			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
-			CorrectedBitmap cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-					reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
+			synchronized(cache) {
+				cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
+						reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
+			}
+			
 			
 			boolean cacheIsEmpty = false;
 			
-			if(cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
+			if(cacheBitmap == null || cacheBitmap.toArray() == null || cacheBitmap.toArray().length == 0) {
 				// NOTHING IN CACHE
 				// LOOK INTO THE ENTIRE BLOCKS
 				cacheIsEmpty = true;
@@ -1653,7 +1691,6 @@ public class GeospatialFileSystem extends FileSystem {
 
 		TemporalType reqTemporalType = TemporalType.getTypeFromLevel(reqTemporalResolution);
 		
-		
 		// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
 
 		// The level of stcache we need to look at
@@ -1663,9 +1700,12 @@ public class GeospatialFileSystem extends FileSystem {
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
 		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
 		
-		
 		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
-		List<String> matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
+		List<String> matchingCacheKeys = null;
+		
+		synchronized(cache) {
+			matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
+		}
 		
 		boolean cacheIsEmpty = false;
 		
@@ -3193,55 +3233,61 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param string 
 	 * @param list 
 	 */
-	public synchronized void fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
+	public boolean fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
 			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys) {
 		
-		String eventTokens[] = eventId.split("\\$\\$");
-		
-		long eventTime = Long.valueOf(eventTokens[0]);
-		
-		String[] timeTokens = timeString.split("-");
-		
-		long qt1 = Long.valueOf(timeTokens[0]);
-		long qt2 = Long.valueOf(timeTokens[1]);
-		
-		int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
-		
-		
-		// GET ALL THE CACHE LEVELS
-		/**** USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE ****/
-		
-		/* ACTUAL EXTRACTION OF EXISTING CACHE ENTRIES USING KEYS */
-		if(existingCacheKeys != null ) {
+		synchronized(stCache) {
 			
-			SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(cacheResolution);
-			fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells(), finalisedSummaries);
+			String eventTokens[] = eventId.split("\\$\\$");
 			
-		}
-		
-		int totalInserted = 0;
-		// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
-		for(String key: finalisedSummaries.keySet()) {
+			long eventTime = Long.valueOf(eventTokens[0]);
 			
-			SummaryWrapper sw = finalisedSummaries.get(key);
+			String[] timeTokens = timeString.split("-");
 			
-			// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
-			// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
-			if(sw.isNeedsInsertion()) {
-				// THIS IS A NEW CELL GETTING INSERTED
-				boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+			long qt1 = Long.valueOf(timeTokens[0]);
+			long qt2 = Long.valueOf(timeTokens[1]);
+			
+			int cacheResolution = stCache.getCacheLevel(spatialResolution, temporalResolution);
+			
+			
+			// GET ALL THE CACHE LEVELS
+			/**** USE CACHE KEYS TO EXTRACT STUFF FROM THE CACHE ****/
+			
+			/* ACTUAL EXTRACTION OF EXISTING CACHE ENTRIES USING KEYS */
+			if(existingCacheKeys != null ) {
 				
-				if(newEntry)
-					totalInserted++;
-			} else {
-				// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
-				stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(cacheResolution);
+				fetchCacheEntriesUsingKeys(existingCacheKeys, specificCache.getCells(), finalisedSummaries);
+				
 			}
 			
+			int totalInserted = 0;
+			// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
+			for(String key: finalisedSummaries.keySet()) {
+				
+				SummaryWrapper sw = finalisedSummaries.get(key);
+				
+				// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
+				// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
+				if(sw.isNeedsInsertion()) {
+					// THIS IS A NEW CELL GETTING INSERTED
+					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+					
+					if(newEntry)
+						totalInserted++;
+				} else {
+					// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
+					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+				}
+				
+			}
+			
+			if(totalInserted > 0)
+				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
+			
+			return false;
+			
 		}
-		
-		if(totalInserted > 0)
-			stCache.addEntryCount(totalInserted);
 		
 	}
 
@@ -3325,11 +3371,28 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
+		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
 				event.getTimeString(), event.getEventId(), existingCacheKeys);
+		
+		if(cleanUpNeeded)
+			handleCacheCleaning();
 		
 		return finalisedSummaries;
 	}
+	
+	
+	/**
+	 * CLEANING CACHE. THIS HAS TO BE IN A SEPARATE THREAD.
+	 * @author sapmitra
+	 */
+	public void handleCacheCleaning() {
+		
+		ExecutorService executor = Executors.newFixedThreadPool(1);
+		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, total_reduced_entries);
+		executor.execute(c);
+		
+	}
+	
 
 	/**
 	 * 
@@ -3342,7 +3405,7 @@ public class GeospatialFileSystem extends FileSystem {
 			Map<String, PathRequirements> blockRequirements, VisualizationEvent event) throws InterruptedException {
 		// TODO Auto-generated method stub
 
-		int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		// int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		
 		/* LIST OF ALL CACHE KEYS THAT ARE PRE_EXISTING IN CACHE */
 		List<String> existingCacheKeys = new ArrayList<String>();
@@ -3413,10 +3476,37 @@ public class GeospatialFileSystem extends FileSystem {
 
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
-		fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
+		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
 				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
+		
+		if(cleanUpNeeded)
+			handleCacheCleaning();
 
 		return finalisedSummaries;
+	}
+	
+	
+
+	public int getTotal_cache_entry_allowed() {
+		return total_cache_entry_allowed;
+	}
+
+	public void setTotal_cache_entry_allowed(int total_cache_entry_allowed) {
+		this.total_cache_entry_allowed = total_cache_entry_allowed;
+	}
+	
+	public void addEvent(String eventId) {
+		
+		synchronized(peList) {
+			peList.add(eventId);
+		}
+	}
+	
+	public void removeEvent(String eventId) {
+		
+		synchronized(peList) {
+			peList.remove(eventId);
+		}
 	}
 	
 }

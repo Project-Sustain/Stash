@@ -178,6 +178,7 @@ public class FilesystemEvent implements Event{
 		this.temporalHint = in.readString();
 		this.spatialPartitioningType = in.readInt();
 		
+		this.summaryHints = new ArrayList<String>();
 		boolean hasSummaryHints = in.readBoolean();
 		if(hasSummaryHints)
 			in.readStringCollection(this.summaryHints);

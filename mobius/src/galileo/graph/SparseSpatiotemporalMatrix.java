@@ -120,20 +120,6 @@ public class SparseSpatiotemporalMatrix {
 		
 	}
 	
-	/**
-	 * ONCE A CELL HAS BEEN ACCESSED, ITS UPDATE COUNTER HAS TO BE INCREASED,
-	 * ALONG WITH ITS PARENT,CHILDREN AND NEIGHBORS
-	 * 
-	 * @author sapmitra
-	 */
-	public void updateCellAndDisperse(String key) {
-		
-		CacheCell c = cells.get(key);
-		
-		
-	}
-	
-
 	public HashMap<String, CacheCell> getCells() {
 		return cells;
 	}

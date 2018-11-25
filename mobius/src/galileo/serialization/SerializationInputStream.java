@@ -86,6 +86,17 @@ public class SerializationInputStream extends DataInputStream {
             collection.add(obj);
         }
     }
+    
+    public <T extends ByteSerializable> void readSerializableArray(Class<T> type, ByteSerializable[] objects) throws IOException, SerializationException {
+    	
+        int size = readInt();
+        objects = new ByteSerializable[size];
+        
+        for (int i = 0; i < size; ++i) {
+        	ByteSerializable obj = Serializer.deserializeFromStream(type, this);
+            objects[i] = obj;
+        }
+    }
 
     public void readStringCollection(Collection<String> collection)
     throws IOException {

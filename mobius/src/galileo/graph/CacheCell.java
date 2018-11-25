@@ -64,7 +64,7 @@ public class CacheCell {
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
 		
-		String[] components = spatiotemporalInfo.split(",");
+		String[] components = spatiotemporalInfo.split("\\$\\$");
 		
 		this.temporalInfo = components[0];
 		this.spatialInfo = components[1];
@@ -156,6 +156,22 @@ public class CacheCell {
 
 	public float getFreshness() {
 		return freshness;
+	}
+	
+	/**
+	 * ADDED TIME DECAY
+	 * @author sapmitra
+	 * @return
+	 */
+	public float getCorrectedFreshness() {
+		
+		double timeInt = System.currentTimeMillis() - lastAccessed;
+		
+		double multiplier = java.lang.Math.exp(-1d * timeInt/1000);
+		
+		float updatedFrashness = (float)(freshness*multiplier);
+		
+		return updatedFrashness;
 	}
 
 	public void setFreshness(float freshness) {

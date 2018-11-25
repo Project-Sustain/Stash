@@ -57,35 +57,35 @@ abstract class GalileoConnectorInterface {
 	
 	
 	public void createFS(String name, SpatialHint sh,List<Pair<String, FeatureType>> featureList, String temporalHint, int mode) throws IOException {
-		int spUnc = 0;
-		int tempUnc = 0;
-		if(mode == 1) {
-			
-			spUnc = 6;
-			// 5 min
-			tempUnc = 5*60*1000;
-			
-		} else if(mode == 2) {
-			
-			spUnc = 6;
-			tempUnc = 60*60*1000;
-			
-		} else if (mode == 3) {
-			// For Sensor FS
-			spUnc = 6;
-			
-			// 5 mins
-			tempUnc = 5*60*1000;
-			// geohash precision for storage is preset to 4
-		}
-		FilesystemRequest fsRequest = new FilesystemRequest(name, FilesystemAction.CREATE, featureList, sh, spUnc, tempUnc,  false, temporalHint);
+		int maxSpatialResolution = 6;
+		int maxTemporalResolution = 4;
+		
+		FilesystemRequest fsRequest = new FilesystemRequest(name, FilesystemAction.CREATE, featureList, sh, maxSpatialResolution, maxTemporalResolution,  false, temporalHint);
 		fsRequest.setSpatialPartitioningType(3);
 		fsRequest.setNodesPerGroup(30);
 		fsRequest.setPrecision(4);
 		fsRequest.setTemporalType(TemporalType.DAY_OF_MONTH);
-		
 		publisher.publish(server, fsRequest);
 	}
+	
+	/* THIS IS THE ONE WE USE */
+	public void createFSViz(String name, SpatialHint sh,List<Pair<String, FeatureType>> featureList, String temporalHint, List<String> summaryHints) throws IOException {
+		
+		int maxSpatialResolution = 6;
+		int maxTemporalResolution = 4;
+		
+		FilesystemRequest fsRequest = new FilesystemRequest(name, FilesystemAction.CREATE, featureList, sh, maxSpatialResolution, maxTemporalResolution,  false, temporalHint);
+		fsRequest.setSpatialPartitioningType(2);
+		fsRequest.setNodesPerGroup(30);
+		fsRequest.setPrecision(4);
+		fsRequest.setTemporalType(TemporalType.DAY_OF_MONTH);
+		fsRequest.setSummaryHints(summaryHints);
+		
+		publisher.publish(server, fsRequest);
+		
+	}
+	
+	
 	
 	public void createFSNoaa(String name, SpatialHint sh,List<Pair<String, FeatureType>> featureList, String temporalHint, int mode) throws IOException {
 		int spUnc = 0;

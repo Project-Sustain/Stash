@@ -1,8 +1,6 @@
 package galileo.comm;
 
-import java.time.Period;
 import java.util.Calendar;
-import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.Days;
@@ -37,12 +35,19 @@ public enum TemporalType {
 		switch (temporalType) {
 		case HOUR_OF_DAY:
 			temporalLevel = 4;
+			break;
 		case DAY_OF_MONTH:
 			temporalLevel = 3;
+			break;
 		case MONTH:
 			temporalLevel = 2;
+			break;
 		case YEAR:
 			temporalLevel = 1;
+			break;
+		default:
+			temporalLevel = 1;
+			break;
 		}
 		return temporalLevel;
 	}
@@ -157,14 +162,21 @@ public enum TemporalType {
 		
 		TemporalType tt = TemporalType.YEAR;
 		switch (reqTemporalResolution) {
-		case 4:
-			tt = TemporalType.HOUR_OF_DAY;
-		case 3:
-			tt = TemporalType.DAY_OF_MONTH;
-		case 2:
-			tt = TemporalType.MONTH;
-		case 1:
-			tt = TemporalType.YEAR;
+			case 4:
+				tt = TemporalType.HOUR_OF_DAY;
+				break;
+			case 3:
+				tt = TemporalType.DAY_OF_MONTH;
+				break;
+			case 2:
+				tt = TemporalType.MONTH;
+				break;
+			case 1:
+				tt = TemporalType.YEAR;
+				break;
+			default:
+				tt = TemporalType.YEAR;
+				break;
 		}
 		return tt;
 	}
