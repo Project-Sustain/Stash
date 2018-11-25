@@ -29,8 +29,8 @@ public class SubBlockLevelBitmaps {
 	public SubBlockLevelBitmaps(int spatialSubLevels, int temporalSubLevels, int geohashPrecision, int temporalFSLevel) {
 		
 		// +1 for when either spatial or temporal level is same as FSLEVEL
-		this.spatialSubLevels = spatialSubLevels+1;
-		this.temporalSubLevels = temporalSubLevels+1;
+		this.spatialSubLevels = spatialSubLevels + 1;
+		this.temporalSubLevels = temporalSubLevels + 1;
 		this.spatialFSLevel = geohashPrecision;
 		this.temporalFSLevel = temporalFSLevel;
 		this.spatioTemporalBitmaps = new CorrectedBitmap[(spatialSubLevels)*(temporalSubLevels)];
@@ -114,7 +114,7 @@ public class SubBlockLevelBitmaps {
 		
 		synchronized(spatioTemporalBitmaps) {
 			// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
-			for(int i = 0; i< temporaryBitmaps.length; i++) {
+			for(int i = 0; i < temporaryBitmaps.length; i++) {
 				
 				if(spatioTemporalBitmaps[i] == null) {
 					temporaryBitmaps[i].applyUpdates();
