@@ -156,6 +156,7 @@ public enum TemporalType {
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 2));
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 3));
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 4));
+		System.out.println(TemporalType.YEAR.getType());
 	}
 
 	public static TemporalType getTypeFromLevel(int reqTemporalResolution) {

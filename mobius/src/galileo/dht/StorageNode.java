@@ -858,8 +858,13 @@ public class StorageNode implements RequestListener {
 				
 				// KEY Format : year-month-day-hour$$geohash
 				
+				// RIKI-REMOVE
+				logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 						event.getSpatialResolution(), event.getTemporalResolution());
+				
+				// RIKI-REMOVE
+				logger.info("RIKI: MATCHING BLOCKS: "+blockMap);
 				
 				// FIGURING OUT WHAT DATA IS ALREADY IN THE CACHES
 				// FETCH CACHED DATA AND REMOVE THEM FROM THE LIST OF CANDIDATE BLOCKS TO BE SEARCHED
@@ -884,6 +889,8 @@ public class StorageNode implements RequestListener {
 					List<String> existingCacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
+					// RIKI-REMOVE
+					logger.info("RIKI: REFINED BLOCK MAP: "+refinedBlockMap);
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
 					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES
 					// SummaryWrapper has needsInsertion that says if it needs to be populated in cache

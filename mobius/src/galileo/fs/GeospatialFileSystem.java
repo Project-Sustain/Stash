@@ -1202,6 +1202,9 @@ public class GeospatialFileSystem extends FileSystem {
 				// NOTHING IN CACHE
 				// LOOK INTO THE ENTIRE BLOCKS
 				cacheIsEmpty = true;
+				
+				// RIKI-REMOVE
+				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE IS EMPTY");
 			}
 			
 			// FIND WHATEVER CELLS ARE ALREADY IN CACHE AND STORE THEIR KEYS
@@ -1212,9 +1215,10 @@ public class GeospatialFileSystem extends FileSystem {
 				cachekeysFound = fetchCacheKeysUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
 						temporalLevel, blockBitmapResolutionTemporal, tokens[1], blockTimeStamp);
 				req.setCacheCellKeys(cachekeysFound);
+				
+				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
 			}
 				
-			
 			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
 			// FIGURE OUT WHAT NEEDS TO BE QUIRIED IN THE FILESYSTEM
 			// EVERYTHING ELSE HAS ALREADY BEEN FETCHED FROM THE CACHE
@@ -1244,6 +1248,9 @@ public class GeospatialFileSystem extends FileSystem {
 						
 						req.addCellrequirements(cr);
 						
+						// RIKI-REMOVE
+						logger.info("BLOCK " + blockKey+ " "+block+" IS FULLY CONTAINED IN CACHE");
+						
 					} else {
 						
 						// SOME OF THE BLOCK CELLS IS IN CACHE
@@ -1262,6 +1269,11 @@ public class GeospatialFileSystem extends FileSystem {
 							
 							keysToBeFetchedFromCache.add(cellKey);
 						}
+						
+						// RIKI-REMOVE
+						logger.info("BLOCK " + blockKey+ " "+block+" IS PARTIALLY CONTAINED AND NEEDS "+keysToBeFetchedFromCache);
+						
+						
 						CellRequirements cr = new CellRequirements(block, 2, keysToBeFetchedFromCache);
 						req.addCellrequirements(cr);
 					}
@@ -1270,6 +1282,8 @@ public class GeospatialFileSystem extends FileSystem {
 					// REQUIREMENT MODE 3
 					CellRequirements cr = new CellRequirements(block, 3);
 					
+					// RIKI-REMOVE
+					logger.info("BLOCK " + blockKey+ " "+block+" NEEDS FULL PROCESSING");
 					req.addCellrequirements(cr);
 				}
 				
@@ -1711,6 +1725,9 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		
 		boolean cacheIsEmpty = false;
+		
+		// RIKI-REMOVE
+		logger.info("RIKI: MATCHING CACHE CELLS FOUND: "+matchingCacheKeys);
 		
 		if(matchingCacheKeys == null || matchingCacheKeys.size() == 0) {
 			// NOTHING IN CACHE
@@ -3265,6 +3282,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 			int totalInserted = 0;
+			
 			// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
 			for(String key: finalisedSummaries.keySet()) {
 				
@@ -3273,12 +3291,16 @@ public class GeospatialFileSystem extends FileSystem {
 				// MAKE SURE THAT PARENTS AND NEIGHBORS AND CHILDREN DO NOT GET UPDATED MORE THAN ONCE
 				// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
 				if(sw.isNeedsInsertion()) {
+					
+					// RIKI-REMOVE
+					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL "+cacheResolution);
 					// THIS IS A NEW CELL GETTING INSERTED
 					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 					
 					if(newEntry)
 						totalInserted++;
 				} else {
+					logger.info("RIKI: CELL " + key+ " HAS BEEN VISITED ONCE ");
 					// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
 					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 				}
@@ -3390,6 +3412,9 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public void handleCacheCleaning() {
 		
+		// RIKI-REMOVE
+		logger.info("RIKI: CACHE CLEANUP STARTED");
+		
 		ExecutorService executor = Executors.newFixedThreadPool(1);
 		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, total_reduced_entries);
 		executor.execute(c);
@@ -3417,7 +3442,7 @@ public class GeospatialFileSystem extends FileSystem {
 
 		if (blockRequirements.keySet().size() > 0) {
 
-			if (event.getFeatureQuery() != null || event.getPolygon() != null) {
+			if (event.getFeatureQuery() != null || event.getPolygon() != null || event.getTimeString() != null) {
 
 				// maximum parallelism = 64
 				ExecutorService executor = Executors.newFixedThreadPool(java.lang.Math.min(blockRequirements.keySet().size(), 2 * numCores));
@@ -3442,6 +3467,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					existingCacheKeys.addAll(pathReqs.getCacheCellKeys());
 					
+					// ACTUAL FILE SYSTEM READING FOR REQUIRED CELLS
 					VisualizationQueryProcessor qp = new VisualizationQueryProcessor(this, pathReqs, geoQuery, blockGrid, queryBitmap, event.getSpatialResolution(),
 							event.getTemporalResolution(), getSummaryPosns(), true, blockKey);
 
@@ -3455,6 +3481,9 @@ public class GeospatialFileSystem extends FileSystem {
 				if (!status)
 					logger.log(Level.WARNING, "Executor terminated because of the specified timeout=10minutes");
 
+				// RIKI-REMOVE
+				logger.info("RIKI: FS LOOKUP COMPLETED, COMPILING RESULTS AND UPDATING CACHE");
+				
 				// OUTPUTS FROM FILE PROCESSING ARE ROUNDED UP HERE, CACHE IS NOT TOUCHED
 				for (VisualizationQueryProcessor qp : queryProcessors) {
 
@@ -3479,10 +3508,13 @@ public class GeospatialFileSystem extends FileSystem {
 
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
+		
+		// RIKI-REMOVE
+		logger.info("RIKI: CACHE POPULATION STARTED ");
 		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
 				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
 		
-		if(cleanUpNeeded)
+		if(cleanUpNeeded) 
 			handleCacheCleaning();
 
 		return finalisedSummaries;
