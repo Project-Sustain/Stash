@@ -118,6 +118,7 @@ public class VisualizationEvent implements Event{
 		this.temporalResolution = in.readInt();
 		
 		//this cannot be null
+		reqFeatures = new ArrayList<String>();
 		in.readStringCollection(reqFeatures);
 		
 	}

@@ -9,11 +9,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import galileo.graph.SubBlockLevelBitmaps;
+
 import java.util.Set;
 
 public class RikiTest {
 	
-	public static void main(String arg[]) throws FileNotFoundException, IOException {
+	public static void main1(String arg[]) throws FileNotFoundException, IOException {
 		
 		Map<String, Float> map = new HashMap<String, Float>();
         map.put("1@stKey1", 20f);
@@ -83,6 +89,49 @@ public class RikiTest {
         System.out.println(entriesToRemove);
 		
 		return entriesToRemove;
+	}
+	
+	
+	public static void main(String arg[]) {
+		
+	}
+	
+	public JSONObject objectToJSON(Map<String, SubBlockLevelBitmaps> blockBitmaps) {
+		
+		JSONObject state = new JSONObject();
+		JSONArray sbMaps = new JSONArray();
+		for(String path : blockBitmaps.keySet()) {
+			
+			SubBlockLevelBitmaps sbm = blockBitmaps.get(path);
+			
+			JSONObject jsonSBM = sbm.createJsonObject(path);
+			
+			sbMaps.put(jsonSBM);
+		}
+		state.put("subBlockBitmaps", sbMaps);
+		return state;
+	}
+	
+	public Map<String, SubBlockLevelBitmaps> jsonToObject(JSONObject state) {
+		
+		Map<String, SubBlockLevelBitmaps> blockBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
+		
+		JSONArray sbMaps = state.getJSONArray("subBlockBitmaps");
+		
+		if (sbMaps != null && sbMaps.length() > 0) {
+			
+			for (int i = 0; i < sbMaps.length(); i++) {
+				
+				JSONObject jsonObject = sbMaps.getJSONObject(i);
+				String path = jsonObject.getString("path");
+				SubBlockLevelBitmaps sbm = new SubBlockLevelBitmaps();
+				sbm.populateFromJson(jsonObject);
+				blockBitmaps.put(path, sbm);
+				
+			}
+		}
+		
+		return blockBitmaps;
 	}
 	
 

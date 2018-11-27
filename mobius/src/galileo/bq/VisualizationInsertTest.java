@@ -83,10 +83,12 @@ public class VisualizationInsertTest {
 					System.out.println(lastLine);
 					
 					/*Using the lastline to create metadata */
-					Block tmp = GalileoConnector.createBlock(lastLine, allLines.substring(0, allLines.length() - 1), fsName, mode);
+					Block tmp = GalileoConnector.createBlockViz(lastLine, allLines.substring(0, allLines.length() - 1));
+					
 					if (tmp != null) {
 						gc.store(tmp);
 					}
+					
 					data = new StringBuffer();
 					rowCount = 0;
 				}

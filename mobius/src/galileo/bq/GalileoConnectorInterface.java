@@ -9,6 +9,7 @@ import galileo.comm.FilesystemRequest;
 import galileo.comm.StorageRequest;
 import galileo.comm.SurveyRequest;
 import galileo.comm.TemporalType;
+import galileo.comm.VisualizationRequest;
 import galileo.dataset.Block;
 import galileo.dataset.SpatialHint;
 import galileo.dataset.feature.FeatureType;
@@ -130,6 +131,11 @@ abstract class GalileoConnectorInterface {
 	
 	public void integrate(DataIntegrationRequest dr) throws IOException {
 		publisher.publish(server, dr);
+	}
+	
+
+	public void integrate(VisualizationRequest vr) throws IOException {
+		publisher.publish(server, vr);
 	}
 	
 	public void survey(SurveyRequest sr) throws IOException {

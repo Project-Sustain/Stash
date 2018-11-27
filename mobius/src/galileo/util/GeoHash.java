@@ -281,11 +281,68 @@ public class GeoHash {
 			    
 		}
 		
-	        
+	    //long offset = TemporalHash.TIMEZONE.getRawOffset() - TimeZone.getDefault().getRawOffset();
+	    
+	    return calendar.getTimeInMillis() ;
+		
+	}
+	
+public static long getStartTimeStamp_BackupWithOffset(String year, String month, String day, String hour, TemporalType temporalType) throws ParseException {
+		
+		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
+		calendar.setTimeZone(TemporalHash.TIMEZONE);
+		//calendar.setLenient(false);
+		
+		
+		if(month.contains("x"))
+			month = "00";
+		if(day.contains("x"))
+			day = "01";
+		if(hour.contains("x"))
+			hour = "00";
+		
+		switch (temporalType) {
+			case HOUR_OF_DAY:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(day));
+				calendar.set(Calendar.HOUR_OF_DAY, Integer.parseInt(hour));
+				calendar.set(Calendar.MINUTE, 0);
+			    calendar.set(Calendar.SECOND, 0);
+			    calendar.set(Calendar.MILLISECOND, 0);
+			    break;
+			case DAY_OF_MONTH:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(day));
+				calendar.set(Calendar.HOUR_OF_DAY, 0);
+				calendar.set(Calendar.MINUTE, 0);
+			    calendar.set(Calendar.SECOND, 0);
+			    calendar.set(Calendar.MILLISECOND, 0);
+			    break;
+			case MONTH:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				calendar.set(Calendar.DAY_OF_MONTH, 1);
+				calendar.set(Calendar.HOUR_OF_DAY, 0);
+				calendar.set(Calendar.MINUTE, 0);
+			    calendar.set(Calendar.SECOND, 0);
+			    calendar.set(Calendar.MILLISECOND, 0);
+			    break;
+			case YEAR:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, 0);
+				calendar.set(Calendar.DAY_OF_MONTH, 1);
+				calendar.set(Calendar.HOUR_OF_DAY, 0);
+				calendar.set(Calendar.MINUTE, 0);
+			    calendar.set(Calendar.SECOND, 0);
+			    calendar.set(Calendar.MILLISECOND, 0);
+			    break;
+			    
+		}
+		
 	    long offset = TemporalHash.TIMEZONE.getRawOffset() - TimeZone.getDefault().getRawOffset();
 	    
-	    
-	    //System.out.println(calendar.getTimeInMillis() + offset);
 	    return calendar.getTimeInMillis() + offset;
 		
 	}

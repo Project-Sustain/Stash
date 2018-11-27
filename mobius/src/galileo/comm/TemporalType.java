@@ -3,6 +3,7 @@ package galileo.comm;
 import java.util.Calendar;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Days;
 import org.joda.time.Hours;
 import org.joda.time.Months;
@@ -10,6 +11,7 @@ import org.joda.time.Months;
 import galileo.dht.hash.TemporalHash;
 
 public enum TemporalType {
+	
 	YEAR(Calendar.YEAR), MONTH(Calendar.MONTH), DAY_OF_MONTH(Calendar.DAY_OF_MONTH), HOUR_OF_DAY(Calendar.HOUR_OF_DAY);
 	
 	private int type;
@@ -62,7 +64,7 @@ public enum TemporalType {
 	 */
 	public static long getTemporalIndex (DateTime d1, long currentTimeStamp, int desiredLevel) {
 		
-		DateTime d2 = new DateTime(currentTimeStamp);
+		DateTime d2 = new DateTime(currentTimeStamp, DateTimeZone.UTC);
 		
 		long tmpIndex = 0;
 		
@@ -73,7 +75,8 @@ public enum TemporalType {
 		else if(desiredLevel == 4)
 			tmpIndex = Hours.hoursBetween(d1, d2).getHours();
 		
-		
+		// RIKI-REMOVE
+		System.out.println("RIKI: START TIME "+d1+" END TIME: "+d2+" TEMPORAL INDEX: "+tmpIndex + " TEMPORAL TYPE "+desiredLevel);
 		return tmpIndex;
 		
 	}
@@ -87,22 +90,6 @@ public enum TemporalType {
 	 * @return
 	 */
 	public static long getTemporalIndex (DateTime d1, DateTime d2, int desiredLevel) {
-		
-		long tmpIndex = 0;
-		
-		if(desiredLevel == 2)
-			tmpIndex = Months.monthsBetween(d1, d2).getMonths();
-		else if(desiredLevel == 3)
-			tmpIndex = Days.daysBetween(d1, d2).getDays();
-		else if(desiredLevel == 4)
-			tmpIndex = Hours.hoursBetween(d1, d2).getHours();
-		
-		
-		return tmpIndex;
-		
-	}
-	
-	public static long getTemporalStringFromIndex (DateTime d1, DateTime d2, int desiredLevel) {
 		
 		long tmpIndex = 0;
 		
@@ -151,6 +138,10 @@ public enum TemporalType {
 		
 		//Monday, October 1, 2018 12:00:00 AM
 		DateTime d1 = new DateTime(1535760000000l);
+		
+		DateTime d2 = new DateTime(1538352000000l);
+		
+		System.out.println("RIKI: " +Hours.hoursBetween(d1, d2).getHours());
 		
 		//Wednesday, October 3, 2018 6:56:35 PM
 		System.out.println(getTemporalIndex(d1, 1538352000000l, 2));

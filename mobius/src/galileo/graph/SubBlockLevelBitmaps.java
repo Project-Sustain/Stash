@@ -1,9 +1,12 @@
 package galileo.graph;
 
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.logging.Logger;
 
 import org.joda.time.DateTime;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import com.googlecode.javaewah.EWAHCompressedBitmap;
 
@@ -35,9 +38,59 @@ public class SubBlockLevelBitmaps {
 		this.temporalSubLevels = temporalSubLevels + 1;
 		this.spatialFSLevel = geohashPrecision;
 		this.temporalFSLevel = temporalFSLevel;
-		this.spatioTemporalBitmaps = new CorrectedBitmap[(spatialSubLevels)*(temporalSubLevels)];
+		this.spatioTemporalBitmaps = new CorrectedBitmap[(this.spatialSubLevels)*(this.spatialSubLevels)];
 		
 	}
+	
+	public SubBlockLevelBitmaps() {}
+	
+	/**
+	 * CREATING JSON REPRESENTATION OF A SUBBLOCK BITMAP
+	 * @author sapmitra
+	 * @param path
+	 * @return
+	 */
+	public JSONObject createJsonObject(String path) {
+    	
+    	JSONObject blockBitmap = new JSONObject();
+    	
+    	blockBitmap.put("path", path);
+    	blockBitmap.put("spatialFSLevel", spatialFSLevel);
+    	blockBitmap.put("temporalFSLevel", temporalFSLevel);
+    	blockBitmap.put("spatialSubLevels", spatialSubLevels);
+    	blockBitmap.put("temporalSubLevels", temporalSubLevels);
+    	
+    	blockBitmap.put("allbitmaps", Arrays.asList(spatioTemporalBitmaps));
+    	
+    	return blockBitmap;
+    }
+    
+	/**
+	 * REGENERATING SUBBLOCK BITMAP FROM JSON OBJECT
+	 * @author sapmitra
+	 * @param jsonObj
+	 */
+    public void populateFromJson(JSONObject jsonObj) {
+    	
+    	this.spatialFSLevel = jsonObj.getInt("spatialFSLevel");
+    	this.temporalFSLevel = jsonObj.getInt("temporalFSLevel");
+    	this.spatialSubLevels = jsonObj.getInt("spatialSubLevels");
+    	this.temporalSubLevels = jsonObj.getInt("temporalSubLevels");
+    	
+    	
+    	JSONArray bmaps = jsonObj.getJSONArray("allbitmaps");
+    	
+		for (int i = 0; i < bmaps.length(); i++) {
+			JSONObject object = bmaps.getJSONObject(i);
+			if(object != JSONObject.NULL) {
+				CorrectedBitmap b = new CorrectedBitmap();
+				b.populateFromJson(object);
+			} else {
+				spatioTemporalBitmaps[i] = null;
+			}
+		}
+    	
+    }
 	
 	/**
 	 * RETURNS THE BITMAP FOR A REQUESTED SPATIOTEMPORAL LEVEL
@@ -109,6 +162,9 @@ public class SubBlockLevelBitmaps {
 			
 			String choppedGeohash = geoHash.substring(removeLength);
 			
+			// RIKI-REMOVE
+			//logger.info("RIKI: GEOHASH: "+geoHash+" CHOPPED GEOHASH: "+choppedGeohash);
+			
 			// CREATE A SET OF TEMPORARY BITMAPS
 			populateBitmapUsingRecord(startDate, timestamp, choppedGeohash, temporaryBitmaps);
 			
@@ -117,15 +173,23 @@ public class SubBlockLevelBitmaps {
 		synchronized(spatioTemporalBitmaps) {
 			// POPULATE THE ACTUAL BITMAPS USING THE TEMPORARY BITMAPS EXTRACTED FROM THE BLOCK
 			for(int i = 0; i < temporaryBitmaps.length; i++) {
-				temporaryBitmaps[i].applyUpdates();
-				
-				//RIKI-REMOVE
-				logger.info("BITMAP FOR LEVEL "+i+" IS "+temporaryBitmaps[i].toString());
-				
-				if(spatioTemporalBitmaps[i] == null) {
-					spatioTemporalBitmaps[i] = temporaryBitmaps[i];
+				if(temporaryBitmaps[i] != null) {
+					
+					temporaryBitmaps[i].applyUpdates();
+					//RIKI-REMOVE
+					logger.info("BITMAP FOR LEVEL "+i+" IS "+temporaryBitmaps[i].toString());
+					
+					if(spatioTemporalBitmaps[i] == null) {
+						spatioTemporalBitmaps[i] = temporaryBitmaps[i];
+					} else {
+						spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
+					}
+					
+					//RIKI-REMOVE
+					logger.info("BITMAP FOR LEVEL "+i+" IS POPULATED");
 				} else {
-					spatioTemporalBitmaps[i].applyUpdates(temporaryBitmaps[i].bmp);
+					//RIKI-REMOVE
+					logger.info("BITMAP FOR LEVEL "+i+" IS NOT AVAILABLE");
 				}
 		}
 		}
@@ -159,21 +223,28 @@ public class SubBlockLevelBitmaps {
 				// AND SHOULD NOT BE CONFUSED WITH BITMAP ARRAY INDEX
 				long spatialIndex = 0;
 				
-				// if we do not go down the spatial resolution but only in temporal resolution
+				// If we do not go down the spatial resolution but only in temporal resolution
 				if(i > 0) {
 					
-					String partialGeohash = choppedGeohash.substring(0, i+1);
+					String partialGeohash = choppedGeohash.substring(0, i);
 					
 					// returns a number between 0 and 31 for single character
 					spatialIndex = GeoHash.hashToLong(partialGeohash);
 					
+					// RIKI-REMOVE
+					logger.info("RIKI: PARTIAL GEOHASH " + partialGeohash + " SPATIAL INDEX: "+spatialIndex);
 				}
 				
 				long temporalIndex = 0;
 				
-				if(j > 0)
+				if(j > 0) {
+					
 					temporalIndex = TemporalType.getTemporalIndex(startTime, recordTimestamp, currentTemporalLevel);
+					
+				}
 				
+				// RIKI-REMOVE
+				//logger.info("RIKI: HERE");
 				CorrectedBitmap bm = temporaryBitmaps[bitmapArrayIndx];
 				
 				if(bm == null) {
@@ -183,6 +254,8 @@ public class SubBlockLevelBitmaps {
 				
 				int spatialSize = (int)java.lang.Math.pow(32, i);
 				
+				// RIKI-REMOVE
+				//logger.info("RIKI: HERE1");
 				
 				int bitIndex = (int)(temporalIndex*spatialSize + spatialIndex);
 				

@@ -58,6 +58,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -458,6 +459,22 @@ public class GeospatialFileSystem extends FileSystem {
 		state.put("spatialPartitioningType", this.spatialPartitioningType);
 		state.put("summaryHints", this.summaryHints);
 		
+		// PERSISTING SUB-BLOCK BITMAPS
+		if(needSublevelBitmaps) {
+			
+			JSONArray sbMaps = new JSONArray();
+			for(String path : blockBitmaps.keySet()) {
+				
+				SubBlockLevelBitmaps sbm = blockBitmaps.get(path);
+				
+				JSONObject jsonSBM = sbm.createJsonObject(path);
+				
+				sbMaps.put(jsonSBM);
+			}
+			state.put("subBlockBitmaps", sbMaps);
+			
+		}
+		
 		return state;
 	}
 
@@ -507,6 +524,26 @@ public class GeospatialFileSystem extends FileSystem {
 		gfs.temporalPosn = state.getInt("temporalPosn");
 		gfs.spatialPosn1 = state.getInt("spatialPosn1");
 		gfs.spatialPosn2 = state.getInt("spatialPosn2");
+		
+		
+		// REGENERATING SUBBLOCK LEVEL BITMAP FROM JSON
+		if (state.has("subBlockBitmaps")) {
+			
+			JSONArray sbMaps = state.getJSONArray("subBlockBitmaps");
+			
+			if (sbMaps != null && sbMaps.length() > 0) {
+				
+				for (int i = 0; i < sbMaps.length(); i++) {
+					
+					JSONObject jsonObject = sbMaps.getJSONObject(i);
+					String path = jsonObject.getString("path");
+					SubBlockLevelBitmaps sbm = new SubBlockLevelBitmaps();
+					sbm.populateFromJson(jsonObject);
+					gfs.blockBitmaps.put(path, sbm);
+					
+				}
+			}
+		}
 		
 		return gfs;
 	}
@@ -609,6 +646,10 @@ public class GeospatialFileSystem extends FileSystem {
 		Metadata meta = block.getMetadata();
 		/* RETURNS A STRING OF THE FORMAT year-month-day-hour */
 		String time = getTemporalString(meta.getTemporalProperties());
+		
+		// RIKI-REMOVE
+		//logger.info("RIKI: TEMPORAL STRING IS :" + time);
+		
 		String geohash = getSpatialString(meta.getSpatialProperties());
 		
 		/* Name of the block to be saved */
@@ -671,7 +712,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN S BLOCK
 		if(needSublevelBitmaps) {
 			// RIKI-REMOVE
-			logger.info("THIS FILE SYSTEM NEEDS BITMAP");
+			logger.info("RIKI: THIS FILE SYSTEM NEEDS BITMAP");
 			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
 			if(bitmaps == null) {
 				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
@@ -718,10 +759,13 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		String[] timeTokens = fileTime.split("-");
 		
+		
 		// The starting timestamp of the block at the given resolution
 		long startTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], temporalType);
 		
-		DateTime startDate = new DateTime(startTimeStamp);
+		// RIKI-REMOVE
+		logger.info("RIKI: FILE TIMESTAMP IS "+startTimeStamp+" TIME STRING IS "+fileTime);
+		DateTime startDate = new DateTime(startTimeStamp, DateTimeZone.UTC);
 		
 		String blockString = new String(data);
 		String[] records = blockString.split("\n");
@@ -730,7 +774,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// Creates a temporary bitmap using the records and then append to the old bitmap
 		// RIKI-REMOVE
-		logger.info("ABOUT TO POPULATE BITMAP");
+		logger.info("RIKI: ABOUT TO POPULATE BITMAP");
 		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
 		
 	}

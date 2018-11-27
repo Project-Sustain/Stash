@@ -23,7 +23,10 @@ public class VisualizationRequest implements Event {
 	private int spatialResolution;
 	private int temporalResolution;
 	
+	// What features to return as summaries
 	private List<String> reqFeatures;
+	
+	public VisualizationRequest() {}
 
 	private void validate(String fsName) {
 		if (fsName == null || fsName.trim().length() == 0 || !fsName.matches("[a-z0-9-]{5,50}"))
@@ -116,6 +119,7 @@ public class VisualizationRequest implements Event {
 		this.temporalResolution = in.readInt();
 		
 		// this cannot be null
+		reqFeatures = new ArrayList<String>();
 		in.readStringCollection(reqFeatures);
 		
 	}

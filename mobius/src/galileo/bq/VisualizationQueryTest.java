@@ -8,23 +8,11 @@ package galileo.bq;
  * This program read a csv-formatted file and send each line to the galileo server
  */
 
-import galileo.comm.DataIntegrationRequest;
-import galileo.dataset.Block;
-import galileo.dataset.Coordinates;
-import galileo.dataset.SpatialHint;
-import galileo.dataset.feature.FeatureType;
-import galileo.util.Pair;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-import java.util.Scanner;
-import java.util.TimeZone;
+
+import galileo.comm.VisualizationRequest;
+import galileo.dataset.Coordinates;
 
 public class VisualizationQueryTest {
 
@@ -39,31 +27,40 @@ public class VisualizationQueryTest {
 	 * @throws Exception
 	 */
 	
-	private static void processFile(GalileoConnector gc) throws Exception {
+	private static void processRequest(GalileoConnector gc) throws Exception {
 		
 		// CREATING FS1
 		
-		DataIntegrationRequest dr = new DataIntegrationRequest(); 
-		dr.setFsname1("testfs1");
-		dr.setFsname2("testfs2");
+		VisualizationRequest vr = new VisualizationRequest(); 
+		vr.setFsName("testfs1");
 		
-		Coordinates c1 = new Coordinates(39.8117f, -95.3311f);
-		Coordinates c2 = new Coordinates(39.75682f, -94.099f);
-		Coordinates c3 = new Coordinates(39.0938f, -94.0209f);
-		Coordinates c4 = new Coordinates(39.13858f, -95.51101f);
+		float lat1 = 39.1f;
+		float lat2 = 40.0f;
+		
+		float lon1 = -95.1f;
+		float lon2 = -94.0f;
+		
+		Coordinates c1 = new Coordinates(lat2, lon1);
+		Coordinates c2 = new Coordinates(lat2, lon2);
+		Coordinates c3 = new Coordinates(lat1, lon2);
+		Coordinates c4 = new Coordinates(lat1, lon1);
 		//Coordinates c5 = new Coordinates(36.78f, -107.64f);
 		
 		List<Coordinates> cl = new ArrayList<Coordinates>();
 		cl.add(c1); cl.add(c2); cl.add(c3); cl.add(c4);
 		
-		dr.setPolygon(cl);
-		dr.setTime("2017-02-xx-xx");
-		dr.setLatRelax(0.05f);
-		dr.setLongRelax(0.05f);
-		dr.setTimeRelaxation(100);
+		vr.setPolygon(cl);
+		vr.setTime("2017-02-xx-xx");
+		vr.setSpatialResolution(5);
+		vr.setTemporalResolution(4);
+		
+		List<String> sumFt = new ArrayList<String>();
+		sumFt.add("fs_feature1");
+		sumFt.add("fs_feature2");
+		vr.setReqFeatures(sumFt);
 		
 		try {
-			gc.integrate(dr);
+			gc.integrate(vr);
 			Thread.sleep(10000);
 		} finally {
 			gc.disconnect();
@@ -79,26 +76,26 @@ public class VisualizationQueryTest {
 	 */
 	public static void main(String[] args1) {
 		String args[] = new String[2];
-		args[0] = "phoenix.cs.colostate.edu";
+		args[0] = "lattice-1.cs.colostate.edu";
 		args[1] = "5634";
 		
 		
 		if (args.length != 2) {
 			System.out.println(
-					"Usage: MyIntegrationTest [galileo-hostname] [galileo-port-number]");
+					"Usage: VisualizationQueryTest [galileo-hostname] [galileo-port-number]");
 			System.exit(0);
 		} else {
 			try {
-				GalileoConnector gc = new GalileoConnector("phoenix.cs.colostate.edu", 5634);
+				GalileoConnector gc = new GalileoConnector(args[0], Integer.parseInt(args[1]));
 				System.out.println(args[0] + "," + Integer.parseInt(args[1]));
 				
-				processFile(gc);
+				processRequest(gc);
 				
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-		System.out.println("Data Integration Finished");
+		System.out.println("Visualization Finished");
 		System.exit(0);
 	}
 	// [END Main]

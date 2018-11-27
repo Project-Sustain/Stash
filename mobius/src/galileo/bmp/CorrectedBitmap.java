@@ -25,9 +25,14 @@ software, even if advised of the possibility of such damage.
 
 package galileo.bmp;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.logging.Logger;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import com.googlecode.javaewah.EWAHCompressedBitmap;
 
@@ -38,7 +43,8 @@ import com.googlecode.javaewah.EWAHCompressedBitmap;
  * @author malensek
  */
 public class CorrectedBitmap implements Iterable<Integer> {
-
+	
+	private static final Logger logger = Logger.getLogger("galileo");
 	private SortedSet<Integer> pendingUpdates = new TreeSet<>();
 	
     public EWAHCompressedBitmap bmp;
@@ -63,6 +69,24 @@ public class CorrectedBitmap implements Iterable<Integer> {
     public void set(int bit) {
     	pendingUpdates.add(bit);
     }
+    
+    public JSONObject createJsonObject() {
+    	
+    	JSONObject jarray = new JSONObject();
+    	jarray.put("bitmap",Arrays.asList(bmp.toArray()));
+    	return jarray;
+    }
+    
+    public void populateFromJson(JSONObject jsonObj) {
+    	
+    	JSONArray inds = jsonObj.getJSONArray("bitmap");
+		for (int i = 0; i < inds.length(); i++)
+			pendingUpdates.add(inds.getInt(i));
+		applyUpdates();
+    	
+    }
+    
+    
     
     /**
      * Creates a bitmap of updates and returns it
@@ -92,7 +116,6 @@ public class CorrectedBitmap implements Iterable<Integer> {
     public void applyUpdates() {
     	
     	EWAHCompressedBitmap updateBitmap = new EWAHCompressedBitmap();
-    	
 		for (int i : pendingUpdates) {
 			updateBitmap.set(i);
 		}
