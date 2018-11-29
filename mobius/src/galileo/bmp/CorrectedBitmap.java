@@ -71,15 +71,17 @@ public class CorrectedBitmap implements Iterable<Integer> {
     }
     
     public JSONObject createJsonObject() {
+    	applyUpdates();
     	
     	JSONObject jarray = new JSONObject();
+    	
     	jarray.put("bitmap",Arrays.asList(bmp.toArray()));
     	return jarray;
     }
     
     public void populateFromJson(JSONObject jsonObj) {
     	
-    	JSONArray inds = jsonObj.getJSONArray("bitmap");
+    	JSONArray inds = jsonObj.getJSONArray("bitmap").getJSONArray(0);
 		for (int i = 0; i < inds.length(); i++)
 			pendingUpdates.add(inds.getInt(i));
 		applyUpdates();

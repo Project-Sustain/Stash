@@ -134,7 +134,7 @@ abstract class GalileoConnectorInterface {
 	}
 	
 
-	public void integrate(VisualizationRequest vr) throws IOException {
+	public void visualize(VisualizationRequest vr) throws IOException {
 		publisher.publish(server, vr);
 	}
 	

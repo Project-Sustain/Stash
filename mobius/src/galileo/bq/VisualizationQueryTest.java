@@ -37,8 +37,8 @@ public class VisualizationQueryTest {
 		float lat1 = 39.1f;
 		float lat2 = 40.0f;
 		
-		float lon1 = -95.1f;
-		float lon2 = -94.0f;
+		float lon1 = -96.1f;
+		float lon2 = -95.0f;
 		
 		Coordinates c1 = new Coordinates(lat2, lon1);
 		Coordinates c2 = new Coordinates(lat2, lon2);
@@ -60,7 +60,7 @@ public class VisualizationQueryTest {
 		vr.setReqFeatures(sumFt);
 		
 		try {
-			gc.integrate(vr);
+			gc.visualize(vr);
 			Thread.sleep(10000);
 		} finally {
 			gc.disconnect();

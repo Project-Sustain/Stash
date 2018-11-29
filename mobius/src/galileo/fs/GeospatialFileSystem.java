@@ -254,7 +254,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		super(storageDirectory, name, ignoreIfPresent);
 		
-		logger.info("REACHED HERE 1");
+		//logger.info("REACHED HERE 1");
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
@@ -340,7 +340,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		this.temporalSubLevels = stCache.getTotalTemporalLevels() - temporalLevel;
 		
-		logger.info("REACHED HERE 2");
+		//logger.info("REACHED HERE 2");
 		logger.info("TOTAL TEMPORAL LEVELS: "+ stCache.getTotalTemporalLevels());
 		logger.info("TOTAL SPATIAL LEVELS: " + stCache.getTotalSpatialLevels());
 		logger.info("TOTAL TEMPORAL SUBLEVELS: "+ temporalSubLevels);
@@ -483,7 +483,9 @@ public class GeospatialFileSystem extends FileSystem {
 			HashTopologyException {
 		String name = state.getString("name");
 		String storageRoot = state.getString("storageRoot");
+		
 		int geohashPrecision = state.getInt("precision");
+		
 		JSONArray geohashIndices = state.getJSONArray("geohashIndex");
 		String featureList = null;
 		if (state.get("featureList") != JSONObject.NULL)
@@ -654,8 +656,10 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		/* Name of the block to be saved */
 		String name = String.format("%s-%s", time, geohash);
-		if (meta.getName() != null && meta.getName().trim() != "")
+		
+		if (meta.getName() != null && !meta.getName().isEmpty())
 			name = meta.getName();
+		
 		String blockDirPath = this.storageDirectory + File.separator + getStorageDirectory(block);
 		String blockPath = blockDirPath + File.separator + name + FileSystem.BLOCK_EXTENSION;
 		String metadataPath = blockDirPath + File.separator + name + FileSystem.METADATA_EXTENSION;
@@ -713,10 +717,10 @@ public class GeospatialFileSystem extends FileSystem {
 		if(needSublevelBitmaps) {
 			// RIKI-REMOVE
 			logger.info("RIKI: THIS FILE SYSTEM NEEDS BITMAP");
-			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(name);
+			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(blockPath);
 			if(bitmaps == null) {
 				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
-				blockBitmaps.put(name, bitmaps);
+				blockBitmaps.put(blockPath, bitmaps);
 			}
 			
 			try {
@@ -1222,8 +1226,8 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		for(String blockKey : blockMap.keySet()) {
 			
-			PathRequirements req = new PathRequirements();
-			requirementMap.put(blockKey, req);
+			PathRequirements required = new PathRequirements();
+			requirementMap.put(blockKey, required);
 			
 			String[] tokens = blockKey.split("\\$\\$");
 			String blockTimeTokens[] = tokens[0].split("-");
@@ -1258,7 +1262,7 @@ public class GeospatialFileSystem extends FileSystem {
 				
 				cachekeysFound = fetchCacheKeysUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
 						temporalLevel, blockBitmapResolutionTemporal, tokens[1], blockTimeStamp);
-				req.setCacheCellKeys(cachekeysFound);
+				required.setCacheCellKeys(cachekeysFound);
 				
 				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
 			}
@@ -1290,7 +1294,7 @@ public class GeospatialFileSystem extends FileSystem {
 						// LOOK INTO THE SUMMARY CACHE AND FETCH THE PRE-EXISTING SUMMARY KEYS
 						CellRequirements cr = new CellRequirements(block, 1);
 						
-						req.addCellrequirements(cr);
+						required.addCellrequirements(cr);
 						
 						// RIKI-REMOVE
 						logger.info("BLOCK " + blockKey+ " "+block+" IS FULLY CONTAINED IN CACHE");
@@ -1319,7 +1323,7 @@ public class GeospatialFileSystem extends FileSystem {
 						
 						
 						CellRequirements cr = new CellRequirements(block, 2, keysToBeFetchedFromCache);
-						req.addCellrequirements(cr);
+						required.addCellrequirements(cr);
 					}
 				} else {
 					// CACHE EMPTY
@@ -1328,7 +1332,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					// RIKI-REMOVE
 					logger.info("BLOCK " + blockKey+ " "+block+" NEEDS FULL PROCESSING");
-					req.addCellrequirements(cr);
+					required.addCellrequirements(cr);
 				}
 				
 			}
@@ -1831,9 +1835,15 @@ public class GeospatialFileSystem extends FileSystem {
 			space = getSpatialString(sp);
 			
 			/* Returns all 2 char geohashes that intersect with the searched polygon */
-			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry)));
 			
+			logger.info("RIKI: GEOHASH PRECISION: "+geohashPrecision);
+			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry, geohashPrecision)));
+			
+			
+			logger.info("RIKI: HASHLOCATIONSZZZ "+hashLocations);
 			hashLocations.retainAll(this.geohashIndex);
+			
+			logger.info("existing Locations: " + geohashIndex);
 			logger.info("baseLocations: " + hashLocations);
 			Query query = new Query();
 			

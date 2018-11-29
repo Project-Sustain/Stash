@@ -60,7 +60,21 @@ public class SubBlockLevelBitmaps {
     	blockBitmap.put("spatialSubLevels", spatialSubLevels);
     	blockBitmap.put("temporalSubLevels", temporalSubLevels);
     	
-    	blockBitmap.put("allbitmaps", Arrays.asList(spatioTemporalBitmaps));
+    	
+    	
+		JSONArray spbMaps = new JSONArray();
+		for(CorrectedBitmap bm : spatioTemporalBitmaps) {
+			if(bm == null) {
+				spbMaps.put(JSONObject.NULL);
+			} else {
+				
+				JSONObject sJSON = bm.createJsonObject();
+				spbMaps.put(sJSON);
+			}
+		}
+		
+	
+    	blockBitmap.put("allbitmaps", spbMaps);
     	
     	return blockBitmap;
     }
@@ -77,14 +91,18 @@ public class SubBlockLevelBitmaps {
     	this.spatialSubLevels = jsonObj.getInt("spatialSubLevels");
     	this.temporalSubLevels = jsonObj.getInt("temporalSubLevels");
     	
+    	this.spatioTemporalBitmaps = new CorrectedBitmap[(this.spatialSubLevels)*(this.spatialSubLevels)];
+    	
     	
     	JSONArray bmaps = jsonObj.getJSONArray("allbitmaps");
     	
 		for (int i = 0; i < bmaps.length(); i++) {
-			JSONObject object = bmaps.getJSONObject(i);
-			if(object != JSONObject.NULL) {
+			
+			if(bmaps.get(i) != JSONObject.NULL) {
+				JSONObject object = bmaps.getJSONObject(i);
 				CorrectedBitmap b = new CorrectedBitmap();
 				b.populateFromJson(object);
+				spatioTemporalBitmaps[i] = b;
 			} else {
 				spatioTemporalBitmaps[i] = null;
 			}

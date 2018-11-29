@@ -870,6 +870,9 @@ public class StorageNode implements RequestListener {
 				// FETCH CACHED DATA AND REMOVE THEM FROM THE LIST OF CANDIDATE BLOCKS TO BE SEARCHED
 				if(subBlockLevel) {
 					
+					// RIKI-REMOVE
+					logger.info("RIKI: GOING SUB LEVEL");
+					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());

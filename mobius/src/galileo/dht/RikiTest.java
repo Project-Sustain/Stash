@@ -9,10 +9,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import galileo.bmp.CorrectedBitmap;
 import galileo.graph.SubBlockLevelBitmaps;
 
 import java.util.Set;
@@ -94,7 +96,61 @@ public class RikiTest {
 	
 	public static void main(String arg[]) {
 		
+		Map<String, SubBlockLevelBitmaps> populateMap = populateMap(5);
+		
+		RikiTest rt = new RikiTest();
+		
+		JSONObject objectToJSON = rt.objectToJSON(populateMap);
+		
+		System.out.println(objectToJSON.toString());
+		
+		
+		Map<String, SubBlockLevelBitmaps> extractdMap = rt.jsonToObject(objectToJSON);
+		
+		System.out.println(extractdMap);
+		
+		for(String p : extractdMap.keySet()) {
+			
+			SubBlockLevelBitmaps subBlockLevelBitmaps = extractdMap.get(p);
+			
+			System.out.println(subBlockLevelBitmaps);
+			
+		}
+		
 	}
+	
+	
+	public static Map<String, SubBlockLevelBitmaps> populateMap(int totals) {
+		
+		Map<String, SubBlockLevelBitmaps> blockBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
+		
+		Random r = new Random();
+		for(int k = 0; k< totals; k++) {
+			
+			SubBlockLevelBitmaps sbms = new SubBlockLevelBitmaps(2, 1, 4, 3);
+			
+			CorrectedBitmap[] spatioTemporalBitmaps = sbms.getSpatioTemporalBitmaps();
+			
+			for(int i=0; i < 3; i++) {
+				spatioTemporalBitmaps[i] = new CorrectedBitmap();
+				
+				for(int j=0; j< 12; j++) {
+					
+					int ind = Math.abs(r.nextInt());
+					spatioTemporalBitmaps[i].set(ind);
+				}
+				spatioTemporalBitmaps[i].applyUpdates();
+				
+			}
+			
+			blockBitmaps.put("myfile"+k, sbms);
+			
+		}
+		
+		return blockBitmaps;
+	}
+	
+	
 	
 	public JSONObject objectToJSON(Map<String, SubBlockLevelBitmaps> blockBitmaps) {
 		
@@ -110,6 +166,7 @@ public class RikiTest {
 		}
 		state.put("subBlockBitmaps", sbMaps);
 		return state;
+		
 	}
 	
 	public Map<String, SubBlockLevelBitmaps> jsonToObject(JSONObject state) {

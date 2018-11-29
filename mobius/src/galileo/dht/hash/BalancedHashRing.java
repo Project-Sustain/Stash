@@ -142,6 +142,7 @@ public class BalancedHashRing<T> implements HashRing<T> {
         /* Find the largest empty span of hash space */
         BigInteger largestSpan = BigInteger.ZERO;
         HashRingEntry largestEntry = null;
+        
         for (HashRingEntry entry : entryMap.values()) {
             BigInteger len = lengthBetween(entry, entry.neighbor);
             if (len.compareTo(largestSpan) > 0) {
