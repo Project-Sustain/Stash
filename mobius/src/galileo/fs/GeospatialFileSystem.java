@@ -1060,7 +1060,8 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			space = space.substring(0,spatialResolution);
 			
-			
+			// RIKI-REMOVE
+			logger.info("RIKI: WHILE CREATING TEMPORAL STRING: "+year+"$"+month+"$"+day+"$"+hour);
 			String temporalTag = getTemporalString(year, month, day, hour, temporalResolution);
 			
 			
@@ -1074,15 +1075,15 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		switch (type) {
 		case 4:
-			return String.format("%d-%d-%d-%d", year, month, day, hour);
+			return String.format("%s-%s-%s-%s", year, month, day, hour);
 		case 3:
-			return String.format("%d-%d-%d-xx", year, month, day);
+			return String.format("%s-%s-%s-xx", year, month, day);
 		case 2:
-			return String.format("%d-%d-xx-xx", year, month);
+			return String.format("%s-%s-xx-xx", year, month);
 		case 1:
-			return String.format("%d-xx-xx-xx", year);
+			return String.format("%s-xx-xx-xx", year);
 		}
-		return String.format("%d-%d-%d-xx", year, month, day);
+		return String.format("%s-%s-%s-xx", year, month, day);
 	}
 
 	private String getSpaceKey(Path<Feature, String> path) {
