@@ -39,6 +39,8 @@ public class VisualizationEventResponse implements Event{
 	public VisualizationEventResponse(SerializationInputStream in) throws IOException, SerializationException {
 		summaries = new ArrayList<SummaryWrapper>();
 		in.readSerializableCollection(SummaryWrapper.class, summaries);
+		
+		keys = new ArrayList<String>();
 		in.readStringCollection(keys);
 		this.hostName = in.readString();
 		this.hostPort = in.readInt();

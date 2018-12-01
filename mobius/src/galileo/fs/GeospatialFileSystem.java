@@ -1257,16 +1257,16 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 			// FIND WHATEVER CELLS ARE ALREADY IN CACHE AND STORE THEIR KEYS
-			List<String> cachekeysFound = null;
+			List<String> cachekeysFound = new ArrayList<String>();
 			
 			if(!cacheIsEmpty) {
 				
 				cachekeysFound = fetchCacheKeysUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
 						temporalLevel, blockBitmapResolutionTemporal, tokens[1], blockTimeStamp);
-				required.setCacheCellKeys(cachekeysFound);
 				
 				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
 			}
+			required.setCacheCellKeys(cachekeysFound);
 				
 			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
 			// FIGURE OUT WHAT NEEDS TO BE QUIRIED IN THE FILESYSTEM
@@ -1837,14 +1837,14 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			/* Returns all 2 char geohashes that intersect with the searched polygon */
 			
-			logger.info("RIKI: GEOHASH PRECISION: "+geohashPrecision);
+			//logger.info("RIKI: GEOHASH PRECISION: "+geohashPrecision);
 			List<String> hashLocations = new ArrayList<>(Arrays.asList(GeoHash.getIntersectingGeohashes(geometry, geohashPrecision)));
 			
 			
-			logger.info("RIKI: HASHLOCATIONSZZZ "+hashLocations);
+			//logger.info("RIKI: HASHLOCATIONSZZZ "+hashLocations);
 			hashLocations.retainAll(this.geohashIndex);
 			
-			logger.info("existing Locations: " + geohashIndex);
+			//logger.info("existing Locations: " + geohashIndex);
 			logger.info("baseLocations: " + hashLocations);
 			Query query = new Query();
 			
@@ -2968,7 +2968,7 @@ public class GeospatialFileSystem extends FileSystem {
 			featurePaths = getFeaturePathsLocal(blocks);
 		} 
 		
-		//logger.log(Level.INFO, "RIKI: FS1 LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
+		logger.log(Level.INFO, "RIKI: FS LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
 		int size = featurePaths.size();
 		int partition = java.lang.Math.max(size / numCores, MIN_GRID_POINTS);
 		int parallelism = java.lang.Math.min(size / partition, numCores);
@@ -3035,7 +3035,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 		} 
-
+		logger.info("RIKI: SUMMARIES IN FS: "+allSummaries);
 		return allSummaries;
 	}
 	
@@ -3065,6 +3065,8 @@ public class GeospatialFileSystem extends FileSystem {
 			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
 			throws IOException, InterruptedException {
 		
+		logger.info("RIKI: LOOKING FOR SUMMARIES IN FS.");
+		
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
 		
 		List<String[]> featurePaths = new ArrayList<String[]>();
@@ -3074,14 +3076,16 @@ public class GeospatialFileSystem extends FileSystem {
 		boolean skipGridProcessing = false;
 		if (geoQuery.getPolygon() != null && geoQuery.getQuery() != null) {
 			/* If polygon complete encompasses geohash */
+			logger.info("RIKI: HERE");
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
 			
 			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getPolygon() != null) {
 			/* If grid lies completely inside polygon */
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
-			if(!skipGridProcessing)
-				featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
+			logger.info("RIKI: HERE1 "+skipGridProcessing);
+			//if(!skipGridProcessing)
+			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getQuery() != null) {
 			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} 
@@ -3102,6 +3106,8 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		
 		if (parallelism > 0) {
+			
+			logger.info("RIKI: PARALLELISM > 1");
 			
 			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
 			
@@ -3153,7 +3159,8 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 		} 
-
+		logger.info("RIKI: SUMMARIES : "+allSummaries);
+		
 		return allSummaries;
 	}
 
@@ -3491,7 +3498,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		
 		/* LIST OF ALL CACHE KEYS THAT ARE PRE_EXISTING IN CACHE */
-		List<String> existingCacheKeys = new ArrayList<String>();
+		List<String> availableCacheKeys = new ArrayList<String>();
 		
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
 
@@ -3520,8 +3527,9 @@ public class GeospatialFileSystem extends FileSystem {
 
 					PathRequirements pathReqs = blockRequirements.get(blockKey);
 					
-					existingCacheKeys.addAll(pathReqs.getCacheCellKeys());
+					availableCacheKeys.addAll(pathReqs.getCacheCellKeys());
 					
+					logger.info("RIKI: GEOQUERY POLYGON: "+geoQuery.getPolygon());
 					// ACTUAL FILE SYSTEM READING FOR REQUIRED CELLS
 					VisualizationQueryProcessor qp = new VisualizationQueryProcessor(this, pathReqs, geoQuery, blockGrid, queryBitmap, event.getSpatialResolution(),
 							event.getTemporalResolution(), getSummaryPosns(), true, blockKey);
@@ -3541,10 +3549,11 @@ public class GeospatialFileSystem extends FileSystem {
 				
 				// OUTPUTS FROM FILE PROCESSING ARE ROUNDED UP HERE, CACHE IS NOT TOUCHED
 				for (VisualizationQueryProcessor qp : queryProcessors) {
-
+					logger.info("RIKI: LOOKING FOR STATS...");
 					if (qp.getResultSummaries().size() > 0) {
 						Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
 
+						logger.info("RIKI: SUMMARY STATS FOUND: "+ localSummary);
 						for (String key : localSummary.keySet()) {
 
 							SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
@@ -3567,7 +3576,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// RIKI-REMOVE
 		logger.info("RIKI: CACHE POPULATION STARTED ");
 		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
-				event.getPolygon(), event.getTimeString(), event.getEventId(), existingCacheKeys);
+				event.getPolygon(), event.getTimeString(), event.getEventId(), availableCacheKeys);
 		
 		if(cleanUpNeeded) 
 			handleCacheCleaning();

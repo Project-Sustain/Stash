@@ -907,38 +907,6 @@ public class StorageNode implements RequestListener {
 				/*************** EVENT REMOVED FROM ENTRY LIST************/
 				fs.removeEvent(eventString);
 				
-				/* CREATING A RESPONSE TO BE SENT BACK. MIGHT NEED TO UPDATE THIS 
-				JSONArray summaryJSONs = new JSONArray();
-				
-				for(String key: finalSummaries.keySet()) {
-					
-					JSONObject obj = new JSONObject();
-					obj.put("key", key);
-					String summaryString = "";
-					
-					JSONArray summarystats = new JSONArray();
-					
-					int i=0;
-					
-					for(SummaryStatistics ss : finalSummaries.get(key).getStats()) {
-						if(i==0)
-							summaryString = ss.toString();
-						else 
-							summaryString += ","+ss.toString();
-					}
-					
-					obj.put("summary", summaryString);
-					
-					logger.info(key+":::"+summaryString);
-					
-					summaryJSONs.put(obj);
-				}
-				
-				totalProcessingTime = System.currentTimeMillis() - eventTime;
-				
-				resultJSON.put("hostName", this.canonicalHostname);
-				resultJSON.put("hostPort", this.port);
-				resultJSON.put("summaries", summaryJSONs);*/
 			} else {
 				logger.log(Level.SEVERE, "Requested file system(" + fsName
 						+ ") not found. Ignoring the query and returning empty results.");
@@ -954,6 +922,8 @@ public class StorageNode implements RequestListener {
 		
 		try {
 			context.sendReply(response);
+			// RIKI-REMOVE
+			logger.info("RIKI: VISUALIZATION RESPONSE SENT OUT.");
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
 		}

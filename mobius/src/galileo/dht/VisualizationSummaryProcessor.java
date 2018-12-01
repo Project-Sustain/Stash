@@ -116,9 +116,9 @@ public class VisualizationSummaryProcessor implements Runnable{
 				else
 					index++;
 			}
-			//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS "+featurePaths);
+			logger.log(Level.INFO, "RIKI: Local PATHS "+featurePaths);
 			if (queryBitmap != null) {
-				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS1 "+featurePaths);
+				logger.log(Level.INFO, "RIKI: Local PATHS1 "+featurePaths);
 				
 
 				GeoavailabilityMap<String[]> geoMap = new GeoavailabilityMap<String[]>(grid);
