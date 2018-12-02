@@ -68,6 +68,8 @@ public class ClientRequestHandler implements MessageListener {
 		this.eventMap = new GalileoEventMap();
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
+		
+		logger.info("RIKI: HANDLER NEEDS BACK "+expectedResponses+" RESPONSES");
 	}
 
 	public void closeRequest() {
@@ -114,8 +116,47 @@ public class ClientRequestHandler implements MessageListener {
 			responseCount++;
 			Event event;
 			try {
+				
 				event = this.eventWrapper.unwrap(gresponse);
-				if(event instanceof DataIntegrationResponse && this.response instanceof DataIntegrationFinalResponse) {
+				
+				//logger.info("RIKI: CLASS INFO: "+ event.getClass().getCanonicalName() + response.getClass().getCanonicalName());
+				
+				//logger.info("RIKI: CLASS CHECK: "+ (event instanceof VisualizationEventResponse) +" "+ ( this.response instanceof VisualizationResponse));
+				
+				
+				if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
+					
+					logger.info("RIKI: ENTERED HERE !!!!");
+					VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
+					
+					logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+					
+					if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
+						
+						List<String> keys = eventResponse.getKeys();
+						List<SummaryWrapper> summaries = eventResponse.getSummaries();
+						
+						int num = 0;
+						for(String key : keys) {
+							
+							SummaryWrapper eventSumm = summaries.get(num);
+							
+							if(accumulatedSummaries.containsKey(key)) {
+								SummaryWrapper oldSumm = accumulatedSummaries.get(key);
+								
+								SummaryStatistics[] mergeSummaries = SummaryStatistics.mergeSummaries(oldSumm.getStats(), eventSumm.getStats());
+								oldSumm.setStats(mergeSummaries);
+								
+							} else {
+								accumulatedSummaries.put(key, eventSumm);
+							}
+							
+							
+							num++;
+						}
+						
+					}
+				} else if(event instanceof DataIntegrationResponse && this.response instanceof DataIntegrationFinalResponse) {
 					DataIntegrationFinalResponse actualResponse = (DataIntegrationFinalResponse) this.response;
 					
 					DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
@@ -305,37 +346,6 @@ public class ClientRequestHandler implements MessageListener {
 								}
 							}
 						}
-					} else if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
-						
-						VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
-						
-						logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
-						
-						if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
-							
-							List<String> keys = eventResponse.getKeys();
-							List<SummaryWrapper> summaries = eventResponse.getSummaries();
-							
-							int num = 0;
-							for(String key : keys) {
-								
-								SummaryWrapper eventSumm = summaries.get(num);
-								
-								if(accumulatedSummaries.containsKey(key)) {
-									SummaryWrapper oldSumm = accumulatedSummaries.get(key);
-									
-									SummaryStatistics[] mergeSummaries = SummaryStatistics.mergeSummaries(oldSumm.getStats(), eventSumm.getStats());
-									oldSumm.setStats(mergeSummaries);
-									
-								} else {
-									accumulatedSummaries.put(key, eventSumm);
-								}
-								
-								
-								num++;
-							}
-							
-						}
 					} 
 				}
 			} catch (IOException | SerializationException e) {
@@ -407,7 +417,7 @@ public class ClientRequestHandler implements MessageListener {
 		}
 		
 		*/
-		
+		logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
 		
 		if (null != message)
 			this.responses.add(message);

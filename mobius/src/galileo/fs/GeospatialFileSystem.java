@@ -346,7 +346,7 @@ public class GeospatialFileSystem extends FileSystem {
 		logger.info("TOTAL TEMPORAL SUBLEVELS: "+ temporalSubLevels);
 		logger.info("TOTAL SPATIAL SUBLEVELS: " + spatialSubLevels);
 		
-		logger.info("SUMMARY_HINTS: " + summaryHints);
+		logger.info("SUMMARY_HINTS: " + this.summaryHints);
 		logger.info("SUMMARY POSITIONS: " + summaryPosns);
 		
 		
@@ -504,9 +504,12 @@ public class GeospatialFileSystem extends FileSystem {
 		int temporalResolution = state.getInt("temporalResolution");
 		
 		JSONArray sHints = state.getJSONArray("summaryHints");
+		
 		List<String> summaryHints = new ArrayList<String>();
-		for (int i = 0; i < geohashIndices.length(); i++)
+		for (int i = 0; i < sHints.length(); i++)
 			summaryHints.add(sHints.getString(i));
+		
+		
 		
 		GeospatialFileSystem gfs = new GeospatialFileSystem(storageNode, storageRoot, name, geohashPrecision,
 				temporalType, networkInfo, featureList, spHint,tHint, true, spPartitioningType, spatialResolution, temporalResolution, summaryHints);

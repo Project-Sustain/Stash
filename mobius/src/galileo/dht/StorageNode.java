@@ -101,6 +101,7 @@ import galileo.comm.TrainingDataResponse;
 import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
+import galileo.comm.VisualizationResponse;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
@@ -739,7 +740,8 @@ public class StorageNode implements RequestListener {
 		
 		/* POPULATING THE METADATA FOR THE QUERY */
 		if (gfs != null) {
-			QueryResponse response = new QueryResponse(queryId, gfs.getFeaturesRepresentation(), new JSONObject());
+			VisualizationResponse response = new VisualizationResponse();
+			
 			
 			if (request.isSpatial()) {
 				logger.log(Level.INFO, "Spatial query: {0}", request.getPolygon());
@@ -921,6 +923,8 @@ public class StorageNode implements RequestListener {
 				,hostname, port);
 		
 		try {
+			
+			logger.info("RIKI: SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
 			context.sendReply(response);
 			// RIKI-REMOVE
 			logger.info("RIKI: VISUALIZATION RESPONSE SENT OUT.");

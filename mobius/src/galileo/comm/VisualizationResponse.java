@@ -9,6 +9,7 @@ import galileo.serialization.SerializationOutputStream;
 
 public class VisualizationResponse implements Event {
 
+	
 	private String summariesJSON;
 	
 	@Override
@@ -35,5 +36,7 @@ public class VisualizationResponse implements Event {
 	public VisualizationResponse(SerializationInputStream in) throws IOException, SerializationException {
 		this.summariesJSON = in.readString();
 	}
+	
+	public VisualizationResponse() {}
 
 }
