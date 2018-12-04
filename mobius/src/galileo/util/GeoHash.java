@@ -946,7 +946,10 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 	 */
 	public static boolean checkEnclosure(String geohash1, String geohash2) {
 		
-		if(geohash2.length() > geohash1.length()) {
+		if(geohash1.equals(geohash2))
+			return true;
+		
+		if(geohash2.length() < geohash1.length()) {
 			return false;
 		}
 		
@@ -2117,6 +2120,7 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 		
 		String orientation = "none";
 		
+		// THEY BOTH ARE THE SAME
 		if(g1.equals(g2))
 			return "full";
 		
@@ -3071,6 +3075,11 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 	}
 	
 	public static void main(String arg[]) {
+		
+		System.out.println(getSpatialOrientationSimplified("9zh0", "9z5b1"));
+		System.out.println(getSpatialOrientationSimplified("9zh0", "9zh0"));
+		System.out.println(getSpatialOrientationSimplified("9zh0", "9zh01"));
+		System.out.println(getSpatialOrientationSimplified("9zh0", "9zh"));
 		//List<String> borderingGeohashesForDirection = getBorderingGeohashesGivenDirection("u9", 4, "s");
 		
 		//System.out.println(borderingGeohashesForDirection);
@@ -3084,9 +3093,9 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 		
 		//System.out.println(getSummaryKey(40.58f, -105.08f, 1537990007000f, 7, 4));
 		
-		System.out.println(GeoHash.hashToLong("00p0"));
+		//System.out.println(GeoHash.hashToLong("00p0"));
 		
-		System.out.println(getTemporalParent("2018-01-11-xx", 3));
+		//System.out.println(getTemporalParent("2018-01-11-xx", 3));
 	}
 	
 	/**

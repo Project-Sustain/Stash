@@ -762,8 +762,7 @@ public class StorageNode implements RequestListener {
 				VisualizationEvent vEvent = new VisualizationEvent(queryId, request);
 						
 				try {
-					ClientRequestHandler reqHandler = new ClientRequestHandler(new ArrayList<NetworkDestination>(nodes),
-							context, this);
+					ClientRequestHandler reqHandler = new ClientRequestHandler(new ArrayList<NetworkDestination>(nodes), context, this);
 					
 					/* Sending out query to all nodes */
 					reqHandler.handleRequest(vEvent, response);
@@ -887,8 +886,10 @@ public class StorageNode implements RequestListener {
 					
 				} else {
 					
-					// NOT SUB-BLOCK LEVEL
-					Map<String, List<String>> refinedBlockMap = null;
+					// SUPER-BLOCK LEVEL
+					logger.info("RIKI: GOING SUPER LEVEL");
+					
+					Map<String, List<String>> refinedBlockMap = new HashMap<String, List<String>>();
 					
 					// KEYS ALREADY EXISTING IN CACHE
 					List<String> existingCacheKeys = fs.listMatchingCellsForSuperResolution(blockMap, event.getSpatialResolution(), 
@@ -896,6 +897,8 @@ public class StorageNode implements RequestListener {
 					
 					// RIKI-REMOVE
 					logger.info("RIKI: REFINED BLOCK MAP: "+refinedBlockMap);
+					logger.info("RIKI: OLD BLOCK MAP: "+blockMap);
+					
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
 					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES
 					// SummaryWrapper has needsInsertion that says if it needs to be populated in cache
@@ -925,9 +928,12 @@ public class StorageNode implements RequestListener {
 		try {
 			
 			logger.info("RIKI: SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
+			
 			context.sendReply(response);
+			
 			// RIKI-REMOVE
 			logger.info("RIKI: VISUALIZATION RESPONSE SENT OUT.");
+			
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
 		}

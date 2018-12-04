@@ -148,9 +148,9 @@ public class ClientRequestHandler implements MessageListener {
 								oldSumm.setStats(mergeSummaries);
 								
 							} else {
+								eventSumm.cleanHouse();
 								accumulatedSummaries.put(key, eventSumm);
 							}
-							
 							
 							num++;
 						}
@@ -378,6 +378,7 @@ public class ClientRequestHandler implements MessageListener {
 						summaryString = ss.toString();
 					else 
 						summaryString += ","+ss.toString();
+					i++;
 				}
 				
 				obj.put("summary", summaryString);

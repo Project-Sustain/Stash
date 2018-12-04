@@ -318,7 +318,6 @@ public class VisualizationSummaryProcessor implements Runnable{
 					maxs[i] = featureValues[i];
 					mins[i] = featureValues[i];
 					sums[i] += featureValues[i];
-					counts++;
 					continue;
 				}
 				if(maxs[i] < featureValues[i]) {
@@ -328,9 +327,9 @@ public class VisualizationSummaryProcessor implements Runnable{
 					mins[i] = featureValues[i];
 				}
 				sums[i] += featureValues[i];
-				counts++;
 				
 			}
+			counts++;
 			
 		}
 		

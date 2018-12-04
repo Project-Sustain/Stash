@@ -22,7 +22,7 @@ import galileo.util.PathRequirements;
 
 public class VisualizationQueryProcessor implements Runnable{
 	
-private static final Logger logger = Logger.getLogger("galileo");
+	private static final Logger logger = Logger.getLogger("galileo");
 	
 	/* Represents the path that will be queried. All blocks in this path will be looked into. */
 

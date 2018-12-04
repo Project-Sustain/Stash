@@ -1493,6 +1493,7 @@ public class GeospatialFileSystem extends FileSystem {
 			// full-st means block extent encloses cache extent
 			// full-rev means cache extent encloses block extent
 			
+			logger.info("RIKI: THESE ARE THE GEOHASHES "+ blockGeoHash+" "+cellGeohashString);
 			String spatialOrientation = GeoHash.getSpatialOrientationSimplified(blockGeoHash, cellGeohashString);
 			String temporalOrientation = GeoHash.getTemporalOrientationSimplified(blockTime, cellTimeString, blockType, cellType);
 			
@@ -1779,7 +1780,7 @@ public class GeospatialFileSystem extends FileSystem {
 		boolean cacheIsEmpty = false;
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: MATCHING CACHE CELLS FOUND: "+matchingCacheKeys);
+		logger.info("RIKI: MATCHING CACHE CELLS FOUND: " + matchingCacheKeys);
 		
 		if(matchingCacheKeys == null || matchingCacheKeys.size() == 0) {
 			// NOTHING IN CACHE
@@ -1788,15 +1789,23 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		
 		// FETCH WHATEVER IS ALREADY IN CACHE
-		//Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+		// Map<String, SummaryStatistics[]> cacheSummariesFound = null;
+		logger.info("RIKI: TEST1: "+cacheIsEmpty);
 		
 		if(cacheIsEmpty) {
 			// NOTHING OF IMPORTANCE FOUND IN CACHE, ALL FILES NEED TO BE PROCESSED
-			refinedBlockMap = blockMap;
+			
+			for(String k : blockMap.keySet()) {
+				refinedBlockMap.put(k, blockMap.get(k));
+				
+			}
+			
+			logger.info("RIKI: TEST2: "+refinedBlockMap);
+			logger.info("RIKI: TEST3: "+blockMap);
 			return null;
 		}
 		
-		refinedBlockMap = new HashMap<String, List<String>>();
+		//refinedBlockMap = new HashMap<String, List<String>>();
 		
 		// CACHE KEYS AND MAP KEYS MUST LOOK IDENTICAL IN CASE OF SUPER RESOLUTION
 		for (String blockKey : blockMap.keySet()) {
@@ -2941,7 +2950,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 * @param summaryPosns
-	 * @param needMoreGrouping all records will be under the single blocksKey if this is false
+	 * @param needMoreGrouping all records will be under the single blocksKey if this is false. false for SUPER
 	 * @param blocksKey
 	 * @return
 	 * @throws IOException
@@ -3401,7 +3410,7 @@ public class GeospatialFileSystem extends FileSystem {
 		//int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
 			
-		if (blockMap.keySet().size() > 0) {
+		if (blockMap.keySet() != null && blockMap.keySet().size() > 0) {
 			
 			if (event.getFeatureQuery() != null || event.getPolygon() != null) {
 				
@@ -3448,12 +3457,15 @@ public class GeospatialFileSystem extends FileSystem {
 						for(String key: localSummary.keySet()) {
 							
 							SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
+							
 							finalisedSummaries.put(key, sw);
 
 						}
 					}
 				}
 			} 
+		} else {
+			logger.info("RIKI: REFINED BLOCKMAP IS EMPTY");
 		}
 		
 

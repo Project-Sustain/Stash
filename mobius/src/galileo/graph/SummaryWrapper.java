@@ -17,6 +17,22 @@ public class SummaryWrapper implements ByteSerializable{
 	
 	private SummaryStatistics[] stats;
 	
+	public String toString() {
+		
+		String sString = "";
+		
+		int i=0;
+		for(SummaryStatistics ss : stats) {
+			if(i==0)
+				sString = ss.toString();
+			else
+				sString+=","+ss.toString();
+			i++;
+		}
+		
+		return sString;
+	}
+	
 	public SummaryWrapper(boolean needsInsertion, SummaryStatistics[] stats) {
 		
 		this.needsInsertion = needsInsertion;
@@ -53,6 +69,18 @@ public class SummaryWrapper implements ByteSerializable{
 		in.readSerializableCollection(SummaryStatistics.class, elements);
 		stats = elements.toArray(new SummaryStatistics[elements.size()]);
 		
+	}
+	
+	/**
+	 * CALCULATE THE AVERAGES BEFORE BEING SENT OUT
+	 * @author sapmitra
+	 */
+	public void cleanHouse() {
+		
+		for(SummaryStatistics ss : stats) {
+			ss.setResolved(true);
+			ss.calculateAvg();
+		}
 	}
 	
 	

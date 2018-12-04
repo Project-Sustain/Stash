@@ -1,6 +1,7 @@
 package galileo.graph;
 
 import java.io.IOException;
+import java.util.logging.Logger;
 
 import galileo.serialization.ByteSerializable;
 import galileo.serialization.SerializationException;
@@ -8,6 +9,8 @@ import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
 
 public class SummaryStatistics implements ByteSerializable{
+	
+	private static final Logger logger = Logger.getLogger("galileo");
 	
 	private int count;
 	private float max;
@@ -75,6 +78,10 @@ public class SummaryStatistics implements ByteSerializable{
 	public void setResolved(boolean resolved) {
 		this.resolved = resolved;
 	}
+	
+	public void calculateAvg() {
+		this.avg = tmpSum/count;
+	}
 
 	/**
 	 * 
@@ -84,6 +91,8 @@ public class SummaryStatistics implements ByteSerializable{
 	 * @return
 	 */
 	public static SummaryStatistics[] mergeSummaries(SummaryStatistics[] oldStats, SummaryStatistics[] statsUpdate) {
+		
+		logger.info("RIKI: MERGE SUMMARY CALLED HERE");
 		
 		SummaryStatistics[] newStats = new SummaryStatistics[oldStats.length];
 		for(int i=0; i< oldStats.length; i++) {
@@ -136,6 +145,7 @@ public class SummaryStatistics implements ByteSerializable{
 		old.addToTmpSum(upd.getTmpSum());
 		old.increaseCount(upd.getCount());
 		
+		old.setAvg(old.getTmpSum()/ old.count);
 		return old;
 		
 	}
@@ -157,7 +167,7 @@ public class SummaryStatistics implements ByteSerializable{
 	
 	@Override
 	public String toString() {
-		String retStr = "{"+min+","+max+","+avg+","+count+"}";
+		String retStr = "{"+resolved+","+min+","+max+","+avg+","+count+"}";
 		return retStr;
 	}
 

@@ -51,8 +51,8 @@ public class VisualizationQueryTest {
 		
 		vr.setPolygon(cl);
 		vr.setTime("2017-02-xx-xx");
-		vr.setSpatialResolution(5);
-		vr.setTemporalResolution(4);
+		vr.setSpatialResolution(2);
+		vr.setTemporalResolution(2);
 		
 		List<String> sumFt = new ArrayList<String>();
 		sumFt.add("fs_feature1");
@@ -61,7 +61,7 @@ public class VisualizationQueryTest {
 		
 		try {
 			gc.visualize(vr);
-			Thread.sleep(10000);
+			Thread.sleep(4000);
 		} finally {
 			gc.disconnect();
 		}
@@ -79,10 +79,8 @@ public class VisualizationQueryTest {
 		args[0] = "lattice-1.cs.colostate.edu";
 		args[1] = "5634";
 		
-		
 		if (args.length != 2) {
-			System.out.println(
-					"Usage: VisualizationQueryTest [galileo-hostname] [galileo-port-number]");
+			System.out.println("Usage: VisualizationQueryTest [galileo-hostname] [galileo-port-number]");
 			System.exit(0);
 		} else {
 			try {
