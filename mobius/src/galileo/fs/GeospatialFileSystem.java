@@ -3367,7 +3367,7 @@ public class GeospatialFileSystem extends FileSystem {
 				if(sw.isNeedsInsertion()) {
 					
 					// RIKI-REMOVE
-					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL "+cacheResolution);
+					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution);
 					// THIS IS A NEW CELL GETTING INSERTED
 					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 					
