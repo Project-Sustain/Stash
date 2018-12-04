@@ -3381,8 +3381,34 @@ public class GeospatialFileSystem extends FileSystem {
 				
 			}
 			
+			logger.info("RIKI: CACHE INFO: COUNT: "+ stCache.getTotalRooms());
+			
+			int i=0;
+			
+			for(SparseSpatiotemporalMatrix stm: stCache.getCacheLevels()) {
+				logger.info("\n\nRIKI: CACHE INFO: LEVEL: "+ i +"\n===============================================================\n");
+				
+				if(stm.getCells() != null && stm.getCells().size() > 0) {
+				
+					
+					for(String cellK : stm.getCells().keySet()) {
+						
+						logger.info("\n\nRIKI: CACHE INFO: CELL KEY "+cellK + " CELL FRESHNESS "+stm.getCells().get(cellK).getFreshness());
+						
+					}
+				}
+				
+				i++;
+			}
+			
+			
+			
+			
 			if(totalInserted > 0)
 				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
+			
+			
+			
 			
 			return false;
 			
