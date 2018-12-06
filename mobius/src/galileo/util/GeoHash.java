@@ -193,7 +193,7 @@ public class GeoHash {
 	 * @return
 	 * @throws ParseException
 	 */
-	public static long getStartTimeStamp(String temporalString, TemporalType temporalType) throws ParseException {
+	public static long getStartTimeStamp(String temporalString, TemporalType temporalType) {
 		
 		String timeTokens[] = temporalString.split("-");
 		return getStartTimeStamp(timeTokens[0],timeTokens[1],timeTokens[2],timeTokens[3], temporalType);
@@ -209,7 +209,7 @@ public class GeoHash {
 	 * @return
 	 * @throws ParseException
 	 */
-	public static long getEndTimeStamp(String temporalString, TemporalType temporalType) throws ParseException {
+	public static long getEndTimeStamp(String temporalString, TemporalType temporalType) {
 		
 		String timeTokens[] = temporalString.split("-");
 		return getEndTimeStamp(timeTokens[0],timeTokens[1],timeTokens[2],timeTokens[3], temporalType);
@@ -227,7 +227,7 @@ public class GeoHash {
 	 * @return
 	 * @throws ParseException
 	 */
-	public static long getStartTimeStamp(String year, String month, String day, String hour, TemporalType temporalType) throws ParseException {
+	public static long getStartTimeStamp(String year, String month, String day, String hour, TemporalType temporalType) {
 		
 		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
 		calendar.setTimeZone(TemporalHash.TIMEZONE);
@@ -287,7 +287,7 @@ public class GeoHash {
 		
 	}
 	
-public static long getStartTimeStamp_BackupWithOffset(String year, String month, String day, String hour, TemporalType temporalType) throws ParseException {
+	public static long getStartTimeStamp_BackupWithOffset(String year, String month, String day, String hour, TemporalType temporalType) throws ParseException {
 		
 		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
 		calendar.setTimeZone(TemporalHash.TIMEZONE);
@@ -358,6 +358,103 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 	 * @return
 	 */
 	public static long getEndTimeStamp(String year, String month, String day, String hour, TemporalType temporalType) {
+		
+		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
+		calendar.setTimeZone(TemporalHash.TIMEZONE);
+		//calendar.setLenient(false);
+		
+		if(month.contains("x"))
+			month = "11";
+		
+		int mn = Integer.parseInt(month);
+		
+		if(day.contains("x")) {
+			if(mn == 1 || mn == 3 || mn == 5 || mn == 7 || mn == 8 || mn == 10 || mn == 12 )
+				day = "31";
+			else if(mn == 2) {
+				int yr = Integer.parseInt(year) ;
+				if(yr % 4 == 0) 
+					day = "29";
+				else
+					day = "28";
+			}
+		}
+			
+		if(hour.contains("x"))
+			hour = "23";
+		
+		switch (temporalType) {
+			case HOUR_OF_DAY:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(day));
+				calendar.set(Calendar.HOUR_OF_DAY, Integer.parseInt(hour));
+				calendar.set(Calendar.MINUTE, 59);
+			    calendar.set(Calendar.SECOND, 59);
+			    calendar.set(Calendar.MILLISECOND, 999);
+			    break;
+			case DAY_OF_MONTH:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(day));
+				calendar.set(Calendar.HOUR_OF_DAY, 23);
+				calendar.set(Calendar.MINUTE, 59);
+			    calendar.set(Calendar.SECOND, 59);
+			    calendar.set(Calendar.MILLISECOND, 999);
+			    break;
+			case MONTH:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, Integer.parseInt(month)-1);
+				
+				int m = Integer.parseInt(month);
+				if(m == 1 || m == 3 || m == 5 || m == 7 || m == 8 || m == 10 || m == 12 )
+					calendar.set(Calendar.DAY_OF_MONTH, 31);
+				else if(m == 2) {
+					int yr = calendar.get(Calendar.YEAR) ;
+					if(yr % 4 == 0) 
+						calendar.set(Calendar.DAY_OF_MONTH, 29);
+					else
+						calendar.set(Calendar.DAY_OF_MONTH, 28);
+				} else 
+					calendar.set(Calendar.DAY_OF_MONTH, 30);
+				
+				calendar.set(Calendar.HOUR_OF_DAY, 23);
+			    calendar.set(Calendar.MINUTE, 59);
+			    calendar.set(Calendar.SECOND, 59);
+			    calendar.set(Calendar.MILLISECOND, 999);
+			    break;
+			case YEAR:
+				calendar.set(Calendar.YEAR, Integer.parseInt(year));
+				calendar.set(Calendar.MONTH, 11);
+				calendar.set(Calendar.DAY_OF_MONTH, 31);
+				calendar.set(Calendar.HOUR_OF_DAY, 23);
+				calendar.set(Calendar.MINUTE, 59);
+			    calendar.set(Calendar.SECOND, 59);
+			    calendar.set(Calendar.MILLISECOND, 999);
+			    break;
+			    
+		}
+		
+	    //System.out.println(calendar.getTime());
+		    
+	    //System.out.println("CONVERTED:" + d1);
+	    
+	    //System.out.println(calendar.getTimeInMillis() + offset);
+	    return calendar.getTimeInMillis();
+		
+	}
+	
+	/**
+	 * 
+	 * @author sapmitra
+	 * @param year
+	 * @param month
+	 * @param day
+	 * @param hour
+	 * @param temporalType
+	 * @return
+	 */
+	public static long getEndTimeStamp_BackupWithOffset(String year, String month, String day, String hour, TemporalType temporalType) {
 		
 		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
 		calendar.setTimeZone(TemporalHash.TIMEZONE);
@@ -3096,6 +3193,10 @@ public static long getStartTimeStamp_BackupWithOffset(String year, String month,
 		//System.out.println(GeoHash.hashToLong("00p0"));
 		
 		//System.out.println(getTemporalParent("2018-01-11-xx", 3));
+		
+		
+		System.out.println(getEndTimeStamp("2017-2-xx-xx", TemporalType.MONTH));
+		System.out.println(getStartTimeStamp("2017-2-xx-xx", TemporalType.MONTH));
 	}
 	
 	/**

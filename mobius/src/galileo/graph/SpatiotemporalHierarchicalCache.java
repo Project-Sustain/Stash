@@ -1,13 +1,14 @@
 package galileo.graph;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 import galileo.dataset.Coordinates;
 import galileo.fs.GeospatialFileSystem;
 import galileo.util.STRelatives;
 
 public class SpatiotemporalHierarchicalCache {
-	
+	private static final Logger logger = Logger.getLogger("galileo");
 	// EACH LEVEL IS A 2D SPARSE MATRIX
 	private SparseSpatiotemporalMatrix[] cacheLevels;
 	
@@ -104,8 +105,10 @@ public class SpatiotemporalHierarchicalCache {
 		
 		boolean newEntry = false;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
+			logger.info("RIKI: REACHED INSIDE");
 			newEntry = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
 		}
+		
 		return newEntry;
 	}
 	

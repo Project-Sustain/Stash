@@ -943,7 +943,7 @@ public class MDC {
 			mins.add(startTimeStamp);
 			spans.add(span);
 			
-		} catch (ParseException e) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

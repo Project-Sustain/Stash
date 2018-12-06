@@ -1608,6 +1608,10 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			String[] cellTimeTokens = cellTimeString.split("-");
 			
+			
+			logger.info("RIKI: CELL TIMESTRINGS "+cellTimeTokens[0]+" " + cellTimeTokens[1]+" " + cellTimeTokens[2]+" " + cellTimeTokens[3]);
+			logger.info("RIKI: QUERY TIMESTAMPS "+qt1+" "+qt2);
+			
 			// CHECK IF THE CACHE CELL IS CONTAINED IN THE POLYGON AND TIMERANGE OF THE QUERY
 			long cellTimeStamp = GeoHash.getStartTimeStamp(cellTimeTokens[0], cellTimeTokens[1], cellTimeTokens[2], cellTimeTokens[3], cellType);
 			boolean spatialIntersection = GeoHash.checkIntersection(polygon, cellGeohashString);
@@ -1615,6 +1619,8 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			if(cellTimeStamp >= qt1 && cellTimeStamp <= qt2 )
 				temporalIntersection = true;
+			
+			logger.info("RIKI: CHECKING 123..."+key+" "+spatialIntersection+" "+temporalIntersection);
 			
 			// THIS CACHE CELL IS TO BE CONSIDERED FOR EXTRACTION
 			if (spatialIntersection && temporalIntersection) {
@@ -1766,6 +1772,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// The level of stcache we need to look at
 		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
 		
+		logger.info("RIKI: ABOUT TO LOOK INTO CACHE LEVEL: "+level);
 		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
 		// GO THROUGH THE KEYS OF THE CELL MATRIX TO GET THIS DONE
 		SparseSpatiotemporalMatrix cache = stCache.getSpecificCache(level);
@@ -1773,6 +1780,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
 		List<String> matchingCacheKeys = null;
 		
+		logger.info("RIKI: CACHE HAS: "+cache.getCells().keySet());
 		synchronized(cache) {
 			matchingCacheKeys = getCacheCellsForForQueryArea(cache.getCells().keySet(),reqTemporalType, temporalLevel, polygon, qt1, qt2);
 		}
@@ -1799,9 +1807,6 @@ public class GeospatialFileSystem extends FileSystem {
 				refinedBlockMap.put(k, blockMap.get(k));
 				
 			}
-			
-			logger.info("RIKI: TEST2: "+refinedBlockMap);
-			logger.info("RIKI: TEST3: "+blockMap);
 			return null;
 		}
 		
@@ -1834,7 +1839,8 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	public Map<String, List<String>> listBlocksForVisualization(String temporalProperties, List<Coordinates> spatialProperties, 
 			int reqSpatialResolution, int reqTemporalResolution) throws InterruptedException {
-		 Map<String, List<String>> blockMap = new HashMap<String, List<String>>();
+		
+		Map<String, List<String>> blockMap = new HashMap<String, List<String>>();
 		String space = null;
 		List<Path<Feature, String>> paths = null;
 		List<String> blocks = new ArrayList<String>();
@@ -3366,11 +3372,12 @@ public class GeospatialFileSystem extends FileSystem {
 				// HERE, UPDATE EACH CELL, EXTRACT ITS CONTENTS AND DISPERSE FRESHNESS
 				if(sw.isNeedsInsertion()) {
 					
-					// RIKI-REMOVE
-					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution);
+					
 					// THIS IS A NEW CELL GETTING INSERTED
 					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
 					
+					// RIKI-REMOVE
+					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution+" "+newEntry);
 					if(newEntry)
 						totalInserted++;
 				} else {
@@ -3383,9 +3390,12 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			logger.info("RIKI: CACHE INFO: COUNT: "+ stCache.getTotalRooms());
 			
-			int i=0;
+			//int i=0;
 			
-			for(SparseSpatiotemporalMatrix stm: stCache.getCacheLevels()) {
+			for(int i=0; i < stCache.getCacheLevels().length; i++) {
+			//for(SparseSpatiotemporalMatrix stm: stCache.getCacheLevels()) {
+				
+				SparseSpatiotemporalMatrix stm = stCache.getCacheLevels()[i];
 				logger.info("\n\nRIKI: CACHE INFO: LEVEL: "+ i +"\n===============================================================\n");
 				
 				if(stm.getCells() != null && stm.getCells().size() > 0) {
@@ -3398,17 +3408,10 @@ public class GeospatialFileSystem extends FileSystem {
 					}
 				}
 				
-				i++;
 			}
-			
-			
-			
 			
 			if(totalInserted > 0)
 				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
-			
-			
-			
 			
 			return false;
 			

@@ -1,6 +1,7 @@
 package galileo.comm;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,6 +14,7 @@ import galileo.query.Query;
 import galileo.serialization.SerializationException;
 import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
+import galileo.util.GeoHash;
 
 public class VisualizationEvent implements Event{
 
@@ -160,7 +162,19 @@ public class VisualizationEvent implements Event{
 	}
 
 	public String getTimeString() {
-		return timeString;
+		
+		String timeSt = "";
+		
+		TemporalType tt = TemporalType.getTypeFromLevel(temporalResolution);
+		
+		
+		long qt1 = GeoHash.getStartTimeStamp(timeString, tt);
+		long qt2 = GeoHash.getEndTimeStamp(timeString, tt);
+		
+		timeSt = qt1+"-"+qt2;
+			
+		
+		return timeSt;
 	}
 
 	public void setTimeString(String timeString) {
