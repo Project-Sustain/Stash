@@ -3392,8 +3392,10 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			//int i=0;
 			
-			for(int i=0; i < stCache.getCacheLevels().length; i++) {
-			//for(SparseSpatiotemporalMatrix stm: stCache.getCacheLevels()) {
+			
+			// LOGGING
+			
+			/*for(int i=0; i < stCache.getCacheLevels().length; i++) {
 				
 				SparseSpatiotemporalMatrix stm = stCache.getCacheLevels()[i];
 				logger.info("\n\nRIKI: CACHE INFO: LEVEL: "+ i +"\n===============================================================\n");
@@ -3408,7 +3410,7 @@ public class GeospatialFileSystem extends FileSystem {
 					}
 				}
 				
-			}
+			}*/
 			
 			if(totalInserted > 0)
 				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
