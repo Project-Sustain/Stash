@@ -1478,6 +1478,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// In this loop, for each cache key, we find which block bitmap bits it covers, if any
 		for(String key : cacheCells) {
 			
+			logger.info("RIKI: DEALING WITH BLOCK: "+key);
 			String[] cellTokens = key.split("\\$\\$");
 			
 			String cellTimeString = cellTokens[0];
@@ -1494,7 +1495,10 @@ public class GeospatialFileSystem extends FileSystem {
 			// full-rev means cache extent encloses block extent
 			
 			logger.info("RIKI: THESE ARE THE GEOHASHES "+ blockGeoHash+" "+cellGeohashString);
+			
 			String spatialOrientation = GeoHash.getSpatialOrientationSimplified(blockGeoHash, cellGeohashString);
+			
+			logger.info("RIKI: BLOCK INFO "+ blockTime+" "+ cellTimeString+" "+ blockType+" "+ cellType);
 			String temporalOrientation = GeoHash.getTemporalOrientationSimplified(blockTime, cellTimeString, blockType, cellType);
 			
 			
@@ -3083,7 +3087,7 @@ public class GeospatialFileSystem extends FileSystem {
 			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
 			throws IOException, InterruptedException {
 		
-		logger.info("RIKI: LOOKING FOR SUMMARIES IN FS.");
+		logger.info("RIKI: LOOKING FOR SUMMARIES IN FS. BLOCK KEY: "+blocksKey);
 		
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
 		
@@ -3094,14 +3098,14 @@ public class GeospatialFileSystem extends FileSystem {
 		boolean skipGridProcessing = false;
 		if (geoQuery.getPolygon() != null && geoQuery.getQuery() != null) {
 			/* If polygon complete encompasses geohash */
-			logger.info("RIKI: HERE");
+			//logger.info("RIKI: HERE");
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
 			
 			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getPolygon() != null) {
 			/* If grid lies completely inside polygon */
 			skipGridProcessing = isGridInsidePolygon(grid, geoQuery);
-			logger.info("RIKI: HERE1 "+skipGridProcessing);
+			//logger.info("RIKI: HERE1 "+skipGridProcessing);
 			//if(!skipGridProcessing)
 			featurePaths = getFeaturePathsLocal(pathReqs, spatialResolution, temporalResolution);
 		} else if (geoQuery.getQuery() != null) {
@@ -3395,7 +3399,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			// LOGGING
 			
-			/*for(int i=0; i < stCache.getCacheLevels().length; i++) {
+			for(int i=0; i < stCache.getCacheLevels().length; i++) {
 				
 				SparseSpatiotemporalMatrix stm = stCache.getCacheLevels()[i];
 				logger.info("\n\nRIKI: CACHE INFO: LEVEL: "+ i +"\n===============================================================\n");
@@ -3410,7 +3414,7 @@ public class GeospatialFileSystem extends FileSystem {
 					}
 				}
 				
-			}*/
+			}
 			
 			if(totalInserted > 0)
 				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());

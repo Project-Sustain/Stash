@@ -51,8 +51,13 @@ public class VisualizationQueryTest {
 		
 		vr.setPolygon(cl);
 		vr.setTime("2017-02-xx-xx");
-		vr.setSpatialResolution(2);
-		vr.setTemporalResolution(2);
+		
+		/*vr.setSpatialResolution(2);
+		vr.setTemporalResolution(2);*/
+		
+		
+		vr.setSpatialResolution(5);
+		vr.setTemporalResolution(3);
 		
 		List<String> sumFt = new ArrayList<String>();
 		sumFt.add("fs_feature1");

@@ -183,6 +183,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 				// CREATE A MAP OF KEY TO SUMMARY[]
 				if(evaluatedPaths.size() > 0) {
 					
+					logger.info("RIKI: DO I NEED MORE GROUPING? "+needMoreGrouping);
 					if(!needMoreGrouping) {
 						getSummariesNoGroupingNeeded(evaluatedPaths);
 					} else {
@@ -202,6 +203,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 	
 	private void getSummariesGroupingNeeded(List<Path<Feature, String>> evaluatedPaths, int latOrder, int lngOrder, int temporalOrder) {
 		
+		//logger.info("RIKI: CHECKING INFOS: "+ latOrder+" "+lngOrder+" "+temporalOrder);
 		for (Path<Feature, String> path : evaluatedPaths) {
 			
 			float[] featureValues = new float[summaryPosns.size()];
@@ -234,8 +236,12 @@ public class VisualizationSummaryProcessor implements Runnable{
 				indx++;
 			}
 			
+			
+			
 			// evaluate key using the resolutions
 			String summaryKey = GeoHash.getSummaryKey(sp1, sp2, tmp, spatialResolution, temporalResolution);
+			//logger.info("RIKI: CHECKING VALS: "+ sp1+" "+sp2+" "+tmp+" "+summaryKey);
+			
 			
 			SummaryStatistics[] summaries = localSummary.get(summaryKey);
 			boolean firstInsertion = false;

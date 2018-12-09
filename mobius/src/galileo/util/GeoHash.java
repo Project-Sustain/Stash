@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.logging.Logger;
 
 import galileo.bmp.Bitmap;
 import galileo.comm.TemporalType;
@@ -67,6 +68,7 @@ import galileo.fs.GeospatialFileSystem;
  */
 public class GeoHash {
 
+	private static final Logger logger = Logger.getLogger("galileo");
 	public final static byte BITS_PER_CHAR = 5;
 	public final static int LATITUDE_RANGE = 90;
 	public final static int LONGITUDE_RANGE = 180;
@@ -3143,7 +3145,14 @@ public class GeoHash {
 		String temporalString = "";
 		Calendar calendar = Calendar.getInstance(TemporalHash.TIMEZONE);
 		calendar.setTimeZone(TemporalHash.TIMEZONE);
-		calendar.setTimeInMillis((long)timestamp);
+		
+		long ts = (long) timestamp;
+		if(Long.toString(ts).length() < 13) {
+			ts = ts*1000;
+		}
+		
+		calendar.setTimeInMillis(ts);
+		
 		//calendar.setLenient(false);
 		
 		int year = calendar.get(Calendar.YEAR);
@@ -3156,13 +3165,13 @@ public class GeoHash {
 				temporalString = year+"-"+month+"-"+day+"-"+hour;
 			    break;
 			case DAY_OF_MONTH:
-				temporalString = year+"-"+month+"-"+day;
+				temporalString = year+"-"+month+"-"+day+"-xx";
 			    break;
 			case MONTH:
-				temporalString = year+"-"+month;
+				temporalString = year+"-"+month+"-xx-xx";
 			    break;
 			case YEAR:
-				temporalString = String.valueOf(year);
+				temporalString = String.valueOf(year)+"-xx-xx-xx";
 			    break;
 			    
 		}
@@ -3197,6 +3206,15 @@ public class GeoHash {
 		
 		System.out.println(getEndTimeStamp("2017-2-xx-xx", TemporalType.MONTH));
 		System.out.println(getStartTimeStamp("2017-2-xx-xx", TemporalType.MONTH));
+		
+		
+		long tmp = 1544227021l;
+		
+		System.out.println(Long.toString(tmp).length());
+		
+		tmp = 1544227021000l;
+		System.out.println(Long.toString(tmp).length());
+		
 	}
 	
 	/**
