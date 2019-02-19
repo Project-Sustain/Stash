@@ -144,6 +144,7 @@ import galileo.util.Requirements;
 import galileo.util.SuperCube;
 import galileo.util.SuperPolygon;
 import galileo.util.Version;
+import web.Listener;
 
 /**
  * Primary communication component in the Galileo DHT. StorageNodes service
@@ -182,6 +183,11 @@ public class StorageNode implements RequestListener {
 	private List<SurveyRequestHandler> surveyHandlers;
 	private List<String> fsToBePruned;
 	private boolean pruningNeeded;
+	
+	private ResourceTracker resourceTracker;
+	
+	// WHETHER THIS NODE IS THE RESOURCE TRACKER OR NOT
+	private boolean isTracker;
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
 
@@ -218,6 +224,7 @@ public class StorageNode implements RequestListener {
 		this.surveyHandlers = new CopyOnWriteArrayList<SurveyRequestHandler>();
 		this.fsToBePruned = new ArrayList<String>();
 		this.pruningNeeded = false;
+		this.isTracker = false;
 	}
 
 	/**
@@ -244,6 +251,28 @@ public class StorageNode implements RequestListener {
 		network = NetworkConfig.readNetworkDescription(SystemConfig.getNetworkConfDir());
 
 		// Verifying if this node is a part of this cluster.
+		
+		// PICK THE LAST NODE AS THE RESOURCE TRACKER
+		List<NodeInfo> allNodes = network.getAllNodes();
+		
+		if(allNodes != null && allNodes.size() > 0) {
+			
+			NodeInfo trackerNode = allNodes.get(allNodes.size()-1);
+			
+			// IF THIS IS THE LAST NODE IN THE LIST
+			if (trackerNode != null && trackerNode.toString().split(":")[0].equals(this.hostname)) {
+				isTracker = true;
+				
+				this.resourceTracker = new ResourceTracker();
+				
+				Thread thread = new Thread(this.resourceTracker);
+				thread.start();
+				
+				// INITIATE THE THREAD FOR RESOURCE TRACKING
+			}
+		}
+		
+		
 		boolean nodeFound = false;
 		for (NodeInfo node : network.getAllNodes()) {
 			String nodeName = node.getHostname();
@@ -1312,6 +1341,8 @@ public class StorageNode implements RequestListener {
 			for (GeospatialFileSystem fs : fsMap.values())
 				fs.shutdown();
 
+			resourceTracker.kill();
+			
 			System.out.println("Goodbye!");
 		}
 	}

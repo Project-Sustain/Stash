@@ -70,5 +70,8 @@ public class GalileoEventMap extends EventMap {
         addMapping(1001, VisualizationEvent.class);
         addMapping(1002, VisualizationEventResponse.class);
         
+        addMapping(1101, HeartbeatRequest.class);
+        addMapping(1102, HeartbeatResponse.class);
+        
     }
 }
