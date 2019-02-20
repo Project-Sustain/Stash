@@ -14,6 +14,7 @@ public class HeartbeatRequest implements Event {
 	public HeartbeatRequest(String queryId) {
 		this.eventID = queryId;
 	}
+	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		

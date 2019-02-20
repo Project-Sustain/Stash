@@ -261,9 +261,10 @@ public class StorageNode implements RequestListener {
 			
 			// IF THIS IS THE LAST NODE IN THE LIST
 			if (trackerNode != null && trackerNode.toString().split(":")[0].equals(this.hostname)) {
+				
 				isTracker = true;
 				
-				this.resourceTracker = new ResourceTracker();
+				this.resourceTracker = new ResourceTracker(allNodes);
 				
 				Thread thread = new Thread(this.resourceTracker);
 				thread.start();
@@ -1341,7 +1342,8 @@ public class StorageNode implements RequestListener {
 			for (GeospatialFileSystem fs : fsMap.values())
 				fs.shutdown();
 
-			resourceTracker.kill();
+			if(resourceTracker != null)
+				resourceTracker.kill();
 			
 			System.out.println("Goodbye!");
 		}
