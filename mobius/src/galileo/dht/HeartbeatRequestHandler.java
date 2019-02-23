@@ -19,6 +19,7 @@ import org.json.JSONObject;
 import galileo.comm.DataIntegrationFinalResponse;
 import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
+import galileo.comm.HeartbeatResponse;
 import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
 import galileo.comm.VisualizationEventResponse;
@@ -53,8 +54,15 @@ public class HeartbeatRequestHandler implements MessageListener {
 	private Event response;
 	private long elapsedTime;
 	private long reqId;
+	private boolean currentlyBusy;
+	
+	private String currentHostString;
+	private NodeResourceInfo currentHostResourceInfo;
+	
+	
+	private Map<String, NodeResourceInfo> nodesResourceMap;
 
-	public HeartbeatRequestHandler(List<NetworkDestination> nodes) throws IOException {
+	public HeartbeatRequestHandler(List<NetworkDestination> nodes, Map<String, NodeResourceInfo> nodesResourceMap) throws IOException {
 		this.nodes = nodes;
 
 		this.router = new ClientMessageRouter(true);
@@ -63,360 +71,60 @@ public class HeartbeatRequestHandler implements MessageListener {
 		this.eventMap = new GalileoEventMap();
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
+		this.currentlyBusy = false;
+		this.nodesResourceMap = nodesResourceMap;
 		
-		logger.info("RIKI: HANDLER NEEDS BACK "+expectedResponses+" RESPONSES");
 	}
 
 	public void closeRequest() {
-		silentClose(); // closing the router to make sure that no new responses
-						// are added.
-		class LocalFeature implements Comparable<LocalFeature> {
-			String name;
-			String type;
-			int order;
-
-			LocalFeature(String name, String type, int order) {
-				this.name = name;
-				this.type = type;
-				this.order = order;
-			}
-
-			@Override
-			public boolean equals(Object obj) {
-				if (obj == null || !(obj instanceof LocalFeature))
-					return false;
-				LocalFeature other = (LocalFeature) obj;
-				if (this.name.equalsIgnoreCase(other.name) && this.type.equalsIgnoreCase(other.type)
-						&& this.order == other.order)
-					return true;
-				return false;
-			}
-
-			@Override
-			public int hashCode() {
-				return name.hashCode() + type.hashCode() + String.valueOf(this.order).hashCode();
-			}
-
-			@Override
-			public int compareTo(LocalFeature o) {
-				return this.order - o.order;
-			}
-		}
-		Map<String, Set<LocalFeature>> resultMap = new HashMap<String, Set<LocalFeature>>();
+		
+		silentClose(); // closing the router to make sure that no new responses are added.
+		
 		int responseCount = 0;
 		
-		Map<String, SummaryWrapper> accumulatedSummaries = new HashMap<String, SummaryWrapper>();
-
 		for (GalileoMessage gresponse : this.responses) {
+			
 			responseCount++;
 			Event event;
+			
 			try {
-				
 				event = this.eventWrapper.unwrap(gresponse);
 				
-				//logger.info("RIKI: CLASS INFO: "+ event.getClass().getCanonicalName() + response.getClass().getCanonicalName());
+				if (event instanceof HeartbeatResponse) {
+					
+					HeartbeatResponse eventResponse = (HeartbeatResponse) event;
+					
+					logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM "+eventResponse.getHostString());
+					
+					NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
+							eventResponse.getHeapMem());
+					nodesResourceMap.put(eventResponse.getHostString(), nr);
 				
-				//logger.info("RIKI: CLASS CHECK: "+ (event instanceof VisualizationEventResponse) +" "+ ( this.response instanceof VisualizationResponse));
-				
-				
-				if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
-					
-					logger.info("RIKI: ENTERED HERE !!!!");
-					VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
-					
-					logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
-					
-					if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
-						
-						List<String> keys = eventResponse.getKeys();
-						List<SummaryWrapper> summaries = eventResponse.getSummaries();
-						
-						int num = 0;
-						for(String key : keys) {
-							
-							SummaryWrapper eventSumm = summaries.get(num);
-							
-							if(accumulatedSummaries.containsKey(key)) {
-								SummaryWrapper oldSumm = accumulatedSummaries.get(key);
-								
-								SummaryStatistics[] mergeSummaries = SummaryStatistics.mergeSummaries(oldSumm.getStats(), eventSumm.getStats());
-								oldSumm.setStats(mergeSummaries);
-								
-							} else {
-								eventSumm.cleanHouse();
-								accumulatedSummaries.put(key, eventSumm);
-							}
-							
-							num++;
-						}
-						
-					}
-				} else if(event instanceof DataIntegrationResponse && this.response instanceof DataIntegrationFinalResponse) {
-					DataIntegrationFinalResponse actualResponse = (DataIntegrationFinalResponse) this.response;
-					
-					DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
-					
-					logger.info("RIKI: DATA INTEGRATION RESPONSE RECEIVED....FROM "+eventResponse.getNodeName()+":"+eventResponse.getNodePort() +" "+eventResponse.getResultPaths());
-					
-					if(eventResponse.getResultPaths() != null && eventResponse.getResultPaths().size() > 0) {
-						for(String path: eventResponse.getResultPaths()) {
-							//logger.info("RIKI: DATA INTEGRATION RESPONSE :"+eventResponse.getResultPaths());
-							String newPath = eventResponse.getNodeName()+":"+eventResponse.getNodePort()+"$$"+path;
-							actualResponse.addResultPath(newPath);
-						}
-					}
-					
-					
-				} else if (event instanceof QueryResponse && this.response instanceof QueryResponse) {
-					QueryResponse actualResponse = (QueryResponse) this.response;
-					actualResponse.setElapsedTime(elapsedTime);
-					QueryResponse eventResponse = (QueryResponse) event;
-					JSONObject responseJSON = actualResponse.getJSONResults();
-					JSONObject eventJSON = eventResponse.getJSONResults();
-					if (responseJSON.length() == 0) {
-						for (String name : JSONObject.getNames(eventJSON))
-							responseJSON.put(name, eventJSON.get(name));
-					} else {
-						if (responseJSON.has("queryId") && eventJSON.has("queryId")
-								&& responseJSON.getString("queryId").equalsIgnoreCase(eventJSON.getString("queryId"))) {
-							if (actualResponse.isDryRun()) {
-								JSONObject actualResults = responseJSON.getJSONObject("result");
-								JSONObject eventResults = eventJSON.getJSONObject("result");
-								if (null != JSONObject.getNames(eventResults)) {
-									for (String name : JSONObject.getNames(eventResults)) {
-										if (actualResults.has(name)) {
-											JSONArray ar = actualResults.getJSONArray(name);
-											JSONArray er = eventResults.getJSONArray(name);
-											for (int i = 0; i < er.length(); i++) {
-												ar.put(er.get(i));
-											}
-										} else {
-											actualResults.put(name, eventResults.getJSONArray(name));
-										}
-									}
-								}
-							} else {
-								JSONArray actualResults = responseJSON.getJSONArray("result");
-								JSONArray eventResults = eventJSON.getJSONArray("result");
-								for (int i = 0; i < eventResults.length(); i++)
-									actualResults.put(eventResults.getJSONObject(i));
-							}
-							if (responseJSON.has("hostProcessingTime")) {
-								JSONObject aHostProcessingTime = responseJSON.getJSONObject("hostProcessingTime");
-								JSONObject eHostProcessingTime = eventJSON.getJSONObject("hostProcessingTime");
-
-								JSONObject aHostFileSize = responseJSON.getJSONObject("hostFileSize");
-								JSONObject eHostFileSize = eventJSON.getJSONObject("hostFileSize");
-
-								for (String key : eHostProcessingTime.keySet())
-									aHostProcessingTime.put(key, eHostProcessingTime.getLong(key));
-								for (String key : eHostFileSize.keySet())
-									aHostFileSize.put(key, eHostFileSize.getLong(key));
-
-								responseJSON.put("totalFileSize",
-										responseJSON.getLong("totalFileSize") + eventJSON.getLong("totalFileSize"));
-								responseJSON.put("totalNumPaths",
-										responseJSON.getLong("totalNumPaths") + eventJSON.getLong("totalNumPaths"));
-								responseJSON.put("totalProcessingTime",
-										java.lang.Math.max(responseJSON.getLong("totalProcessingTime"),
-												eventJSON.getLong("totalProcessingTime")));
-								responseJSON.put("totalBlocksProcessed", responseJSON.getLong("totalBlocksProcessed")
-										+ eventJSON.getLong("totalBlocksProcessed"));
-							}
-						}
-					}
-				} else if (event instanceof MetadataResponse && this.response instanceof MetadataResponse) {
-					MetadataResponse emr = (MetadataResponse) event;
-					JSONArray emrResults = emr.getResponse().getJSONArray("result");
-					JSONObject emrJSON = emr.getResponse();
-					if ("galileo#features".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						for (int i = 0; i < emrResults.length(); i++) {
-							JSONObject fsJSON = emrResults.getJSONObject(i);
-							for (String fsName : fsJSON.keySet()) {
-								Set<LocalFeature> featureSet = resultMap.get(fsName);
-								if (featureSet == null) {
-									featureSet = new HashSet<LocalFeature>();
-									resultMap.put(fsName, featureSet);
-								}
-								JSONArray features = fsJSON.getJSONArray(fsName);
-								for (int j = 0; j < features.length(); j++) {
-									JSONObject jsonFeature = features.getJSONObject(j);
-									featureSet.add(new LocalFeature(jsonFeature.getString("name"),
-											jsonFeature.getString("type"), jsonFeature.getInt("order")));
-								}
-							}
-						}
-						if (this.responses.size() == responseCount) {
-							JSONObject jsonResponse = new JSONObject();
-							jsonResponse.put("kind", "galileo#features");
-							JSONArray fsArray = new JSONArray();
-							for (String fsName : resultMap.keySet()) {
-								JSONObject fsJSON = new JSONObject();
-								JSONArray features = new JSONArray();
-								for (LocalFeature feature : new TreeSet<>(resultMap.get(fsName)))
-									features.put(new JSONObject().put("name", feature.name).put("type", feature.type)
-											.put("order", feature.order));
-								fsJSON.put(fsName, features);
-								fsArray.put(fsJSON);
-							}
-							jsonResponse.put("result", fsArray);
-							this.response = new MetadataResponse(jsonResponse);
-						}
-					} else if ("galileo#filesystem".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						MetadataResponse amr = (MetadataResponse) this.response;
-						JSONObject amrJSON = amr.getResponse();
-						if (amrJSON.getJSONArray("result").length() == 0)
-							amrJSON.put("result", emrResults);
-						else {
-							JSONArray amrResults = amrJSON.getJSONArray("result");
-							for (int i = 0; i < emrResults.length(); i++) {
-								JSONObject emrFilesystem = emrResults.getJSONObject(i);
-								for (int j = 0; j < amrResults.length(); j++) {
-									JSONObject amrFilesystem = amrResults.getJSONObject(j);
-									if (amrFilesystem.getString("name")
-											.equalsIgnoreCase(emrFilesystem.getString("name"))) {
-										long latestTime = amrFilesystem.getLong("latestTime");
-										long earliestTime = amrFilesystem.getLong("earliestTime");
-										if (latestTime == 0 || latestTime < emrFilesystem.getLong("latestTime")) {
-											amrFilesystem.put("latestTime", emrFilesystem.getLong("latestTime"));
-											amrFilesystem.put("latestSpace", emrFilesystem.getString("latestSpace"));
-										}
-										if (earliestTime == 0 || (earliestTime > emrFilesystem.getLong("earliestTime")
-												&& emrFilesystem.getLong("earliestTime") != 0)) {
-											amrFilesystem.put("earliestTime", emrFilesystem.getLong("earliestTime"));
-											amrFilesystem.put("earliestSpace",
-													emrFilesystem.getString("earliestSpace"));
-										}
-										break;
-									}
-								}
-							}
-						}
-					} else if ("galileo#overview".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						logger.info(emrJSON.getString("kind") + ": emr results length = " + emrResults.length());
-						MetadataResponse amr = (MetadataResponse) this.response;
-						JSONObject amrJSON = amr.getResponse();
-						if (amrJSON.getJSONArray("result").length() == 0)
-							amrJSON.put("result", emrResults);
-						else {
-							JSONArray amrResults = amrJSON.getJSONArray("result");
-							for (int i = 0; i < emrResults.length(); i++) {
-								JSONObject efsJSON = emrResults.getJSONObject(i);
-								String efsName = efsJSON.keys().next();
-								JSONObject afsJSON = null;
-								for (int j = 0; j < amrResults.length(); j++) {
-									if (amrResults.getJSONObject(j).has(efsName)) {
-										afsJSON = amrResults.getJSONObject(j);
-										break;
-									}
-								}
-								if (afsJSON == null)
-									amrResults.put(efsJSON);
-								else {
-									JSONArray eGeohashes = efsJSON.getJSONArray(efsName);
-									JSONArray aGeohashes = afsJSON.getJSONArray(efsName);
-									for (int j = 0; j < eGeohashes.length(); j++) {
-										JSONObject eGeohash = eGeohashes.getJSONObject(j);
-										JSONObject aGeohash = null;
-										for (int k = 0; k < aGeohashes.length(); k++) {
-											if (aGeohashes.getJSONObject(k).getString("region")
-													.equalsIgnoreCase(eGeohash.getString("region"))) {
-												aGeohash = aGeohashes.getJSONObject(k);
-												break;
-											}
-										}
-										if (aGeohash == null)
-											aGeohashes.put(eGeohash);
-										else {
-											long eTimestamp = eGeohash.getLong("latestTimestamp");
-											int blockCount = aGeohash.getInt("blockCount")
-													+ eGeohash.getInt("blockCount");
-											long fileSize = aGeohash.getInt("fileSize") + eGeohash.getInt("fileSize");
-											aGeohash.put("blockCount", blockCount);
-											aGeohash.put("fileSize", fileSize);
-											if (eTimestamp > aGeohash.getLong("latestTimestamp"))
-												aGeohash.put("latestTimestamp", eTimestamp);
-										}
-									}
-								}
-							}
-						}
-					} 
 				}
 			} catch (IOException | SerializationException e) {
 				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
 						+ e.getMessage(), e);
 			} catch (Exception e) {
-				logger.log(Level.SEVERE,
-						"An unknown exception occurred while processing the response message. Details follow:"
+				logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
 								+ e.getMessage(), e);
 			}
 		}
 		
-		// COMBINE HERE INTO A SINGLE JSON STRING
-		if (this.response instanceof VisualizationResponse) {
-			
-			VisualizationResponse finalResponse = (VisualizationResponse) this.response;
-			
-			JSONArray summaryJSONs = new JSONArray();
-			
-			for(String key: accumulatedSummaries.keySet()) {
-				
-				JSONObject obj = new JSONObject();
-				obj.put("key", key);
-				String summaryString = "";
-				
-				int i=0;
-				
-				for(SummaryStatistics ss : accumulatedSummaries.get(key).getStats()) {
-					if(i==0)
-						summaryString = ss.toString();
-					else 
-						summaryString += ","+ss.toString();
-					i++;
-				}
-				
-				obj.put("summary", summaryString);
-				
-				logger.info(key+":::"+summaryString);
-				
-				summaryJSONs.put(obj);
-			}
-			
-			JSONObject response = new JSONObject();
-			response.put("summaries", summaryJSONs);
-			
-			finalResponse.setSummariesJSON(response.toString());
-			
-			
-		}
+		nodesResourceMap.put(currentHostString, currentHostResourceInfo);
 		
+		currentlyBusy = false;
+		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
-		long diff = System.currentTimeMillis() - reqId;
-		logger.info("RIKI: ENTIRE THING FINISHED IN: "+ diff);
-		this.requestListener.onRequestCompleted(this.response, clientContext, this);
 	}
 
 	@Override
 	public void onMessage(GalileoMessage message) {
-		/*Event event;
-		try {
-			event = this.eventWrapper.unwrap(message);
-			DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
-			//logger.log(Level.INFO, "RIKI: ONE DATA INTEGRATION RESPONSE RECEIVED FROM "+ eventResponse.getNodeName()+" "+eventResponse.getResultPaths());
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (SerializationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 		
-		*/
-		logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
+		logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED");
 		
 		if (null != message)
 			this.responses.add(message);
+		
 		int awaitedResponses = this.expectedResponses.decrementAndGet();
 		logger.log(Level.INFO, "Awaiting " + awaitedResponses + " more message(s)");
 		if (awaitedResponses <= 0) {
@@ -437,23 +145,32 @@ public class HeartbeatRequestHandler implements MessageListener {
 	 * @param request
 	 *            - This must be a server side event: Generic Event or
 	 *            QueryEvent
+	 * @param nr_current 
+	 * @param hostString 
 	 * @param response
 	 */
-	public void handleRequest(Event request, Event response) {
+	public void handleRequest(Event request, String hostString, NodeResourceInfo nr_current) {
+		
 		try {
+			currentlyBusy = true;
 			reqId = System.currentTimeMillis();
-			logger.info("RIKI: VISUALIZATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
-			this.response = response;
+			
+			this.currentHostString = hostString;
+			this.currentHostResourceInfo = nr_current;
+			
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);
 			for (NetworkDestination node : nodes) {
+				
 				this.router.sendMessage(node, mrequest);
-				//logger.info("Request sent to " + node.toString());
+				logger.info("RIKI: HEARTBEAT REQUEST SENT TO " + node.toString());
+				
 			}
 			this.elapsedTime = System.currentTimeMillis();
 		} catch (IOException e) {
 			logger.log(Level.INFO,
 					"Failed to send request to other nodes in the network. Details follow: " + e.getMessage());
 		}
+		
 	}
 
 	public void silentClose() {
@@ -472,5 +189,13 @@ public class HeartbeatRequestHandler implements MessageListener {
 	@Override
 	public void onDisconnect(NetworkDestination endpoint) {
 
+	}
+
+	public boolean isCurrentlyBusy() {
+		return currentlyBusy;
+	}
+
+	public void setCurrentlyBusy(boolean currentlyBusy) {
+		this.currentlyBusy = currentlyBusy;
 	}
 }

@@ -81,6 +81,8 @@ import galileo.comm.FilesystemAction;
 import galileo.comm.FilesystemEvent;
 import galileo.comm.FilesystemRequest;
 import galileo.comm.GalileoEventMap;
+import galileo.comm.HeartbeatRequest;
+import galileo.comm.HeartbeatResponse;
 import galileo.comm.MetadataEvent;
 import galileo.comm.MetadataRequest;
 import galileo.comm.MetadataResponse;
@@ -144,7 +146,6 @@ import galileo.util.Requirements;
 import galileo.util.SuperCube;
 import galileo.util.SuperPolygon;
 import galileo.util.Version;
-import web.Listener;
 
 /**
  * Primary communication component in the Galileo DHT. StorageNodes service
@@ -184,10 +185,19 @@ public class StorageNode implements RequestListener {
 	private List<String> fsToBePruned;
 	private boolean pruningNeeded;
 	
-	private ResourceTracker resourceTracker;
 	
-	// WHETHER THIS NODE IS THE RESOURCE TRACKER OR NOT
+	/* RESOURCE TRACKING RELATED*/
+	private ResourceTracker resourceTracker;
+		// WHETHER THIS NODE IS THE RESOURCE TRACKER OR NOT
 	private boolean isTracker;
+	
+	
+	/*HOTSPOT HANDLING RELATED*/
+	private static int MESSAGE_QUEUE_THRESHOLD = 100;
+	private static long COOLDOWN_TIME = 30*1000l; // 30secs
+	private long hotspotDetectedTime = -1;
+	private boolean hotspotBeingHandled = false;
+	
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
 
@@ -226,6 +236,22 @@ public class StorageNode implements RequestListener {
 		this.pruningNeeded = false;
 		this.isTracker = false;
 	}
+	
+	
+	/**
+	 * IS THIS CURRENT NODE HOTSPOTTED
+	 * @author sapmitra
+	 * @return
+	 */
+	private boolean isHotspotted() {
+	
+		if(eventReactor.getMessageQueue().size() > MESSAGE_QUEUE_THRESHOLD) {
+			return true;
+		}
+		
+		return false;
+		
+	}
 
 	/**
 	 * Begins Server execution. This method attempts to fail fast to provide
@@ -234,6 +260,7 @@ public class StorageNode implements RequestListener {
 	 * will the StorageNode begin accepting connections.
 	 */
 	public void start() throws Exception {
+		
 		Version.printSplash();
 
 		/* First, make sure the port we're binding to is available. */
@@ -250,6 +277,7 @@ public class StorageNode implements RequestListener {
 		nodeStatus.set("Reading network configuration");
 		network = NetworkConfig.readNetworkDescription(SystemConfig.getNetworkConfDir());
 
+		this.fsMap = new HashMap<>();
 		// Verifying if this node is a part of this cluster.
 		
 		// PICK THE LAST NODE AS THE RESOURCE TRACKER
@@ -264,12 +292,12 @@ public class StorageNode implements RequestListener {
 				
 				isTracker = true;
 				
-				this.resourceTracker = new ResourceTracker(allNodes);
+				// INITIATE THE THREAD FOR RESOURCE TRACKING
+				this.resourceTracker = new ResourceTracker(allNodes, eventReactor.getMessageQueue(), fsMap);
 				
 				Thread thread = new Thread(this.resourceTracker);
 				thread.start();
 				
-				// INITIATE THE THREAD FOR RESOURCE TRACKING
 			}
 		}
 		
@@ -296,8 +324,6 @@ public class StorageNode implements RequestListener {
 		
 		if (!qresultsDir.exists())
 			qresultsDir.mkdirs();
-
-		this.fsMap = new HashMap<>();
 
 		try (BufferedReader br = new BufferedReader(new FileReader(fsFile))) {
 			String jsonSource = br.readLine();
@@ -461,6 +487,26 @@ public class StorageNode implements RequestListener {
 		} else {
 			logger.log(Level.WARNING, "No filesystem name specified to store the block. Request ignored");
 		}
+	}
+	
+	
+	@EventHandler
+	public void handleHeartbeatRequest(HeartbeatRequest request, EventContext context) throws HashException, IOException, PartitionException {
+		
+		int totalGuestTreeSize = 0;
+		for(GeospatialFileSystem fs : fsMap.values()) {
+			
+			totalGuestTreeSize+=fs.getGuestCache().getTotalRooms();
+		}
+		
+		int messageQueueSize = eventReactor.getMessageQueue().size();
+		
+		NodeResourceInfo nri = NodeResourceInfo.getMachineStats(messageQueueSize, totalGuestTreeSize);
+		
+		HeartbeatResponse rsp = new HeartbeatResponse(nri.getQueueSize(), nri.getGuestTreeSize(), nri.getHeapUsage(), hostname + ":" + port);
+		
+		context.sendReply(rsp);
+		
 	}
 
 	@EventHandler

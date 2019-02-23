@@ -13,6 +13,7 @@ public class HeartbeatResponse implements Event {
 	private float guestTreeSize;
 	private float heapMem;
 	private String reqEventId;
+	private String hostString;
 	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
@@ -21,6 +22,7 @@ public class HeartbeatResponse implements Event {
 		out.writeFloat(guestTreeSize);
 		out.writeFloat(heapMem);
 		out.writeFloat(cpuUtil);
+		out.writeString(hostString);
 		
 	}
 
@@ -31,9 +33,17 @@ public class HeartbeatResponse implements Event {
 		this.guestTreeSize = in.readFloat();
 		this.heapMem = in.readFloat();
 		this.cpuUtil = in.readFloat();
+		this.hostString = in.readString();
 		
 	}
 	
+	public HeartbeatResponse(float cpuUtil2, float guestTreeSize2, float heapUsage, String hostString) {
+		this.cpuUtil = cpuUtil2;
+		this.guestTreeSize = guestTreeSize2;
+		this.heapMem = heapUsage;
+		this.hostString = hostString;
+	}
+
 	public float getCpuUtil() {
 		return cpuUtil;
 	}
@@ -64,6 +74,14 @@ public class HeartbeatResponse implements Event {
 
 	public void setReqEventId(String reqEventId) {
 		this.reqEventId = reqEventId;
+	}
+
+	public String getHostString() {
+		return hostString;
+	}
+
+	public void setHostString(String hostString) {
+		this.hostString = hostString;
 	}
 
 }

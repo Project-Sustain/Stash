@@ -234,4 +234,12 @@ public class EventReactor implements MessageListener {
     throws IOException {
         return eventWrapper.wrap(e);
     }
+
+	public BlockingQueue<GalileoMessage> getMessageQueue() {
+		return messageQueue;
+	}
+
+	public void setMessageQueue(BlockingQueue<GalileoMessage> messageQueue) {
+		this.messageQueue = messageQueue;
+	}
 }

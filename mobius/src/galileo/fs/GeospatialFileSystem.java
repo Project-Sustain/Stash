@@ -187,6 +187,9 @@ public class GeospatialFileSystem extends FileSystem {
 	private int temporalSubLevels;
 	
 	private SpatiotemporalHierarchicalCache stCache;
+	
+	private SpatiotemporalHierarchicalCache guestCache;
+	
 	private Map<String, SubBlockLevelBitmaps> blockBitmaps;
 
 	private boolean needSublevelBitmaps;
@@ -3656,6 +3659,14 @@ public class GeospatialFileSystem extends FileSystem {
 		synchronized(peList) {
 			peList.remove(eventId);
 		}
+	}
+
+	public SpatiotemporalHierarchicalCache getGuestCache() {
+		return guestCache;
+	}
+
+	public void setGuestCache(SpatiotemporalHierarchicalCache guestCache) {
+		this.guestCache = guestCache;
 	}
 	
 }

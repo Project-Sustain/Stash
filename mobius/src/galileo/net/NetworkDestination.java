@@ -50,7 +50,7 @@ public class NetworkDestination implements Comparable<NetworkDestination>{
         return port;
     }
 
-    private String stringRepresentation() {
+    public String stringRepresentation() {
         return hostname + ":" + port;
     }
 
