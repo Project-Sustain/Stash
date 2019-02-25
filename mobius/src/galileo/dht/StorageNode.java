@@ -195,8 +195,8 @@ public class StorageNode implements RequestListener {
 	/*HOTSPOT HANDLING RELATED*/
 	private static int MESSAGE_QUEUE_THRESHOLD = 100;
 	private static long COOLDOWN_TIME = 30*1000l; // 30secs
-	private long hotspotDetectedTime = -1;
-	private boolean hotspotBeingHandled = false;
+	private long hotspotHandledTime = -1;
+	private boolean hotspotHasBeenHandled = false;
 	
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
@@ -873,13 +873,90 @@ public class StorageNode implements RequestListener {
 		
 		
 	}
+	
+	/**
+	 * CHECK AND HANDLES HOTSPOT ON THIS NODE
+	 * @author sapmitra
+	 */
+	public void checkAndHandleHotspot(long eventTime) {
+		
+		/*private static int MESSAGE_QUEUE_THRESHOLD = 100;
+		private static long COOLDOWN_TIME = 30*1000l; // 30secs
+		private long hotspotDetectedTime = -1;
+		private boolean hotspotBeingHandled = false;
+		*/
+		
+		// WHEN A REQUEST COMES IN, CHECK IF NODE IS HOTSPOTTED
+		boolean isHotspot = isHotspotted();
+		
+		
+		
+		// TELLS WHETHER MESSAGE NEEDS TO BE REROUTED TO ANOTHER NODE
+		boolean needRedirection = false;
+		
+		if(isHotspot) {
+			
+			// DEFINITELY HOTSPOTTED. 
+			// NOW CHECK WHETHER IT NEEDS HANDLING
+			
+			// HAS THE HOTSPOT BEEN HANDLED?
+			if(!hotspotHasBeenHandled) {
+				
+				// HOTSPOTTED, BUT HAS NOT BEEN HANDLED
+				
+				
+				// HOTSPOT HAS NOT BEEN HANDLED, WILL BE HANDLED
+				// AND ONCE HANDLING IS COMPLETE, FUTURE REQUESTS WILL BE REDIRECTED.
+				// BUT NOT THIS ONE
+				needRedirection = false;
+				handleHotspot();
+				hotspotHandledTime = System.currentTimeMillis();
+				
+			} else {
+				// HOTSPOT ALREADY HANDLED
+				// REQUEST NEEDS REDIRECTION USING ROUTING TABLE
+				needRedirection = true;
+				
+				// IF COOLDOWN_TIME HAS RUN OUT, BUT STILL NEED TO PERSIST HOTSPOT
+				if(eventTime - hotspotHandledTime > COOLDOWN_TIME) {
+					// LOOK INTO ROUTING TABLE AND MESSAGE ALL HELPER NODES TO KEEP THEIR REPLICAS
+					persistHotspot();
+				}
+				
+			}
+		}  else {
+			// NOT HOTSPOTTED
+			
+			// CHECK IF HANDLED FLAG IS ON AND SET IT OFF
+			if(hotspotHasBeenHandled) {
+				// HOTSPOT GONE, REMOVE HOTSPOT FLAG
+				
+				if(eventTime - hotspotHandledTime > COOLDOWN_TIME) {
+					
+					// REMOVE ENTRIES FROM ROUTING TABLE
+					handleHotspotRemoval();
+					
+					// NO LONGER HOTSPOT
+					hotspotHasBeenHandled = false;
+					hotspotHandledTime = -1;
+					
+					needRedirection = false;
+				} 
+			} else {
+				needRedirection = false;
+			}
+			
+		}
+		
+		
+	}
 
 	
 	
 	
 	/**
 	 * Handles Visualization event at each node
-	 * The request contains a polygon and a timestring, which for now can request for upto a day
+	 * The request contains a polygon and a time-string, which for now can request for upto a day
 	 * @author sapmitra
 	 * @param event
 	 * @param context
@@ -887,13 +964,16 @@ public class StorageNode implements RequestListener {
 	
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
+		long eventTime = System.currentTimeMillis();
+		
+		// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
 		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
 		int eventId = r.nextInt();
 		
-		long eventTime = System.currentTimeMillis();
+		
 		String eventString = eventTime+"$$"+eventId;
 		event.setEventId(eventString);
 		
