@@ -40,7 +40,7 @@ import galileo.serialization.SerializationException;
  * This class will collect the responses from all the nodes of galileo and then
  * transfers the result to the listener. Used by the {@link StorageNode} class.
  * 
- * @author kachikaran
+ * @author sapmitra
  */
 public class HeartbeatRequestHandler implements MessageListener {
 
@@ -56,9 +56,9 @@ public class HeartbeatRequestHandler implements MessageListener {
 	private long reqId;
 	private boolean currentlyBusy;
 	
+	
 	private String currentHostString;
 	private NodeResourceInfo currentHostResourceInfo;
-	
 	
 	private Map<String, NodeResourceInfo> nodesResourceMap;
 
@@ -70,10 +70,11 @@ public class HeartbeatRequestHandler implements MessageListener {
 		this.responses = new ArrayList<GalileoMessage>();
 		this.eventMap = new GalileoEventMap();
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
+		
+		// ONE EXTRA FOR HOT CLIQUES CALCULATION
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
 		this.currentlyBusy = false;
 		this.nodesResourceMap = nodesResourceMap;
-		
 	}
 
 	public void closeRequest() {
@@ -82,35 +83,40 @@ public class HeartbeatRequestHandler implements MessageListener {
 		
 		int responseCount = 0;
 		
-		for (GalileoMessage gresponse : this.responses) {
+		// LOCK nodesResourceMap BEFORE ANY UPDATES ARE MADE TO IT
+		synchronized (nodesResourceMap) {
 			
-			responseCount++;
-			Event event;
-			
-			try {
-				event = this.eventWrapper.unwrap(gresponse);
+			for (GalileoMessage gresponse : this.responses) {
 				
-				if (event instanceof HeartbeatResponse) {
-					
-					HeartbeatResponse eventResponse = (HeartbeatResponse) event;
-					
-					logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM "+eventResponse.getHostString());
-					
-					NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
-							eventResponse.getHeapMem());
-					nodesResourceMap.put(eventResponse.getHostString(), nr);
+				responseCount++;
+				Event event;
 				
+				try {
+					event = this.eventWrapper.unwrap(gresponse);
+					
+					if (event instanceof HeartbeatResponse) {
+						
+						HeartbeatResponse eventResponse = (HeartbeatResponse) event;
+						
+						logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM "+eventResponse.getHostString());
+						
+						NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
+								eventResponse.getHeapMem());
+						nodesResourceMap.put(eventResponse.getHostString(), nr);
+					
+					}
+				} catch (IOException | SerializationException e) {
+					logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
+							+ e.getMessage(), e);
+				} catch (Exception e) {
+					logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
+									+ e.getMessage(), e);
 				}
-			} catch (IOException | SerializationException e) {
-				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
-						+ e.getMessage(), e);
-			} catch (Exception e) {
-				logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
-								+ e.getMessage(), e);
 			}
+			
+			nodesResourceMap.put(currentHostString, currentHostResourceInfo);
+			
 		}
-		
-		nodesResourceMap.put(currentHostString, currentHostResourceInfo);
 		
 		currentlyBusy = false;
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
@@ -127,6 +133,8 @@ public class HeartbeatRequestHandler implements MessageListener {
 		
 		int awaitedResponses = this.expectedResponses.decrementAndGet();
 		logger.log(Level.INFO, "Awaiting " + awaitedResponses + " more message(s)");
+		
+		
 		if (awaitedResponses <= 0) {
 			this.elapsedTime = System.currentTimeMillis() - this.elapsedTime;
 			logger.log(Level.INFO, "Closing the request and sending back the response.");
@@ -170,6 +178,8 @@ public class HeartbeatRequestHandler implements MessageListener {
 			logger.log(Level.INFO,
 					"Failed to send request to other nodes in the network. Details follow: " + e.getMessage());
 		}
+		
+		
 		
 	}
 

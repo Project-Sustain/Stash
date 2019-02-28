@@ -21,6 +21,8 @@ public class ResourceTracker implements Runnable{
 	private Map<String, GeospatialFileSystem> fsMap;
 	
 	private Map<String,NodeResourceInfo> nodesResourceMap = new HashMap<String,NodeResourceInfo>();
+	
+	// THE MAIN REQUEST HANDLER
 	private HeartbeatRequestHandler reqHandler;
 	
 	private static final Logger logger = Logger.getLogger("galileo");
@@ -28,7 +30,7 @@ public class ResourceTracker implements Runnable{
 	private boolean stop_flag = false;
 	
 	// TIME INTERVAL IN MILLISECONDS
-	private long waitTime = 10*1000;
+	private static final long WAIT_TIME = 10*1000;
 	
 	/**
 	 * TAKE ALL NODES EXCEPT THE LAST ONE, WHICH SHOULD BE THE CURRENT NODE
@@ -47,6 +49,7 @@ public class ResourceTracker implements Runnable{
 
 			int cnt = 0;
 
+			// THE LAST NODE IN THE NETWORK INFO FILE IS MADE THE RESOURCE TRACKER
 			for (NodeInfo n : allNodes) {
 				
 				NetworkDestination nd = (NetworkDestination) n;
@@ -77,11 +80,13 @@ public class ResourceTracker implements Runnable{
 			try {
 				logger.info("RIKI: ABOUT TO SEND OUT HEARTBEATS");
 				
+				// SENDING OF HEARTBEAT REQUEST AND COMBINING OF THE RESPONSES
 				handleHeartbeatEvent();
 				
 				logger.info("RIKI: ABOUT TO START WAITING FOR 10 SECS");
 				
-				Thread.sleep(waitTime);
+				// SLEEPING FOR 10 SECS
+				Thread.sleep(WAIT_TIME);
 				
 				logger.info("RIKI: FINISHED WAITING FOR 10 SECS");
 				
@@ -95,6 +100,8 @@ public class ResourceTracker implements Runnable{
 	
 	private void handleHeartbeatEvent() {
 		
+		// IF ALREADY A SET OF HEARTBEATS IS BEING DEALT WITH,
+		// DO NOT SEND OUT A NEW SET OF HEARTBEATS
 		if(!reqHandler.isCurrentlyBusy()) {
 			
 			String queryId = String.valueOf(System.currentTimeMillis());
@@ -169,14 +176,6 @@ public class ResourceTracker implements Runnable{
 
 	public void setNodesResourceInfo(Map<String,NodeResourceInfo> nodesResourceInfo) {
 		this.nodesResourceMap = nodesResourceInfo;
-	}
-
-	public long getWaitTime() {
-		return waitTime;
-	}
-
-	public void setWaitTime(long waitTime) {
-		this.waitTime = waitTime;
 	}
 
 

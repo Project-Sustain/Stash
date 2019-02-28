@@ -489,7 +489,15 @@ public class StorageNode implements RequestListener {
 		}
 	}
 	
-	
+	/**
+	 * RESPONDING TO A HEARTBEAT REQUEST FORM A COORDINATOR NODE
+	 * @author sapmitra
+	 * @param request
+	 * @param context
+	 * @throws HashException
+	 * @throws IOException
+	 * @throws PartitionException
+	 */
 	@EventHandler
 	public void handleHeartbeatRequest(HeartbeatRequest request, EventContext context) throws HashException, IOException, PartitionException {
 		
@@ -876,6 +884,9 @@ public class StorageNode implements RequestListener {
 	
 	/**
 	 * CHECK AND HANDLES HOTSPOT ON THIS NODE
+	 * GETS CALLED AT THE START OF EVERY VISUALIZATION QUERY HADNLING
+	 * SIMPLY DETECTS HOTSPOT
+	 * THE HANDLING OF HOTSPOT IS TAKEN CARE OF BY A SEPARATE THREAD
 	 * @author sapmitra
 	 */
 	public void checkAndHandleHotspot(long eventTime) {
@@ -888,7 +899,6 @@ public class StorageNode implements RequestListener {
 		
 		// WHEN A REQUEST COMES IN, CHECK IF NODE IS HOTSPOTTED
 		boolean isHotspot = isHotspotted();
-		
 		
 		
 		// TELLS WHETHER MESSAGE NEEDS TO BE REROUTED TO ANOTHER NODE
@@ -950,10 +960,36 @@ public class StorageNode implements RequestListener {
 		
 		
 	}
+	
+	
+	/**
+	 * REMOVE HOTSPOT
+	 * REMOVE ENTRIES FROM ROUTING TABLE
+	 * @author sapmitra
+	 */
+	private void handleHotspotRemoval() {
+		// TODO Auto-generated method stub
+		
+	}
 
+
+	/**
+	 * HANDLE THE MOVEMENT OF HOTSPOT REPLICAS
+	 * @author sapmitra
+	 */
+	private void handleHotspot() {
+		
+		
+	}
 	
-	
-	
+	edit here
+	public void topCliqueCalculator(GeospatialFileSystem fs) {
+		
+		
+		
+	}
+
+
 	/**
 	 * Handles Visualization event at each node
 	 * The request contains a polygon and a time-string, which for now can request for upto a day
@@ -966,6 +1002,8 @@ public class StorageNode implements RequestListener {
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		long eventTime = System.currentTimeMillis();
 		
+		// HOTSPOT CHECK
+		checkAndHandleHotspot(eventTime);
 		// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
 		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
@@ -1010,6 +1048,9 @@ public class StorageNode implements RequestListener {
 				
 				/*************** EVENT ADDED TO ENRY LIST************/
 				fs.addEvent(eventString);
+				/****************************************************/
+				
+				
 				
 				/* Feature Query is not needed to list blocks */
 				
