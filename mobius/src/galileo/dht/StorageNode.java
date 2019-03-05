@@ -281,7 +281,8 @@ public class StorageNode implements RequestListener {
 		// Verifying if this node is a part of this cluster.
 		
 		// PICK THE LAST NODE AS THE RESOURCE TRACKER
-		List<NodeInfo> allNodes = network.getAllNodes();
+		
+		/*List<NodeInfo> allNodes = network.getAllNodes();
 		
 		if(allNodes != null && allNodes.size() > 0) {
 			
@@ -299,7 +300,7 @@ public class StorageNode implements RequestListener {
 				thread.start();
 				
 			}
-		}
+		}*/
 		
 		
 		boolean nodeFound = false;
@@ -1078,7 +1079,7 @@ public class StorageNode implements RequestListener {
 					// ONCE SUMMARIES HAVE BEEN FETCHED FROM FS,
 					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
 					// LOAD EXISTING CACHE CELLS USING CELL KEY
-					
+					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
 					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event);
 					
 				} else {
@@ -1101,7 +1102,7 @@ public class StorageNode implements RequestListener {
 					// SummaryWrapper has needsInsertion that says if it needs to be populated in cache
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
-					
+					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
 					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event);
 					
 				}

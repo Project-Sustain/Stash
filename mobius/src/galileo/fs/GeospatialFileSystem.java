@@ -183,6 +183,9 @@ public class GeospatialFileSystem extends FileSystem {
 	private int spatialPosn1;
 	private int spatialPosn2;
 	private int spatialPartitioningType;
+	
+	
+	// CACHE RELATED ITEMS
 	private int spatialSubLevels;
 	private int temporalSubLevels;
 	
