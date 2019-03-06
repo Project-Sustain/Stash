@@ -60,10 +60,52 @@ public class SpatiotemporalHierarchicalCache {
 	 */
 	public int getCacheLevel(int spatialResolution, int temporalResolution) {
 		
+		if(spatialResolution < 0 || spatialResolution > totalSpatialLevels || temporalResolution < 0 || temporalResolution > totalTemporalLevels )
+			return -1;
+		
 		int levelNum = (temporalResolution-1)*totalSpatialLevels + (spatialResolution-1);
 		
 		return levelNum;
 	}
+	
+	/**
+	 * RETURNED AS SPATIAL, TEMPORAL, SPATIOTEMPORAL
+	 * @author sapmitra
+	 * @param level
+	 * @return
+	 */
+	public int[] getParentLevels(int level) {
+		
+		int spatialResolution = (level%totalSpatialLevels) + 1;
+		int temporalResolution = (level/totalSpatialLevels) + 1;
+		
+		int[] parents = {getCacheLevel(spatialResolution-1, temporalResolution), getCacheLevel(spatialResolution, temporalResolution-1),
+				getCacheLevel(spatialResolution-1, temporalResolution-1)};
+		
+		
+		return parents;
+		
+	}
+	
+	/**
+	 * RETURNED AS SPATIAL, TEMPORAL, SPATIOTEMPORAL
+	 * @author sapmitra
+	 * @param level
+	 * @return
+	 */
+	public int[] getChildrenLevels(int level) {
+		
+		int spatialResolution = (level%totalSpatialLevels) + 1;
+		int temporalResolution = (level/totalSpatialLevels) + 1;
+		
+		int[] children = {getCacheLevel(spatialResolution+1, temporalResolution), getCacheLevel(spatialResolution, temporalResolution+1),
+				getCacheLevel(spatialResolution+1, temporalResolution+1)};
+		
+		
+		return children;
+	}
+	
+	
 
 	public SparseSpatiotemporalMatrix[] getCacheLevels() {
 		return cacheLevels;

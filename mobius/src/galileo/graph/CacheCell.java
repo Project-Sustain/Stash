@@ -18,6 +18,7 @@ public class CacheCell {
 	private String spatialInfo;
 	private String temporalInfo;
 	
+	// MAINTAINED AS NON-ZERO NUMBERS
 	private int spatialResolution;
 	private int temporalResolution;
 	
@@ -39,6 +40,13 @@ public class CacheCell {
 	private float freshness;
 	private long lastAccessed;
 	private String lastEvent;
+	
+	private String cellKey;
+	
+	
+	public String getCellKey() {
+		return cellKey;
+	}
 	
 	/**
 	 * CREATING A NEW CACHE CELL
@@ -64,6 +72,7 @@ public class CacheCell {
 		this.spatialResolution = spatialResolution;
 		this.temporalResolution = temporalResolution;
 		
+		this.cellKey = spatiotemporalInfo;
 		String[] components = spatiotemporalInfo.split("\\$\\$");
 		
 		this.temporalInfo = components[0];
@@ -301,6 +310,12 @@ public class CacheCell {
 		
 		
 	}
+	
+
+	public int getCellLevel() {
+		
+		return cache.getCacheLevel(spatialResolution, temporalResolution);
+	}
 
 	/**
 	 * DISPERSE FRESHNESS AMONG NEIGHBORS
@@ -377,6 +392,7 @@ public class CacheCell {
 		
 		if(sp != null) {
 			
+			// - 1 because we are loking for parents
 			int cacheLevel = cache.getCacheLevel(spatialResolution-1, temporalResolution);
 			
 			cache.disperseToCell(temporalInfo+"$$"+sp, cacheLevel, eventId, eventTime);
@@ -398,6 +414,26 @@ public class CacheCell {
 		
 	}
 	
+	/**
+	 * Given a set of cache cells, returns the value, if any of an existing cell in the list
+	 * matching a given key
+	 * 
+	 * @author sapmitra
+	 * @param cells
+	 * @param key
+	 * @return
+	 */
+	public static float getExistingCell(List<CacheCell> cells, String key) {
+		
+		for(CacheCell c : cells) {
+			if(c.getCellKey().equals(key)) {
+				return c.getCorrectedFreshness();
+			}
+		}
+		
+		return 0;
+		
+	}
 	
 	
 	

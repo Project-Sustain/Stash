@@ -21,6 +21,8 @@ public class SparseSpatiotemporalMatrix {
 	// THE NUMBER OF CHILDREN EACH CELL CAN HAVE
 	private int numChildren;
 	private int numParents;
+	
+	// MAINTAINED AS NON-ZERO NUMBERS
 	private int spatialResolution;
 	private int temporalResolution;
 	private SpatiotemporalHierarchicalCache cache;
