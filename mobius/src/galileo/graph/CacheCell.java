@@ -170,11 +170,12 @@ public class CacheCell {
 	/**
 	 * ADDED TIME DECAY
 	 * @author sapmitra
+	 * @param currentTime 
 	 * @return
 	 */
-	public float getCorrectedFreshness() {
+	public float getCorrectedFreshness(long currentTime) {
 		
-		double timeInt = System.currentTimeMillis() - lastAccessed;
+		double timeInt = currentTime - lastAccessed;
 		
 		double multiplier = java.lang.Math.exp(-1d * timeInt/1000);
 		
@@ -421,13 +422,14 @@ public class CacheCell {
 	 * @author sapmitra
 	 * @param cells
 	 * @param key
+	 * @param currentTime 
 	 * @return
 	 */
-	public static float getExistingCell(List<CacheCell> cells, String key) {
+	public static float getExistingCell(List<CacheCell> cells, String key, long currentTime) {
 		
 		for(CacheCell c : cells) {
 			if(c.getCellKey().equals(key)) {
-				return c.getCorrectedFreshness();
+				return c.getCorrectedFreshness(currentTime);
 			}
 		}
 		

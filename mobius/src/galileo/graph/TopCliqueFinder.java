@@ -16,10 +16,10 @@ public class TopCliqueFinder {
 	private static final int N = 2014;
 	
 	public static void getTopKCliques(SpatiotemporalHierarchicalCache searchCache, int cliqueDepth) {
-		
+		long currentTime = System.currentTimeMillis();
 		synchronized(searchCache) {
 			
-			scanCacheForTopN(searchCache, cliqueDepth);
+			scanCacheForTopN(searchCache, cliqueDepth, currentTime);
 			
 		}
 		
@@ -29,7 +29,7 @@ public class TopCliqueFinder {
 	
 	
 	
-	public static void scanCacheForTopN(SpatiotemporalHierarchicalCache stCache, int cliqueDepth) {
+	public static void scanCacheForTopN(SpatiotemporalHierarchicalCache stCache, int cliqueDepth, long currentTime) {
 		
 		// All the cache cells, with their freshness values
 		Map<String, CacheCell> keyValues = new HashMap<String, CacheCell>();
@@ -55,10 +55,10 @@ public class TopCliqueFinder {
 		}
 		
 		// GET THE TOP N HOTTEST TILES
-		Map<Integer, List<CacheCell>> topNTiles = getTopNTiles(keyValues, N);
+		Map<Integer, List<CacheCell>> topNTiles = getTopNTiles(keyValues, N, currentTime);
 		
 		// CREATE POSSIBLE CLIQUES OUT OF TOP N TILES
-		Map<Integer, List<String>> centralTilesForCliques = calculateTopNCliquesFromTiles(topNTiles, cliqueDepth, stCache);
+		Map<Integer, List<String>> centralTilesForCliques = calculateTopNCliquesFromTiles(topNTiles, cliqueDepth, stCache, currentTime);
 		
 		
 	}
@@ -71,12 +71,13 @@ public class TopCliqueFinder {
 	 * @param topNTilesGrouped
 	 * @param cliqueDepth
 	 * @param stCache
+	 * @param currentTime 
 	 * @return
 	 */
 	public static Map<Integer, List<String>> calculateTopNCliquesFromTiles(Map<Integer, List<CacheCell>> topNTilesGrouped, int cliqueDepth, 
-			SpatiotemporalHierarchicalCache stCache) {
+			SpatiotemporalHierarchicalCache stCache, long currentTime) {
 		
-		Map<String, Float> candidates = getCandidateCliques(topNTilesGrouped, cliqueDepth, stCache);
+		Map<String, Float> candidates = getCandidateCliques(topNTilesGrouped, cliqueDepth, stCache, currentTime);
 		// FOR EACH TILE, GET PARENT AND CHILDREN
 		return null;
 	}
@@ -87,10 +88,11 @@ public class TopCliqueFinder {
 	 * @param topNTilesGrouped
 	 * @param cliqueDepth - for now, it is 1 - one level up, one level down
 	 * @param stCache 
+	 * @param currentTime 
 	 * @return
 	 */
 	public static Map<String, Float> getCandidateCliques(Map<Integer, List<CacheCell>> topNTilesGrouped, int cliqueDepth, 
-			SpatiotemporalHierarchicalCache stCache) {
+			SpatiotemporalHierarchicalCache stCache, long currentTime) {
 		
 		
 		Map<String, Float> cliques = new HashMap<String, Float>();
@@ -109,7 +111,7 @@ public class TopCliqueFinder {
 			
 			
 			// POPULATE CANDIDATE CLIQUES FOR EACH CELL INTO A LIST OF CANDIDATES
-			getCliqueFromCell(cell, cacheCellLevel, parentLevels, childrenLevels, allCandidateCliques, topNTilesGrouped);
+			getCliqueCombinationsFromCell(cell, cacheCellLevel, parentLevels, childrenLevels, allCandidateCliques, topNTilesGrouped);
 			
 		}
 		
@@ -123,9 +125,10 @@ public class TopCliqueFinder {
 	 * @author sapmitra
 	 * @return
 	 */
-	public static void getCliqueFromCell(CacheCell cell, int cacheCellLevel, int[] parentLevels, int[] childrenLevels,
-			Map<String, Float> allCandidateCliques, Map<Integer, List<CacheCell>> topNTilesGrouped) {
+	public static void getCliqueCombinationsFromCell(CacheCell cell, int cacheCellLevel, int[] parentLevels, int[] childrenLevels,
+			Map<String, Float> allCandidateCliques, Map<Integer, List<CacheCell>> topNTilesGrouped, long currentTime) {
 		
+		String cellKey = cell.getCellKey();
 		String cellSpatialInfo = cell.getSpatialInfo();
 		String cellTemporalInfo = cell.getTemporalInfo();
 		
@@ -135,16 +138,51 @@ public class TopCliqueFinder {
 		List<String> spatialChildren = cell.getSpatialChildren();
 		List<String> temporalChildren = cell.getTemporalChildren();
 		
-		// IMAGINE THIS CELL IS THE BASE GENERATION - CASE 1
+		double currentCellWeight = cell.getCorrectedFreshness(currentTime);
 		
-		// IF THIS CLIQUE HAS NOT ALREADY BEEN PROCESSED AND INSERTED INTO CONTENTION
+		/******IMAGINE THIS CELL IS THE BASE GENERATION - CASE 1*******/
 		
-		if(!allCandidateCliques.containsKey(cell.getCellKey())) {
+		givenBaseTileEvaluateCliqueWeight(cellKey, allCandidateCliques, topNTilesGrouped, parentLevels, childrenLevels, currentCellWeight, 
+				spatialParent, temporalParent, cellSpatialInfo, cellTemporalInfo, spatialChildren, temporalChildren, currentTime);
+		
+		
+		
+		/******IMAGINE THIS CELL IS THE PARENT GENERATION - CASE 2*******/
+		
+		String cellSpatialParent = spatialParent+"$$"+cellTemporalInfo;
+		String cellTemporalParent = cellSpatialInfo+"$$"+temporalParent;
+		
+		
+		
+		
+		
+		
+		// IMAGINE IF THIS CELL WAS THE PARENT
+		
+		
+	}
+	
+	
+	/**
+	 * Given a cache cell, calculate the corresponding basic clique - 1 parent up, 1 child down
+	 * @author sapmitra
+	 * @param cell
+	 * @param allCandidateCliques
+	 * @param topNTilesGrouped
+	 * @param parentLevels
+	 * @param childrenLevels	 
+	 * @param currentTime */
+	public static void givenBaseTileEvaluateCliqueWeight(String cellKey, Map<String, Float> allCandidateCliques, Map<Integer, List<CacheCell>> topNTilesGrouped,
+			int[] parentLevels, int[] childrenLevels, double currentCellWeight, String spatialParent, String temporalParent,
+			String cellSpatialInfo, String cellTemporalInfo, List<String> spatialChildren, List<String> temporalChildren, long currentTime) {
+		
+		if(!allCandidateCliques.containsKey(cellKey)) {
 			
 			float cliqueWeight = 0f;
 			
-			// FINDNG SPATIAL PARENT
+			cliqueWeight += currentCellWeight;
 			
+			// FINDNG SPATIAL PARENT
 			if(spatialParent!= null && spatialParent.length() > 0) {
 				
 				String spatialLevelParent = spatialParent+"$$"+cellTemporalInfo;
@@ -155,13 +193,12 @@ public class TopCliqueFinder {
 				
 				// IF THIS HAS A SPATIAL PARENT LEVEL AND THERE ARE EXISTING HOT TILES IN THAT PARENT LEVEL
 				if(sParentLvl >=0 && topNTilesGrouped.get(sParentLvl)!=null) {
-					cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(sParentLvl), spatialLevelParent);
+					cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(sParentLvl), spatialLevelParent, currentTime);
 				}
 				
 			}
 			
 			// FINDING TEMPORAL PARENT
-			
 			if(temporalParent!= null && temporalParent.length() > 0) {
 				
 				String temporalLevelParent = cellSpatialInfo+"$$"+temporalParent;
@@ -172,31 +209,35 @@ public class TopCliqueFinder {
 				
 				// IF THIS HAS A SPATIAL PARENT LEVEL AND THERE ARE EXISTING HOT TILES IN THAT PARENT LEVEL
 				if(tParentLvl >=0 && topNTilesGrouped.get(tParentLvl)!=null) {
-					cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(tParentLvl), temporalLevelParent);
+					cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(tParentLvl), temporalLevelParent, currentTime);
 				}
 				
 			}
 			
 			
-			
+			int sChildrenLvl = childrenLevels[0];
 			for(String sc : spatialChildren) {
 				
-				cache.disperseToCell(temporalInfo+"$$"+sc, cacheLevel, eventId, eventTime);
+				String childKey = sc+"$$"+cellTemporalInfo;
+				
+				cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(sChildrenLvl), childKey);
 				
 			}
 			
+			int tChildrenLvl = childrenLevels[1];
+			for(String tc : temporalChildren) {
+				
+				String childKey = cellSpatialInfo+"$$"+tc;
+				
+				cliqueWeight += CacheCell.getExistingCell(topNTilesGrouped.get(tChildrenLvl), childKey);
+				
+			}
 			
-			allCandidateCliques.add();
+			if(cliqueWeight > 0)
+				allCandidateCliques.put(cellKey, cliqueWeight);
 			
 			
 		}
-		
-		// IMAGINE THIS CELL WAS A CHILD
-		
-		// IMAGINE IF THIS CELL WAS THE PARENT
-		
-		
-		return null;
 		
 	}
 	
@@ -208,8 +249,9 @@ public class TopCliqueFinder {
 	 * key is level@cache_key
 	 * @param keyValues
 	 * @param entriesAllowed - The number of entries allowed in top N
+	 * @param currentTime 
 	 */
-	public static Map<Integer, List<CacheCell>> getTopNTiles(Map<String, CacheCell> keyValues, int entriesAllowed) {
+	public static Map<Integer, List<CacheCell>> getTopNTiles(Map<String, CacheCell> keyValues, int entriesAllowed, long currentTime) {
 		
 		// SORTING BASED ON VALUES
 		Set<Entry<String, CacheCell>> set = keyValues.entrySet();
@@ -219,8 +261,8 @@ public class TopCliqueFinder {
         {
             public int compare( Map.Entry<String, CacheCell> o1, Map.Entry<String, CacheCell> o2 )
             {
-            	Float f1 = o1.getValue().getCorrectedFreshness();
-            	Float f2 = o2.getValue().getCorrectedFreshness();
+            	Float f1 = o1.getValue().getCorrectedFreshness(currentTime);
+            	Float f2 = o2.getValue().getCorrectedFreshness(currentTime);
                 return (f2.compareTo(f1));
             }
         } );

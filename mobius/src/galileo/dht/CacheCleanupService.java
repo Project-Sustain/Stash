@@ -75,7 +75,7 @@ public class CacheCleanupService implements Runnable{
 	
 	public void pruneCache() {
 		
-		
+		long currentTime = System.currentTimeMillis();
 		synchronized(stCache) {
 			
 			Map<String, Float> keyValues = new HashMap<String, Float>();
@@ -92,7 +92,7 @@ public class CacheCleanupService implements Runnable{
 					for(String key : currentFloor.keySet()) {
 						
 						CacheCell cacheCell = currentFloor.get(key);
-						float fr = cacheCell.getCorrectedFreshness();
+						float fr = cacheCell.getCorrectedFreshness(currentTime);
 						
 						keyValues.put(i+"@"+key, fr);
 						
