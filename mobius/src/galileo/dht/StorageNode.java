@@ -197,7 +197,7 @@ public class StorageNode implements RequestListener {
 	private static long COOLDOWN_TIME = 30*1000l; // 30secs
 	private long hotspotHandledTime = -1;
 	private boolean hotspotHasBeenHandled = false;
-	
+	private boolean hotspotBeingHandled = false;
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
 
@@ -911,36 +911,37 @@ public class StorageNode implements RequestListener {
 			// NOW CHECK WHETHER IT NEEDS HANDLING
 			
 			// HAS THE HOTSPOT BEEN HANDLED?
-			if(!hotspotHasBeenHandled) {
+			if(hotspotHasBeenHandled) {
 				
-				// HOTSPOTTED, BUT HAS NOT BEEN HANDLED
-				
-				
-				// HOTSPOT HAS NOT BEEN HANDLED, WILL BE HANDLED
-				// AND ONCE HANDLING IS COMPLETE, FUTURE REQUESTS WILL BE REDIRECTED.
-				// BUT NOT THIS ONE
-				needRedirection = false;
-				handleHotspot();
-				hotspotHandledTime = System.currentTimeMillis();
-				
-			} else {
-				// HOTSPOT ALREADY HANDLED
+				// HOTSPOTTED, AND HAS NOT BEEN HANDLED
 				// REQUEST NEEDS REDIRECTION USING ROUTING TABLE
+				
 				needRedirection = true;
 				
-				// IF COOLDOWN_TIME HAS RUN OUT, BUT STILL NEED TO PERSIST HOTSPOT
-				if(eventTime - hotspotHandledTime > COOLDOWN_TIME) {
-					// LOOK INTO ROUTING TABLE AND MESSAGE ALL HELPER NODES TO KEEP THEIR REPLICAS
-					persistHotspot();
-				}
 				
+			} else if(!hotspotHasBeenHandled && hotspotBeingHandled) {
+				// HOTSPOT ALREADY BEING HANDLED
+				// WORK AS USUAL TILL TE HANDLING HAS BEEN COMPLETED
+				
+				needRedirection = false;
+				
+			} else if(!hotspotHasBeenHandled && !hotspotBeingHandled) {
+				// HOTSPOT NOT HANDLED
+				needRedirection = false;
+				
+				hotspotBeingHandled = true;
+				hotspotBeingHandled = false;
+				// NEEDS HOTSPOT HANDLING
+				handleHotspot();
 			}
+			
 		}  else {
 			// NOT HOTSPOTTED
 			
 			// CHECK IF HANDLED FLAG IS ON AND SET IT OFF
 			if(hotspotHasBeenHandled) {
-				// HOTSPOT GONE, REMOVE HOTSPOT FLAG
+				
+				// HOTSPOT GONE, PAST COOLDOWN TIME
 				
 				if(eventTime - hotspotHandledTime > COOLDOWN_TIME) {
 					
@@ -949,11 +950,14 @@ public class StorageNode implements RequestListener {
 					
 					// NO LONGER HOTSPOT
 					hotspotHasBeenHandled = false;
+					hotspotBeingHandled = false;
+					
 					hotspotHandledTime = -1;
 					
 					needRedirection = false;
 				} 
 			} else {
+				// NO HOTSPOT HAS BEEN HANDLED, NOT NEEDED
 				needRedirection = false;
 			}
 			
