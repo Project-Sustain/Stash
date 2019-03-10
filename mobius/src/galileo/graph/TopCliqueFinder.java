@@ -13,7 +13,7 @@ public class TopCliqueFinder {
 	
 	// THE NUMBER OF TOP TILES TO FILTER OUT OF THE CACHE
 	// THESE ARE TO BE USED TO FIND THE TOP CLIQUES
-	private static final int N = 2014;
+	private static final int N = 8096;
 	
 	public static Map<String, CliqueContainer> getTopKCliques(SpatiotemporalHierarchicalCache searchCache, int spatialPartitioning) {
 		

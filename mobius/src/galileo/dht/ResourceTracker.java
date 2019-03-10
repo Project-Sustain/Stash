@@ -23,7 +23,7 @@ public class ResourceTracker implements Runnable{
 	private Map<String,NodeResourceInfo> nodesResourceMap = new HashMap<String,NodeResourceInfo>();
 	
 	// THE MAIN REQUEST HANDLER
-	private HeartbeatRequestHandler reqHandler;
+	private NodeInfoRequestHandler reqHandler;
 	
 	private static final Logger logger = Logger.getLogger("galileo");
 	
@@ -63,7 +63,7 @@ public class ResourceTracker implements Runnable{
 			}
 
 			currentNode = (NetworkDestination) (allNodes.get(allNodes.size() - 1));
-			reqHandler = new HeartbeatRequestHandler(allOtherNodes, nodesResourceMap);
+			reqHandler = new NodeInfoRequestHandler(allOtherNodes, nodesResourceMap);
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

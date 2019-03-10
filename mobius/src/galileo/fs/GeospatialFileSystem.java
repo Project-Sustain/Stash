@@ -3641,6 +3641,19 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	
+	
+	/**
+	 * THIS CALCULATES THE TOP CLIQUES AND ALSO CALCULATES THEIR RESPECTIVE LOCATIONS,
+	 * BASED ON THE STATISTICS FROM THE OTHER NODES IN THE CLUSTER
+	 * @author sapmitra
+	 */
+	public void topCliqueCalculator() {
+		
+		
+		
+	}
+	
+	
 
 	public int getTotal_cache_entry_allowed() {
 		return total_cache_entry_allowed;

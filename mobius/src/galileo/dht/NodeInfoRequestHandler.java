@@ -27,6 +27,7 @@ import galileo.comm.VisualizationResponse;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
+import galileo.fs.GeospatialFileSystem;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
 import galileo.net.ClientMessageRouter;
@@ -42,9 +43,13 @@ import galileo.serialization.SerializationException;
  * 
  * @author sapmitra
  */
-public class HeartbeatRequestHandler implements MessageListener {
+public class NodeInfoRequestHandler implements MessageListener {
 
 	private static final Logger logger = Logger.getLogger("galileo");
+	
+	private long WAIT_TIME = 0l;
+	private boolean waitTimeCheck = true;
+	
 	private GalileoEventMap eventMap;
 	private BasicEventWrapper eventWrapper;
 	private ClientMessageRouter router;
@@ -53,17 +58,18 @@ public class HeartbeatRequestHandler implements MessageListener {
 	private List<GalileoMessage> responses;
 	private Event response;
 	private long elapsedTime;
-	private long reqId;
-	private boolean currentlyBusy;
+	private GeospatialFileSystem fs;
 	
 	
-	private String currentHostString;
-	private NodeResourceInfo currentHostResourceInfo;
+	private NetworkDestination currentNode;
 	
 	private Map<String, NodeResourceInfo> nodesResourceMap;
 
-	public HeartbeatRequestHandler(List<NetworkDestination> nodes, Map<String, NodeResourceInfo> nodesResourceMap) throws IOException {
-		this.nodes = nodes;
+	public NodeInfoRequestHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, Map<String, NodeResourceInfo> nodesResourceMap, 
+			NetworkDestination currentNode, long waitTime) throws IOException {
+		
+		
+		this.nodes = allOtherNodes;
 
 		this.router = new ClientMessageRouter(true);
 		this.router.addListener(this);
@@ -71,54 +77,61 @@ public class HeartbeatRequestHandler implements MessageListener {
 		this.eventMap = new GalileoEventMap();
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		
-		// ONE EXTRA FOR HOT CLIQUES CALCULATION
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
-		this.currentlyBusy = false;
 		this.nodesResourceMap = nodesResourceMap;
+		this.fs = fs;
+		this.currentNode = currentNode;
+		this.WAIT_TIME = waitTime;
 	}
 
+	
+	/**
+	 * HERE WE HANDLE :
+	 * 1) INTERPRETING THE HEARTBEAT MESSAGES
+	 * 2) PICKING TOP CLIQUES
+	 * 3) SENDING OF CLIQUES TO RESPECTIVE NODES
+	 * 4) CREATING ROUTING TABLES
+	 * @author sapmitra
+	 */
 	public void closeRequest() {
 		
 		silentClose(); // closing the router to make sure that no new responses are added.
 		
 		int responseCount = 0;
 		
-		// LOCK nodesResourceMap BEFORE ANY UPDATES ARE MADE TO IT
-		synchronized (nodesResourceMap) {
+		for (GalileoMessage gresponse : this.responses) {
 			
-			for (GalileoMessage gresponse : this.responses) {
+			responseCount++;
+			Event event;
+			
+			try {
+				event = this.eventWrapper.unwrap(gresponse);
 				
-				responseCount++;
-				Event event;
+				if (event instanceof HeartbeatResponse) {
+					
+					HeartbeatResponse eventResponse = (HeartbeatResponse) event;
+					
+					logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM " + eventResponse.getHostString());
+					
+					NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
+							eventResponse.getHeapMem());
+					
+					// THE HOSTSTRING IS HOSTNAME:PORT....CAN CREATE NODEINFO FROM IT
+					nodesResourceMap.put(eventResponse.getHostString(), nr);
 				
-				try {
-					event = this.eventWrapper.unwrap(gresponse);
-					
-					if (event instanceof HeartbeatResponse) {
-						
-						HeartbeatResponse eventResponse = (HeartbeatResponse) event;
-						
-						logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM "+eventResponse.getHostString());
-						
-						NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
-								eventResponse.getHeapMem());
-						nodesResourceMap.put(eventResponse.getHostString(), nr);
-					
-					}
-				} catch (IOException | SerializationException e) {
-					logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
-							+ e.getMessage(), e);
-				} catch (Exception e) {
-					logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
-									+ e.getMessage(), e);
 				}
+			} catch (IOException | SerializationException e) {
+				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
+						+ e.getMessage(), e);
+			} catch (Exception e) {
+				logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
+								+ e.getMessage(), e);
 			}
-			
-			nodesResourceMap.put(currentHostString, currentHostResourceInfo);
-			
 		}
+			
+			
 		
-		currentlyBusy = false;
+		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
 	}
@@ -136,13 +149,12 @@ public class HeartbeatRequestHandler implements MessageListener {
 		
 		
 		if (awaitedResponses <= 0) {
+			// PREVENT TIMEOUTCHECKER FROM MEDDLING
+			this.waitTimeCheck = false;
 			this.elapsedTime = System.currentTimeMillis() - this.elapsedTime;
-			logger.log(Level.INFO, "Closing the request and sending back the response.");
-			new Thread() {
-				public void run() {
-					HeartbeatRequestHandler.this.closeRequest();
-				}
-			}.start();
+			
+			closeRequest();
+				
 		}
 	}
 
@@ -157,23 +169,26 @@ public class HeartbeatRequestHandler implements MessageListener {
 	 * @param hostString 
 	 * @param response
 	 */
-	public void handleRequest(Event request, String hostString, NodeResourceInfo nr_current) {
+	public void handleRequest(Event request) {
 		
 		try {
-			currentlyBusy = true;
-			reqId = System.currentTimeMillis();
-			
-			this.currentHostString = hostString;
-			this.currentHostResourceInfo = nr_current;
 			
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);
+			
 			for (NetworkDestination node : nodes) {
 				
 				this.router.sendMessage(node, mrequest);
 				logger.info("RIKI: HEARTBEAT REQUEST SENT TO " + node.toString());
 				
 			}
+			
 			this.elapsedTime = System.currentTimeMillis();
+			
+			TimeoutChecker tc = new TimeoutChecker(this, WAIT_TIME);
+			Thread internalThread = new Thread(tc);
+			
+			internalThread.start();
+			
 		} catch (IOException e) {
 			logger.log(Level.INFO,
 					"Failed to send request to other nodes in the network. Details follow: " + e.getMessage());
@@ -201,11 +216,14 @@ public class HeartbeatRequestHandler implements MessageListener {
 
 	}
 
-	public boolean isCurrentlyBusy() {
-		return currentlyBusy;
+	public boolean isWaitTimeCheck() {
+		return waitTimeCheck;
 	}
 
-	public void setCurrentlyBusy(boolean currentlyBusy) {
-		this.currentlyBusy = currentlyBusy;
+	public void setWaitTimeCheck(boolean waitTimeCheck) {
+		this.waitTimeCheck = waitTimeCheck;
 	}
+	
+	
+
 }

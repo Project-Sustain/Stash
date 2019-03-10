@@ -123,6 +123,7 @@ import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
+import galileo.graph.HotspotCoordinator;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
@@ -159,8 +160,8 @@ public class StorageNode implements RequestListener {
 	private static final Logger logger = Logger.getLogger("galileo");
 	private StatusLine nodeStatus;
 
-	private String hostname; // The name of this host
-	private String canonicalHostname; // The fqdn of this host
+	private String hostname; // The name of this host eg. kiwis
+	private String canonicalHostname; // The fqdn of this host eg. kiwis.cs.colostate.edu
 	private int port;
 	private String rootDir;
 	private String resultsDir;
@@ -890,7 +891,7 @@ public class StorageNode implements RequestListener {
 	 * THE HANDLING OF HOTSPOT IS TAKEN CARE OF BY A SEPARATE THREAD
 	 * @author sapmitra
 	 */
-	public void checkAndHandleHotspot(long eventTime) {
+	public boolean checkAndHandleHotspot(long eventTime) {
 		
 		/*private static int MESSAGE_QUEUE_THRESHOLD = 100;
 		private static long COOLDOWN_TIME = 30*1000l; // 30secs
@@ -963,6 +964,8 @@ public class StorageNode implements RequestListener {
 			
 		}
 		
+		return needRedirection;
+		
 		
 	}
 	
@@ -979,18 +982,33 @@ public class StorageNode implements RequestListener {
 
 
 	/**
-	 * HANDLE THE MOVEMENT OF HOTSPOT REPLICAS
+	 * HANDLE THE CALCULATION AND MOVEMENT OF HOTSPOT REPLICAS
 	 * @author sapmitra
 	 */
 	private void handleHotspot() {
 		
-		
-	}
-	
-	edit here
-	public void topCliqueCalculator(GeospatialFileSystem fs) {
-		
-		
+		// FOR NOW, WE HANDLE ONLY ONE FILESYSTEM IN THE CLUSTER
+		if(fsMap.size() == 1) {
+			
+			Set<Entry<String, GeospatialFileSystem>> entrySet = fsMap.entrySet();
+			
+			Entry<String, GeospatialFileSystem> fsEntry = entrySet.iterator().next();
+			
+			GeospatialFileSystem fs = fsEntry.getValue();
+			
+			/* THE FOLLOWING SHOULD BE HANDLED IN A SEPARATE THREAD
+			 * NOT HOLD UP THE CURRENT ONGOING PROCESS*/
+			
+			// SEND OUT PROBES TO ALL OTHER NODES IN CLUSTER 
+			// TO CHECK THEIR STATISTICS
+			
+			HotspotCoordinator hh = new HotspotCoordinator(this, network.getAllNodes(), fs, this.hostname, this.canonicalHostname);
+			
+			Thread hThread = new Thread(hh);
+			
+			hThread.start();
+			
+		}
 		
 	}
 
@@ -1008,9 +1026,15 @@ public class StorageNode implements RequestListener {
 		long eventTime = System.currentTimeMillis();
 		
 		// HOTSPOT CHECK
-		checkAndHandleHotspot(eventTime);
+		boolean needsRedirection = checkAndHandleHotspot(eventTime);
 		// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
 		
+		if(needsRedirection) {
+			
+			redirectRequest();
+			return;
+			
+		}
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
@@ -1142,6 +1166,12 @@ public class StorageNode implements RequestListener {
 	}
 	
 	
+	private void redirectRequest() {
+		// TODO Auto-generated method stub
+		
+	}
+
+
 	private void blockEntryIfCleaningInitiated(GeospatialFileSystem fs) {
 		
 		while(fs.cleanUpInitiated.get()) {
