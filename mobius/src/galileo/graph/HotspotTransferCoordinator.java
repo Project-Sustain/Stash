@@ -15,7 +15,7 @@ import galileo.dht.StorageNode;
 import galileo.fs.GeospatialFileSystem;
 import galileo.net.NetworkDestination;
 
-public class HotspotCoordinator implements Runnable{
+public class HotspotTransferCoordinator implements Runnable{
 	
 	// ALL NODES OTHER THAN THE CURRENT NODE IN QUESTION
 	private List<NetworkDestination> allOtherNodes;
@@ -41,7 +41,7 @@ public class HotspotCoordinator implements Runnable{
 	 * @param fs 
 	 * @param blockingQueue 
 	 */
-	public HotspotCoordinator(StorageNode storageNode, List<NodeInfo> allNodes, GeospatialFileSystem fs, String currentHostName, String currentCanonicalHostName) {
+	public HotspotTransferCoordinator(StorageNode storageNode, List<NodeInfo> allNodes, GeospatialFileSystem fs, String currentHostName, String currentCanonicalHostName) {
 		
 		try {
 			

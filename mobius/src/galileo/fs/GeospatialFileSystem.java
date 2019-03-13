@@ -3533,9 +3533,12 @@ public class GeospatialFileSystem extends FileSystem {
 		// RIKI-REMOVE
 		logger.info("RIKI: CACHE CLEANUP STARTED");
 		
-		ExecutorService executor = Executors.newFixedThreadPool(1);
+		//ExecutorService executor = Executors.newFixedThreadPool(1);
 		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, total_reduced_entries);
-		executor.execute(c);
+		
+		Thread ct = new Thread(c);
+		//executor.execute(c);
+		ct.start();
 		
 	}
 	

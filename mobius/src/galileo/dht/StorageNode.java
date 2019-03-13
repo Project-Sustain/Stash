@@ -123,7 +123,7 @@ import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
-import galileo.graph.HotspotCoordinator;
+import galileo.graph.HotspotTransferCoordinator;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
@@ -1002,7 +1002,7 @@ public class StorageNode implements RequestListener {
 			// SEND OUT PROBES TO ALL OTHER NODES IN CLUSTER 
 			// TO CHECK THEIR STATISTICS
 			
-			HotspotCoordinator hh = new HotspotCoordinator(this, network.getAllNodes(), fs, this.hostname, this.canonicalHostname);
+			HotspotTransferCoordinator hh = new HotspotTransferCoordinator(this, network.getAllNodes(), fs, this.hostname, this.canonicalHostname);
 			
 			Thread hThread = new Thread(hh);
 			

@@ -28,8 +28,10 @@ import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
 import galileo.fs.GeospatialFileSystem;
+import galileo.graph.CliqueContainer;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
+import galileo.graph.TopCliqueFinder;
 import galileo.net.ClientMessageRouter;
 import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
@@ -129,12 +131,28 @@ public class NodeInfoRequestHandler implements MessageListener {
 			}
 		}
 			
-			
-		
 		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
+		afterHeartbeatCheck();
+		
 	}
+
+	
+	/**
+	 * ONCE HEARTBEAT RESPONSES HAVE BEEN ACCUMULATED
+	 * @author sapmitra
+	 */
+	private void afterHeartbeatCheck() {
+		
+		// FIND TOP N CLIQUES
+		Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
+		
+		
+		
+		
+	}
+
 
 	@Override
 	public void onMessage(GalileoMessage message) {

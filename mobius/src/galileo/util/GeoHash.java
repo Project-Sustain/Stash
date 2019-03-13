@@ -3180,7 +3180,7 @@ public class GeoHash {
 		
 	}
 	
-	public static void main(String arg[]) {
+	public static void main3(String arg[]) {
 		
 		System.out.println(getSpatialOrientationSimplified("9zh0", "9z5b1"));
 		System.out.println(getSpatialOrientationSimplified("9zh0", "9zh0"));
@@ -3267,6 +3267,38 @@ public class GeoHash {
 		return spatialNeighbors;
 		
 	}
+	
+	
+	/**
+	 * GIVEN A GEOHASH, FIND THE GEOHASH DIAGONALLY OPPOSITE TO IT.
+	 * @author sapmitra
+	 * @param geoHash
+	 */
+	public static void getFarthestGeohash(String geoHash) {
+		
+		SpatialRange decodeHash = decodeHash(geoHash);
+		
+		double centralLat = (decodeHash.getLowerBoundForLatitude() + decodeHash.getUpperBoundForLatitude()) / 2d;
+		double centralLon = (decodeHash.getLowerBoundForLongitude() + decodeHash.getUpperBoundForLongitude()) / 2d;
+		
+		if(centralLon > 0)
+			centralLon = centralLon - 180;
+		else 
+			centralLon = 180 + centralLon;
+		
+		String newGeoHash = encode((float)(centralLat*-1), (float)centralLon, geoHash.length());
+		
+		System.out.println(newGeoHash);
+		
+	}
+	
+	
+	
+	public static void main(String arg[]) {
+		
+		GeoHash.getFarthestGeohash("u");
+	}
+	
 	
 	
 }

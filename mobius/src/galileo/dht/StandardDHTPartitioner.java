@@ -171,6 +171,7 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		}
 		
 	}
+	
 
 	/**
 	 * Used for storage of a single block
