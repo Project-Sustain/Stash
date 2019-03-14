@@ -9,10 +9,14 @@ public class CliqueContainer {
 	private List<Integer> levels = null;
 	private List<List<CacheCell>> cells = null;
 	
+	private int totalCliqueSize = 0;
+	
 	public CliqueContainer(String key) {
+		
 		this.geohashKey = key;
 		levels = new ArrayList<Integer>();
 		cells = new ArrayList<List<CacheCell>>();
+		
 	}
 	
 	public void addCells(int level, List<CacheCell> cells) {
@@ -20,6 +24,8 @@ public class CliqueContainer {
 		this.levels.add(level);
 		
 		this.cells.add(cells);
+		
+		totalCliqueSize += cells.size();
 		
 		
 	}
@@ -39,6 +45,22 @@ public class CliqueContainer {
 	}
 	public void setCells(List<List<CacheCell>> cells) {
 		this.cells = cells;
+	}
+
+	public String getGeohashKey() {
+		return geohashKey;
+	}
+
+	public void setGeohashKey(String geohashKey) {
+		this.geohashKey = geohashKey;
+	}
+
+	public int getTotalCliqueSize() {
+		return totalCliqueSize;
+	}
+
+	public void setTotalCliqueSize(int totalCliqueSize) {
+		this.totalCliqueSize = totalCliqueSize;
 	}
 	
 	

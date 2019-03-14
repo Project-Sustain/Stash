@@ -3274,7 +3274,7 @@ public class GeoHash {
 	 * @author sapmitra
 	 * @param geoHash
 	 */
-	public static void getFarthestGeohash(String geoHash) {
+	public static String getAntipodeGeohash(String geoHash) {
 		
 		SpatialRange decodeHash = decodeHash(geoHash);
 		
@@ -3288,15 +3288,19 @@ public class GeoHash {
 		
 		String newGeoHash = encode((float)(centralLat*-1), (float)centralLon, geoHash.length());
 		
-		System.out.println(newGeoHash);
+		//System.out.println(newGeoHash);
+		
+		return newGeoHash;
 		
 	}
 	
 	
 	
+	
+	
 	public static void main(String arg[]) {
 		
-		GeoHash.getFarthestGeohash("u");
+		GeoHash.getAntipodeGeohash("u");
 	}
 	
 	

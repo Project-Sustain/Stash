@@ -7,14 +7,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import galileo.comm.DataIntegrationFinalResponse;
 import galileo.comm.DataIntegrationResponse;
@@ -24,6 +23,11 @@ import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
 import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationResponse;
+import galileo.dataset.Metadata;
+import galileo.dataset.SpatialHint;
+import galileo.dataset.SpatialProperties;
+import galileo.dataset.SpatialRange;
+import galileo.dht.hash.HashException;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventContext;
@@ -38,6 +42,7 @@ import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
 import galileo.net.RequestListener;
 import galileo.serialization.SerializationException;
+import galileo.util.GeoHash;
 
 /**
  * This class will collect the responses from all the nodes of galileo and then
@@ -134,7 +139,12 @@ public class NodeInfoRequestHandler implements MessageListener {
 		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
-		afterHeartbeatCheck();
+		try {
+			afterHeartbeatCheck();
+		} catch (HashException | PartitionException e) {
+			// TODO Auto-generated catch block
+			logger.severe("RIKI: ERROR AFTER SUCCESSFUL HEARTBEAT");
+		}
 		
 	}
 
@@ -142,14 +152,76 @@ public class NodeInfoRequestHandler implements MessageListener {
 	/**
 	 * ONCE HEARTBEAT RESPONSES HAVE BEEN ACCUMULATED
 	 * @author sapmitra
+	 * @throws PartitionException 
+	 * @throws HashException 
 	 */
-	private void afterHeartbeatCheck() {
+	private void afterHeartbeatCheck() throws HashException, PartitionException {
 		
 		// FIND TOP N CLIQUES
 		Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
 		
+		// MAP OF WHICH CLIQUE GOES TO WHICH NODE
+		Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
 		
-		
+		// FOR EACH CLIQUE, FIND A SUITABLE NODE TO SEND IT TO
+		// THE NODE HAS TO BE THE ANTIPODE OF THE GEOHASH IN QUESTION
+		for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
+			
+			String geohashKey = entry.getKey();
+			CliqueContainer clique = entry.getValue();
+			
+			
+			String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
+			
+			boolean looking = true;
+			
+			// EAST OR WEST
+			int randDirection = ThreadLocalRandom.current().nextInt(3,5);
+			
+			// TILL A SUITABLE NODE HAS BEEN FOUND
+			while(looking) {
+				Partitioner<Metadata> partitioner = fs.getPartitioner();
+				
+				SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
+				
+				SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
+				Metadata metadata = new Metadata();
+				metadata.setName(geoHashAntipode);
+				metadata.setSpatialProperties(spatialProperties);
+				
+				NodeInfo targetNode = partitioner.locateData(metadata);
+				
+				String nodeString = targetNode.stringRepresentation();
+				NodeResourceInfo nodeResourceInfo = nodesResourceMap.get(nodeString);
+				
+				
+				if(nodeResourceInfo.getGuestTreeSize() > clique.getTotalCliqueSize()) {
+					looking = false;
+					
+					nodeResourceInfo.decrementGuestTreeSize(clique.getTotalCliqueSize());
+					
+					// ASSIGN THIS CLIQUE TO THIS NODE
+					if(nodeToCliquesMap.get(nodeString) == null) {
+						
+						List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
+						cliques.add(clique);
+						nodeToCliquesMap.put(nodeString, cliques);
+					} else {
+						
+						List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
+						cliques.add(clique);
+					}
+					
+					
+				} else {
+					// WE NEED TO FIND ANOTHER NODE
+					
+					geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
+					
+				}
+			}
+			
+		}
 		
 	}
 

@@ -37,6 +37,10 @@ public class NodeResourceInfo {
 		this.guestTreeSize = guestTreeSize;
 	}
 	
+	public void decrementGuestTreeSize(int cliqueSize) {
+		this.guestTreeSize-=cliqueSize;
+	}
+	
 	
 	public static NodeResourceInfo getMachineStats(int queueSize, int totalGuestTreeSize) {
 		NodeResourceInfo nr = new NodeResourceInfo();
