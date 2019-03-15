@@ -1,6 +1,7 @@
 package galileo.comm;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import galileo.event.Event;
@@ -11,13 +12,7 @@ import galileo.serialization.SerializationOutputStream;
 
 public class HeartbeatRequest implements Event {
 
-	private String eventID;
 	private List<CliqueContainer> cliquesToSend;
-	
-	public HeartbeatRequest(String queryId) {
-		this.eventID = queryId;
-	}
-	
 	
 	public HeartbeatRequest(List<CliqueContainer> cliquesToSend) {
 		
@@ -28,22 +23,16 @@ public class HeartbeatRequest implements Event {
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		
-		out.writeString(eventID);
+		out.writeSerializableCollection(cliquesToSend);
 		
 	}
 	
 	@Deserialize
 	public HeartbeatRequest(SerializationInputStream in) throws IOException, SerializationException {
 		
-		eventID = in.readString();
+		cliquesToSend = new ArrayList<CliqueContainer>();
+		in.readSerializableCollection(CliqueContainer.class, cliquesToSend);
 		
-	}
-	
-	public String getEventID() {
-		return eventID;
-	}
-	public void setEventID(String eventID) {
-		this.eventID = eventID;
 	}
 
 }

@@ -1,9 +1,14 @@
 package galileo.graph;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CliqueContainer {
+import galileo.serialization.ByteSerializable;
+import galileo.serialization.SerializationInputStream;
+import galileo.serialization.SerializationOutputStream;
+
+public class CliqueContainer implements ByteSerializable{
 	
 	private String geohashKey;
 	private List<Integer> levels = null;
@@ -81,7 +86,28 @@ public class CliqueContainer {
 	public void setDirection(int direction) {
 		this.direction = direction;
 	}
+
+	@Override
+	public void serialize(SerializationOutputStream out) throws IOException {
+		
+		out.writeString(geohashKey);
+		out.writeString(geohashAntipode);
+		out.writeInt(direction);
+		out.writeInt(totalCliqueSize);
+		
+		out.writeIntegerCollection(levels);
+		
+		out.writeInt(levels.size());
+		
+		for(List<CacheCell> cellRow: cells)
+			out.writeSerializableCollection(cellRow);
+		
+	}
 	
+	@Deserialize
+	public CliqueContainer(SerializationInputStream in) {
+		
+	}
 	
 
 }

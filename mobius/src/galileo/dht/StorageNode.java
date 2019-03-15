@@ -507,10 +507,58 @@ public class StorageNode implements RequestListener {
 	public void handleHeartbeatRequest(HeartbeatRequest request, EventContext context) throws HashException, IOException, PartitionException {
 		
 		int totalGuestTreeSize = 0;
+		
 		for(GeospatialFileSystem fs : fsMap.values()) {
 			
 			totalGuestTreeSize+=fs.getGuestCache().getTotalRooms();
 		}
+		
+		
+		
+		
+		
+		
+		if(nodeResourceInfo.getGuestTreeSize() > clique.getTotalCliqueSize()) {
+			
+			looking = false;
+			
+			nodeResourceInfo.decrementGuestTreeSize(clique.getTotalCliqueSize());
+			
+			// ASSIGN THIS CLIQUE TO THIS NODE
+			if(nodeToCliquesMap.get(nodeString) == null) {
+				
+				List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
+				cliques.add(clique);
+				nodeToCliquesMap.put(nodeString, cliques);
+			} else {
+				
+				List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
+				cliques.add(clique);
+			}
+			
+			
+		} else {
+			// WE NEED TO FIND ANOTHER NODE
+			
+			geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
+			
+			if(shift > Math.pow(2, geohashKey.length()*3)) {
+				looking = false;
+			}
+			
+		}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		int messageQueueSize = eventReactor.getMessageQueue().size();
 		

@@ -1,4 +1,4 @@
-package galileo.dht;
+/*package galileo.dht;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,12 +32,12 @@ public class ResourceTracker implements Runnable{
 	// TIME INTERVAL IN MILLISECONDS
 	private static final long WAIT_TIME = 10*1000;
 	
-	/**
+	*//**
 	 * TAKE ALL NODES EXCEPT THE LAST ONE, WHICH SHOULD BE THE CURRENT NODE
 	 * @param allNodes
 	 * @param fsMap 
 	 * @param blockingQueue 
-	 */
+	 *//*
 	public ResourceTracker(List<NodeInfo> allNodes, BlockingQueue<GalileoMessage> blockingQueue, Map<String, GeospatialFileSystem> fsMap) {
 		
 		try {
@@ -112,7 +112,7 @@ public class ResourceTracker implements Runnable{
 			// NO NEED TO SEND OUT A REQUEST
 			NodeResourceInfo nr_current = getCurrentMachineInfo();
 			
-			/* Sending out heartbeats to all nodes */
+			 Sending out heartbeats to all nodes 
 			reqHandler.handleRequest(hbEvent, currentNode.stringRepresentation(), nr_current);
 		}
 	}
@@ -180,3 +180,4 @@ public class ResourceTracker implements Runnable{
 
 
 }
+*/

@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import galileo.comm.DataIntegrationFinalResponse;
 import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
+import galileo.comm.HeartbeatRequest;
 import galileo.comm.HeartbeatResponse;
 import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
@@ -62,6 +63,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 	private ClientMessageRouter router;
 	private AtomicInteger expectedResponses;
 	private Collection<NetworkDestination> nodes;
+	private Map<String, NetworkDestination> nodeStringToNodeMap;
 	private List<GalileoMessage> responses;
 	private Event response;
 	private long elapsedTime;
@@ -76,6 +78,14 @@ public class NodeInfoRequestHandler implements MessageListener {
 		
 		this.nodes = allOtherNodes;
 
+		nodeStringToNodeMap = new HashMap<String, NetworkDestination>();
+		
+		for(NetworkDestination nd : allOtherNodes) {
+			
+			nodeStringToNodeMap.put(nd.stringRepresentation(), nd);
+			
+		}
+		
 		this.router = new ClientMessageRouter(true);
 		this.router.addListener(this);
 		this.responses = new ArrayList<GalileoMessage>();
@@ -348,32 +358,17 @@ public class NodeInfoRequestHandler implements MessageListener {
 				String nodeKey = entry.getKey();
 				List<CliqueContainer> cliquesToSend = entry.getValue();
 				
+				NetworkDestination nodeToSendTo = nodeStringToNodeMap.get(nodeKey);
+				
+				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend);
+				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
+				
+				this.router.sendMessage(nodeToSendTo, mrequest);
+				logger.info("RIKI: HEARTBEAT REQUEST SENT TO " + nodeToSendTo.toString());
+				
+				
 				
 			}
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			GalileoMessage mrequest = this.eventWrapper.wrap(request);
-			
-			for (NetworkDestination node : nodes) {
-				
-				this.router.sendMessage(node, mrequest);
-				logger.info("RIKI: HEARTBEAT REQUEST SENT TO " + node.toString());
-				
-			}
-			
-			this.elapsedTime = System.currentTimeMillis();
 			
 			// CHECKS IF THERE IS A TIMEOUT IN RESPONSE COMING BACK FROM THE HELPER NODES
 			TimeoutChecker tc = new TimeoutChecker(this, WAIT_TIME);

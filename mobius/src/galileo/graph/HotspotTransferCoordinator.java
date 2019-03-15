@@ -39,7 +39,7 @@ public class HotspotTransferCoordinator implements Runnable{
 	
 	// TIME INTERVAL IN MILLISECONDS
 	// TIME WE WAIT FOR ALL HEARTBEAT MESSAGES TO COME BACK
-	private static final long WAIT_TIME = 3*1000;
+	private static final long WAIT_TIME = 5*1000;
 	
 	
 	/**
