@@ -5,15 +5,24 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
 import galileo.comm.HeartbeatRequest;
+import galileo.dataset.Metadata;
+import galileo.dataset.SpatialProperties;
+import galileo.dataset.SpatialRange;
 import galileo.dht.NodeInfo;
 import galileo.dht.NodeInfoRequestHandler;
 import galileo.dht.NodeResourceInfo;
+import galileo.dht.PartitionException;
+import galileo.dht.Partitioner;
 import galileo.dht.StorageNode;
+import galileo.dht.hash.HashException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.net.NetworkDestination;
+import galileo.util.GeoHash;
 
 public class HotspotTransferCoordinator implements Runnable{
 	
@@ -22,8 +31,7 @@ public class HotspotTransferCoordinator implements Runnable{
 	private NetworkDestination currentNode;
 	private String currentHostName;
 	
-	private Map<String,NodeResourceInfo> nodesResourceMap = new HashMap<String,NodeResourceInfo>();
-	
+	private GeospatialFileSystem fs;
 	// THE MAIN REQUEST HANDLER
 	private NodeInfoRequestHandler reqHandler;
 	
@@ -45,6 +53,8 @@ public class HotspotTransferCoordinator implements Runnable{
 		
 		try {
 			
+			this.fs = fs;
+			
 			allOtherNodes = new ArrayList<NetworkDestination>();
 
 			for (NodeInfo n : allNodes) {
@@ -60,11 +70,10 @@ public class HotspotTransferCoordinator implements Runnable{
 					continue;
 				}
 				
-				nodesResourceMap.put(nd.stringRepresentation(), null);
 				allOtherNodes.add(nd);
 			}
 
-			reqHandler = new NodeInfoRequestHandler(allOtherNodes, fs, nodesResourceMap, currentNode, WAIT_TIME);
+			reqHandler = new NodeInfoRequestHandler(allOtherNodes, fs, currentNode, WAIT_TIME);
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -77,19 +86,10 @@ public class HotspotTransferCoordinator implements Runnable{
 	@Override
 	public void run() {
 		
-		/**
-		 * STEP 1: INQUIRE ALL NODES AND GET THEIR USAGE STATS
-		 */
-	
 		logger.info("RIKI: ABOUT TO SEND OUT HEARTBEATS");
-
-		// SENDING OF HEARTBEAT REQUEST AND COMBINING OF THE RESPONSES
-		String queryId = String.valueOf(System.currentTimeMillis());
-		
-		HeartbeatRequest hbEvent= new HeartbeatRequest(queryId);
 		
 		/* Sending out heartbeats to all nodes */
-		reqHandler.handleRequest(hbEvent);
+		reqHandler.handleRequest();
 
 		logger.info("RIKI: ABOUT TO START WAITING FOR 3 SECS FOR ALL HEARTBEATS TO COME BACK");
 		
@@ -119,14 +119,6 @@ public class HotspotTransferCoordinator implements Runnable{
 
 	public void setCurrentNode(NetworkDestination currentNode) {
 		this.currentNode = currentNode;
-	}
-
-	public Map<String,NodeResourceInfo> getNodesResourceInfo() {
-		return nodesResourceMap;
-	}
-
-	public void setNodesResourceInfo(Map<String,NodeResourceInfo> nodesResourceInfo) {
-		this.nodesResourceMap = nodesResourceInfo;
 	}
 
 

@@ -70,10 +70,8 @@ public class NodeInfoRequestHandler implements MessageListener {
 	
 	private NetworkDestination currentNode;
 	
-	private Map<String, NodeResourceInfo> nodesResourceMap;
 
-	public NodeInfoRequestHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, Map<String, NodeResourceInfo> nodesResourceMap, 
-			NetworkDestination currentNode, long waitTime) throws IOException {
+	public NodeInfoRequestHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime) throws IOException {
 		
 		
 		this.nodes = allOtherNodes;
@@ -85,7 +83,6 @@ public class NodeInfoRequestHandler implements MessageListener {
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
-		this.nodesResourceMap = nodesResourceMap;
 		this.fs = fs;
 		this.currentNode = currentNode;
 		this.WAIT_TIME = waitTime;
@@ -175,11 +172,14 @@ public class NodeInfoRequestHandler implements MessageListener {
 			
 			boolean looking = true;
 			
+			int shift = 0;
+			
 			// EAST OR WEST
 			int randDirection = ThreadLocalRandom.current().nextInt(3,5);
 			
 			// TILL A SUITABLE NODE HAS BEEN FOUND
 			while(looking) {
+				
 				Partitioner<Metadata> partitioner = fs.getPartitioner();
 				
 				SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
@@ -194,8 +194,10 @@ public class NodeInfoRequestHandler implements MessageListener {
 				String nodeString = targetNode.stringRepresentation();
 				NodeResourceInfo nodeResourceInfo = nodesResourceMap.get(nodeString);
 				
+				shift++;
 				
 				if(nodeResourceInfo.getGuestTreeSize() > clique.getTotalCliqueSize()) {
+					
 					looking = false;
 					
 					nodeResourceInfo.decrementGuestTreeSize(clique.getTotalCliqueSize());
@@ -218,10 +220,18 @@ public class NodeInfoRequestHandler implements MessageListener {
 					
 					geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
 					
+					if(shift > Math.pow(2, geohashKey.length()*3)) {
+						looking = false;
+					}
+					
 				}
 			}
 			
 		}
+		
+		// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
+		// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
+		
 		
 	}
 
@@ -259,9 +269,100 @@ public class NodeInfoRequestHandler implements MessageListener {
 	 * @param hostString 
 	 * @param response
 	 */
-	public void handleRequest(Event request) {
+	public void handleRequest() {
 		
 		try {
+			
+
+			/**
+			 * STEP 1: FIND TOP K CLIQUES IN THE NODE
+			 */
+			
+			// FIND TOP N CLIQUES
+			// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
+			Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
+			
+			// MAP OF WHICH CLIQUE GOES TO WHICH NODE
+			Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
+			
+			// FOR EACH CLIQUE, FIND A SUITABLE NODE TO SEND IT TO
+			// THE NODE HAS TO BE THE ANTIPODE OF THE GEOHASH IN QUESTION
+			for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
+				
+				// EAST OR WEST
+				int randDirection = ThreadLocalRandom.current().nextInt(3,5);
+				
+				String geohashKey = entry.getKey();
+				CliqueContainer clique = entry.getValue();
+				
+				String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
+				
+				// TILL A SUITABLE NODE HAS BEEN FOUND
+					
+				Partitioner<Metadata> partitioner = fs.getPartitioner();
+				
+				// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
+				SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
+				
+				SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
+				Metadata metadata = new Metadata();
+				metadata.setName(geoHashAntipode);
+				metadata.setSpatialProperties(spatialProperties);
+				
+				NodeInfo targetNode = null;
+				
+				try {
+					targetNode = partitioner.locateData(metadata);
+				} catch (HashException | PartitionException e) {
+					logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+				}
+				
+				String nodeString = targetNode.stringRepresentation();
+				
+				// KEEPS TRACK OF WHICH ANTIPODE IS CURRENTLY BEING DEALT WITH
+				clique.setGeohashAntipode(geoHashAntipode);
+				clique.setDirection(randDirection);
+				
+				if(nodeToCliquesMap.get(nodeString) == null) {
+					
+					List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
+					
+					cliques.add(clique);
+					nodeToCliquesMap.put(nodeString, cliques);
+				} else {
+					
+					List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
+					cliques.add(clique);
+				}
+				
+				
+			}
+			
+			// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
+			// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
+			
+			
+			
+			for(Entry<String, List<CliqueContainer>> entry : nodeToCliquesMap.entrySet()) {
+				
+				String nodeKey = entry.getKey();
+				List<CliqueContainer> cliquesToSend = entry.getValue();
+				
+				
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
 			
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);
 			
@@ -274,6 +375,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 			
 			this.elapsedTime = System.currentTimeMillis();
 			
+			// CHECKS IF THERE IS A TIMEOUT IN RESPONSE COMING BACK FROM THE HELPER NODES
 			TimeoutChecker tc = new TimeoutChecker(this, WAIT_TIME);
 			Thread internalThread = new Thread(tc);
 			

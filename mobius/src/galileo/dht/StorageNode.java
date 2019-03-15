@@ -60,6 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -123,12 +124,14 @@ import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
+import galileo.graph.CliqueContainer;
 import galileo.graph.HotspotTransferCoordinator;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
+import galileo.graph.TopCliqueFinder;
 import galileo.net.ClientConnectionPool;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
@@ -517,6 +520,24 @@ public class StorageNode implements RequestListener {
 		
 		context.sendReply(rsp);
 		
+		
+		/* NEEDS MORE WORK
+		
+		String nodeString = targetNode.stringRepresentation();
+		
+		
+		if(nodeToCliquesMap.get(nodeString) == null) {
+			
+			List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
+			clique.setGeohashAntipode(geoHashAntipode);
+			cliques.add(clique);
+			nodeToCliquesMap.put(nodeString, cliques);
+		} else {
+			
+			List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
+			cliques.add(clique);
+		}
+		*/
 	}
 
 	@EventHandler
@@ -931,7 +952,7 @@ public class StorageNode implements RequestListener {
 				needRedirection = false;
 				
 				hotspotBeingHandled = true;
-				hotspotBeingHandled = false;
+				
 				// NEEDS HOTSPOT HANDLING
 				handleHotspot();
 			}
@@ -995,6 +1016,7 @@ public class StorageNode implements RequestListener {
 			Entry<String, GeospatialFileSystem> fsEntry = entrySet.iterator().next();
 			
 			GeospatialFileSystem fs = fsEntry.getValue();
+			
 			
 			/* THE FOLLOWING SHOULD BE HANDLED IN A SEPARATE THREAD
 			 * NOT HOLD UP THE CURRENT ONGOING PROCESS*/

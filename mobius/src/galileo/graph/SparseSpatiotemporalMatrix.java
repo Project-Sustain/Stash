@@ -19,8 +19,8 @@ public class SparseSpatiotemporalMatrix {
 	// THE MATRIX IS MAINTAINED AS A HASHMAP
 	private HashMap<String, CacheCell> cells;
 	// THE NUMBER OF CHILDREN EACH CELL CAN HAVE
-	private int numChildren;
-	private int numParents;
+	/*private int numChildren;
+	private int numParents;*/
 	
 	// MAINTAINED AS NON-ZERO NUMBERS
 	private int spatialResolution;
@@ -50,7 +50,7 @@ public class SparseSpatiotemporalMatrix {
 			//day
 			temporalChildren = 24;
 		}
-		
+		/*
 		numChildren = temporalChildren*spatialChildren;
 		
 		numParents = 0;
@@ -60,7 +60,7 @@ public class SparseSpatiotemporalMatrix {
 		else if(spatialResolution == 1 || temporalResolution == 1)
 			numParents = 1;
 		else if(spatialResolution > 1 && temporalResolution > 1)
-			numParents = 3;
+			numParents = 3;*/
 	}
 	
 	/**
@@ -86,7 +86,7 @@ public class SparseSpatiotemporalMatrix {
 			newEntry = true;
 		
 		// This cell is empty
-		c = new CacheCell(cache, summ, numChildren, 16, numParents, key, spatialResolution, temporalResolution, eventId, eventTime);
+		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime);
 		
 		cells.put(key, c);
 			
@@ -130,13 +130,13 @@ public class SparseSpatiotemporalMatrix {
 		this.cells = cells;
 	}
 
-	public int getNumChildren() {
+	/*public int getNumChildren() {
 		return numChildren;
 	}
 
 	public void setNumChildren(int numChildren) {
 		this.numChildren = numChildren;
-	}
+	}*/
 
 	public int getSpatialResolution() {
 		return spatialResolution;

@@ -1,5 +1,6 @@
 package galileo.graph;
 
+import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -8,11 +9,16 @@ import java.util.List;
 
 import galileo.dataset.Coordinates;
 import galileo.fs.GeospatialFileSystem;
+import galileo.serialization.ByteSerializable;
+import galileo.serialization.SerializationException;
+import galileo.serialization.SerializationInputStream;
+import galileo.serialization.SerializationOutputStream;
+import galileo.serialization.ByteSerializable.Deserialize;
 import galileo.util.GeoHash;
 import galileo.util.STRelatives;
 import galileo.util.SpatialBorder;
 
-public class CacheCell {
+public class CacheCell implements ByteSerializable{
 	
 	private SpatiotemporalHierarchicalCache cache;
 	private String spatialInfo;
@@ -64,7 +70,7 @@ public class CacheCell {
 	 * @param eventId 
 	 */
 	
-	public CacheCell(SpatiotemporalHierarchicalCache cache, SummaryStatistics[] stats, int numChildren, int numNeighbors, int numParents, String spatiotemporalInfo,
+	public CacheCell(SpatiotemporalHierarchicalCache cache, SummaryStatistics[] stats, String spatiotemporalInfo,
 			int spatialResolution, int temporalResolution, String eventId, long eventTime) {
 		
 		this.cache = cache;
@@ -474,6 +480,80 @@ public class CacheCell {
 
 	public void setLastEvent(String lastEvent) {
 		this.lastEvent = lastEvent;
+	}
+
+	@Override
+	public void serialize(SerializationOutputStream out) throws IOException {
+		
+		out.writeString(cellKey);
+		out.writeInt(spatialResolution);
+		out.writeInt(temporalResolution);
+		
+		
+		List<SummaryStatistics> summaries = new ArrayList<>();
+		
+		for(SummaryStatistics stat: stats) {
+			summaries.add(stat);
+		}
+		out.writeSerializableCollection(summaries);
+		
+	}
+	
+	@Deserialize
+	public CacheCell(SerializationInputStream in) throws IOException, SerializationException {
+		
+		this.cellKey = in.readString();
+		this.spatialResolution = in.readInt();
+		this.temporalResolution = in.readInt();
+		
+		List<SummaryStatistics> summaries = new ArrayList<>();
+		in.readSerializableCollection(SummaryStatistics.class, summaries);
+		
+		stats = summaries.toArray(new SummaryStatistics[summaries.size()]);
+		
+		String[] components = cellKey.split("\\$\\$");
+		
+		this.temporalInfo = components[0];
+		this.spatialInfo = components[1];
+		
+		/* NEIGHBORS FOR THIS LEVEL */
+		spatialNeighbors = GeoHash.getSpatialNeighboursSimplified(spatialInfo, GeospatialFileSystem.SPATIAL_SPREAD);
+		temporalNeighbors = GeoHash.getTemporalNeighbors(temporalInfo, temporalResolution);
+		
+		/* PARENTS ONE LEVEL UP */
+		if(spatialResolution > 1)
+			spatialParent = GeoHash.getSpatialParent(spatialInfo, 1);
+		else 
+			spatialParent = null;
+		
+		if(temporalResolution > 1)
+			temporalParent = GeoHash.getTemporalParent(temporalInfo, temporalResolution);
+		else
+			temporalParent = null;
+		
+		hasParent = true;
+		
+		if(spatialParent == null && temporalParent == null)
+			hasParent = false;
+		
+		/* CHILDREN ONE LEVEL DOWN */
+		if(spatialResolution < SpatiotemporalHierarchicalCache.totalSpatialLevels )
+			spatialChildren = GeoHash.getSpatialChildren(spatialInfo);
+		else 
+			spatialChildren = null;
+		
+		if(temporalResolution < SpatiotemporalHierarchicalCache.totalTemporalLevels)
+			temporalChildren = GeoHash.getTemporalChildren(temporalInfo, temporalResolution);
+		else
+			temporalChildren = null;
+		
+		hasChildren = true;
+		
+		if(spatialChildren == null && temporalChildren == null)
+			hasChildren = false;
+		
+		this.freshness = 0;
+		
 	}
 
 
