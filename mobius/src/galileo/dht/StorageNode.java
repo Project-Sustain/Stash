@@ -161,6 +161,8 @@ import galileo.util.Version;
 public class StorageNode implements RequestListener {
 
 	private static final Logger logger = Logger.getLogger("galileo");
+	private static final int GUEST_TREE_SIZE_LIMIT = 16384;
+	
 	private StatusLine nodeStatus;
 
 	private String hostname; // The name of this host eg. kiwis
@@ -514,39 +516,39 @@ public class StorageNode implements RequestListener {
 		}
 		
 		
+		List<CliqueContainer> cliquesToSend = request.getCliquesToSend();
 		
 		
-		
-		
-		if(nodeResourceInfo.getGuestTreeSize() > clique.getTotalCliqueSize()) {
+		for(CliqueContainer cc : cliquesToSend) {
 			
-			looking = false;
-			
-			nodeResourceInfo.decrementGuestTreeSize(clique.getTotalCliqueSize());
-			
-			// ASSIGN THIS CLIQUE TO THIS NODE
-			if(nodeToCliquesMap.get(nodeString) == null) {
+			if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
 				
-				List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
-				cliques.add(clique);
-				nodeToCliquesMap.put(nodeString, cliques);
+				// INSERT DATA IN THE GUEST TREE
+				// LOCK GUEST TREE WHILE LOADING
+				// SEPARATE TREE FOR EACH DISTRESS NODE
+				
+				
+				// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
+				
+				totalGuestTreeSize += cc.getTotalCliqueSize();
+				
 			} else {
+				// SEND BACK FAILED RESPONSE
 				
-				List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
-				cliques.add(clique);
+				geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
+				
+				if(shift > Math.pow(2, geohashKey.length()*3)) {
+					looking = false;
+				}
+				
 			}
 			
 			
-		} else {
-			// WE NEED TO FIND ANOTHER NODE
 			
-			geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
 			
-			if(shift > Math.pow(2, geohashKey.length()*3)) {
-				looking = false;
-			}
 			
 		}
+		
 		
 		
 		

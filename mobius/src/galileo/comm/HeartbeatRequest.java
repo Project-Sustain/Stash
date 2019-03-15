@@ -35,4 +35,12 @@ public class HeartbeatRequest implements Event {
 		
 	}
 
+	public List<CliqueContainer> getCliquesToSend() {
+		return cliquesToSend;
+	}
+
+	public void setCliquesToSend(List<CliqueContainer> cliquesToSend) {
+		this.cliquesToSend = cliquesToSend;
+	}
+
 }

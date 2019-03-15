@@ -127,6 +127,16 @@ public class SerializationOutputStream extends DataOutputStream {
         }
     }
     
+    
+	public void writeBooleanCollection(Collection<Boolean> collection) throws IOException {
+		writeInt(collection.size());
+		for (boolean str : collection) {
+			writeBoolean(str);
+		}
+	}
+    	    
+    
+    
 	public void writeLongCollection(Collection<Long> collection) throws IOException {
 		writeInt(collection.size());
 		for (long str : collection) {

@@ -1,6 +1,8 @@
 package galileo.comm;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import galileo.event.Event;
 import galileo.serialization.SerializationException;
@@ -9,35 +11,37 @@ import galileo.serialization.SerializationOutputStream;
 
 public class HeartbeatResponse implements Event {
 
-	private float cpuUtil;
-	private float guestTreeSize;
-	private float heapMem;
-	private String reqEventId;
-	private String hostString;
+	private List<Boolean> resultFlag;
+	private List<String> geohashOfClique;
+	private List<String> geohashAntipodeOfClique;
+	private List<Integer> direction;
 	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		
-		out.writeString(reqEventId);
-		out.writeFloat(guestTreeSize);
-		out.writeFloat(heapMem);
-		out.writeFloat(cpuUtil);
-		out.writeString(hostString);
+		out.writeBooleanCollection(resultFlag);
+		out.writeStringCollection(geohashOfClique);
+		out.writeStringCollection(geohashAntipodeOfClique);
+		out.writeIntegerCollection(direction);
 		
 	}
 
 	@Deserialize
 	public HeartbeatResponse(SerializationInputStream in) throws IOException, SerializationException {
 		
-		this.reqEventId = in.readString();
-		this.guestTreeSize = in.readFloat();
-		this.heapMem = in.readFloat();
-		this.cpuUtil = in.readFloat();
-		this.hostString = in.readString();
+		resultFlag = new ArrayList<Boolean>();
+		geohashOfClique = new ArrayList<String>();
+		geohashAntipodeOfClique = new ArrayList<String>();
+		direction = new ArrayList<Integer>();
+		
+		in.readBooleanCollection(this.resultFlag);
+		in.readStringCollection(this.geohashOfClique);
+		in.readStringCollection(this.geohashAntipodeOfClique);
+		in.readIntegerCollection(direction);
 		
 	}
 	
-	public HeartbeatResponse(float cpuUtil2, float guestTreeSize2, float heapUsage, String hostString) {
+	public HeartbeatResponse(String geoHash, String antipode, boolean result, int direction) {
 		this.cpuUtil = cpuUtil2;
 		this.guestTreeSize = guestTreeSize2;
 		this.heapMem = heapUsage;

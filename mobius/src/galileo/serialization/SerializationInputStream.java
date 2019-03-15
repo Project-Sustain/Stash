@@ -106,6 +106,16 @@ public class SerializationInputStream extends DataInputStream {
             collection.add(str);
         }
     }
+    
+    
+	public void readBooleanCollection(Collection<Boolean> collection) throws IOException {
+		int size = readInt();
+		for (int i = 0; i < size; ++i) {
+			boolean str = readBoolean();
+			collection.add(str);
+		}
+	}
+
     public void readIntegerCollection(Collection<Integer> collection)
     	    throws IOException {
     	        int size = readInt();
