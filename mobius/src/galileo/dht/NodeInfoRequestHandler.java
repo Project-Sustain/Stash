@@ -124,14 +124,23 @@ public class NodeInfoRequestHandler implements MessageListener {
 				if (event instanceof HeartbeatResponse) {
 					
 					HeartbeatResponse eventResponse = (HeartbeatResponse) event;
+					for (int i = 0; i< eventResponse.getDirection().size(); i++) {
+						
+						if(eventResponse.getResultFlag().get(i)) {
+							// THIS CLIQUE HAS BEEN REPLICATED SUCCESSFULLY
+							// REMOVE THIS CLIQUE FROM TOP CLIQUE
+							// ADD THIS ENTRY TO THE ROUTING TABLE
+							
+						} else {
+							// FAILED TO REPLICATE THIS, TRY ANOTHER NODE
+							// KEEP THIS ENTRY IN TOP CLIQUES
+							// CALCULATE THE NEXT ANTIPODE GEOHASH
+							
+							
+						}
+						
+					}
 					
-					logger.info("RIKI: HEARTBEAT RESPONSE RECEIVED....FROM " + eventResponse.getHostString());
-					
-					NodeResourceInfo nr = new NodeResourceInfo(eventResponse.getCpuUtil(), eventResponse.getGuestTreeSize(),
-							eventResponse.getHeapMem());
-					
-					// THE HOSTSTRING IS HOSTNAME:PORT....CAN CREATE NODEINFO FROM IT
-					nodesResourceMap.put(eventResponse.getHostString(), nr);
 				
 				}
 			} catch (IOException | SerializationException e) {
@@ -360,7 +369,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 				
 				NetworkDestination nodeToSendTo = nodeStringToNodeMap.get(nodeKey);
 				
-				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend);
+				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend, nodeKey);
 				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
 				
 				this.router.sendMessage(nodeToSendTo, mrequest);

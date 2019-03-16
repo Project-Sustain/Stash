@@ -104,6 +104,7 @@ import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
 import galileo.dht.hash.TemporalHash;
 import galileo.graph.CacheCell;
+import galileo.graph.CliqueContainer;
 import galileo.graph.FeaturePath;
 import galileo.graph.MetadataGraph;
 import galileo.graph.Path;
@@ -191,7 +192,7 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	private SpatiotemporalHierarchicalCache stCache;
 	
-	private SpatiotemporalHierarchicalCache guestCache;
+	private Map<String,SpatiotemporalHierarchicalCache> guestCache;
 	
 	private Map<String, SubBlockLevelBitmaps> blockBitmaps;
 
@@ -264,6 +265,8 @@ public class GeospatialFileSystem extends FileSystem {
 		this.spatialPartitioningType = spatialPartitioningType;
 		
 		this.geohashIndex = new HashSet<>();
+		
+		this.guestCache = new HashMap<String, SpatiotemporalHierarchicalCache>();
 		
 		this.summaryPosns = new ArrayList<Integer>();
 		this.summaryHints = summaryHints;
@@ -3679,13 +3682,64 @@ public class GeospatialFileSystem extends FileSystem {
 			peList.remove(eventId);
 		}
 	}
+	
+	/**
+	 * RETURNS THE TOTAL CELLS CONTAINED IN THE GUEST CACHE ON THIS NODE
+	 * @author sapmitra
+	 * @return
+	 */
+	public int getGuestCacheSize() {
+		
+		int totalRooms = 0;
+		
+		for(SpatiotemporalHierarchicalCache shc : guestCache.values()) {
+			totalRooms += shc.getTotalRooms();
+		}
+		
+		return totalRooms;
+	}
 
-	public SpatiotemporalHierarchicalCache getGuestCache() {
+	public Map<String,SpatiotemporalHierarchicalCache> getGuestCache() {
 		return guestCache;
 	}
 
-	public void setGuestCache(SpatiotemporalHierarchicalCache guestCache) {
+	public void setGuestCache(Map<String,SpatiotemporalHierarchicalCache> guestCache) {
 		this.guestCache = guestCache;
 	}
+	
+	/**
+	 * POPULATING THE GUEST TREE WITH CLIQUES THAT WERE DEEMED TO BE STORABLE
+	 * @author sapmitra
+	 * @param cliquesToAdd
+	 * @param nodeString
+	 */
+
+	public void addToGuestTree(List<CliqueContainer> cliquesToAdd, String nodeString) {
+		
+		synchronized(guestCache) {
+			SpatiotemporalHierarchicalCache cache = null;
+			
+			if(guestCache.get(nodeString) == null) {
+				
+				cache = stCache.getNewCache();
+				guestCache.put(nodeString, cache);
+				
+			} else {
+				cache = guestCache.get(nodeString);
+			}
+			
+			cache.populateClique(cliquesToAdd);
+		}
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 }

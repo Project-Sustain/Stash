@@ -510,84 +510,56 @@ public class StorageNode implements RequestListener {
 		
 		int totalGuestTreeSize = 0;
 		
-		for(GeospatialFileSystem fs : fsMap.values()) {
+		if(fsMap.size() == 1) {
 			
-			totalGuestTreeSize+=fs.getGuestCache().getTotalRooms();
-		}
-		
-		
-		List<CliqueContainer> cliquesToSend = request.getCliquesToSend();
-		
-		
-		for(CliqueContainer cc : cliquesToSend) {
 			
-			if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
+			Set<Entry<String, GeospatialFileSystem>> entrySet = fsMap.entrySet();
+			
+			Entry<String, GeospatialFileSystem> fsEntry = entrySet.iterator().next();
+			
+			GeospatialFileSystem fs = fsEntry.getValue();
+			
+			totalGuestTreeSize+=fs.getGuestCacheSize();
+			
+			
+			List<CliqueContainer> cliquesToSend = request.getCliquesToSend();
+			
+			HeartbeatResponse hbr = new HeartbeatResponse();
+			
+			String nodeString = request.getNodeString();
+			
+			List<CliqueContainer> cliquesToAdd = new ArrayList<CliqueContainer>();
+			
+			for(CliqueContainer cc : cliquesToSend) {
 				
-				// INSERT DATA IN THE GUEST TREE
-				// LOCK GUEST TREE WHILE LOADING
-				// SEPARATE TREE FOR EACH DISTRESS NODE
-				
-				
-				// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
-				
-				totalGuestTreeSize += cc.getTotalCliqueSize();
-				
-			} else {
-				// SEND BACK FAILED RESPONSE
-				
-				geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
-				
-				if(shift > Math.pow(2, geohashKey.length()*3)) {
-					looking = false;
+				if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
+					
+					// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
+					// SEPARATE TREE FOR EACH DISTRESS NODE
+					cliquesToAdd.add(cc);
+					
+					// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
+					
+					totalGuestTreeSize += cc.getTotalCliqueSize();
+					
+					hbr.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+					
+				} else {
+					
+					// SEND BACK FAILED RESPONSE
+					hbr.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+					
 				}
 				
 			}
 			
+			fs.addToGuestTree(cliquesToAdd, nodeString);
 			
 			
-			
-			
+			context.sendReply(hbr);
 		}
 		
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		int messageQueueSize = eventReactor.getMessageQueue().size();
-		
-		NodeResourceInfo nri = NodeResourceInfo.getMachineStats(messageQueueSize, totalGuestTreeSize);
-		
-		HeartbeatResponse rsp = new HeartbeatResponse(nri.getQueueSize(), nri.getGuestTreeSize(), nri.getHeapUsage(), hostname + ":" + port);
-		
-		context.sendReply(rsp);
-		
-		
-		/* NEEDS MORE WORK
-		
-		String nodeString = targetNode.stringRepresentation();
-		
-		
-		if(nodeToCliquesMap.get(nodeString) == null) {
-			
-			List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
-			clique.setGeohashAntipode(geoHashAntipode);
-			cliques.add(clique);
-			nodeToCliquesMap.put(nodeString, cliques);
-		} else {
-			
-			List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
-			cliques.add(clique);
-		}
-		*/
 	}
 
 	@EventHandler

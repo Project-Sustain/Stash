@@ -98,6 +98,23 @@ public class SparseSpatiotemporalMatrix {
 	}
 	
 	
+	public void addGuestCell(SummaryStatistics[] summ, String key, long qt1, long qt2, String eventId, long eventTime) {
+		
+		boolean newEntry = false;
+		// The new summary replaces the old cache summary, whatever may be the case
+		CacheCell c = cells.get(key);
+		
+		if(c == null)
+			newEntry = true;
+		
+		// This cell is empty
+		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime);
+		
+		cells.put(key, c);
+			
+	}
+	
+	
 	/**
 	 * CASE WHERE NEW CELL DOES NOT NEED TO BE CREATED
 	 * 

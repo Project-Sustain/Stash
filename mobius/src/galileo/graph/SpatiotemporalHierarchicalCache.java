@@ -19,6 +19,19 @@ public class SpatiotemporalHierarchicalCache {
 	public static int totalSpatialLevels = 6;
 	public static int totalTemporalLevels = 4;
 	
+	
+	/**
+	 * CREATES A CACHE OF SAME DIMENSIONS OF THE CALLING CACHE
+	 * @author sapmitra
+	 * @return
+	 */
+	public SpatiotemporalHierarchicalCache getNewCache() {
+		
+		SpatiotemporalHierarchicalCache newCache = new SpatiotemporalHierarchicalCache(totalSpatialLevels, totalTemporalLevels);
+		
+		return newCache;
+	}
+	
 	public SpatiotemporalHierarchicalCache(int totalSpatialLevels, int totalTemporalLevels) {
 		
 		SpatiotemporalHierarchicalCache.totalSpatialLevels = totalSpatialLevels;
@@ -259,5 +272,47 @@ public class SpatiotemporalHierarchicalCache {
 	public void setTotalRooms(int totalRooms) {
 		this.totalRooms = totalRooms;
 	}
+	
+	
+	
+	public void populateClique(List<CliqueContainer> cliquesToAdd) {
+		
+		
+		for(CliqueContainer cc : cliquesToAdd) {
+			
+			int count = 0;
+			for(int l : cc.getLevels()) {
+				
+				List<CacheCell> cellsToAdd = cc.getCells().get(count);
+				
+				for(CacheCell c : cellsToAdd) {
+					cacheLevels[l].addGuestCell(c.getStats(), c.getCellKey(), c.getSpatialResolution(), c.getTemporalResolution(), "guest", 0l);
+				}
+				
+				
+				count++;
+			}
+			
+		}
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 }

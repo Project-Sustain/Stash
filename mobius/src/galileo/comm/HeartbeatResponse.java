@@ -16,6 +16,14 @@ public class HeartbeatResponse implements Event {
 	private List<String> geohashAntipodeOfClique;
 	private List<Integer> direction;
 	
+	public HeartbeatResponse() {
+		
+		resultFlag = new ArrayList<Boolean>();
+		geohashOfClique = new ArrayList<String>();
+		geohashAntipodeOfClique = new ArrayList<String>();
+		direction = new ArrayList<Integer>();
+	}
+	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		
@@ -40,52 +48,49 @@ public class HeartbeatResponse implements Event {
 		in.readIntegerCollection(direction);
 		
 	}
+
+	public void addEntry(boolean b, String geohashKey, String geohashAntipode, int direction2) {
+		
+		resultFlag.add(b);
+		geohashOfClique.add(geohashKey);
+		geohashAntipodeOfClique.add(geohashAntipode);
+		direction.add(direction2);
+		
+		
+	}
+
+	public List<Boolean> getResultFlag() {
+		return resultFlag;
+	}
+
+	public void setResultFlag(List<Boolean> resultFlag) {
+		this.resultFlag = resultFlag;
+	}
+
+	public List<String> getGeohashOfClique() {
+		return geohashOfClique;
+	}
+
+	public void setGeohashOfClique(List<String> geohashOfClique) {
+		this.geohashOfClique = geohashOfClique;
+	}
+
+	public List<String> getGeohashAntipodeOfClique() {
+		return geohashAntipodeOfClique;
+	}
+
+	public void setGeohashAntipodeOfClique(List<String> geohashAntipodeOfClique) {
+		this.geohashAntipodeOfClique = geohashAntipodeOfClique;
+	}
+
+	public List<Integer> getDirection() {
+		return direction;
+	}
+
+	public void setDirection(List<Integer> direction) {
+		this.direction = direction;
+	}
 	
-	public HeartbeatResponse(String geoHash, String antipode, boolean result, int direction) {
-		this.cpuUtil = cpuUtil2;
-		this.guestTreeSize = guestTreeSize2;
-		this.heapMem = heapUsage;
-		this.hostString = hostString;
-	}
-
-	public float getCpuUtil() {
-		return cpuUtil;
-	}
-
-	public void setCpuUtil(float cpuUtil) {
-		this.cpuUtil = cpuUtil;
-	}
-
-	public float getGuestTreeSize() {
-		return guestTreeSize;
-	}
-
-	public void setGuestTreeSize(float guestTreeSize) {
-		this.guestTreeSize = guestTreeSize;
-	}
-
-	public float getHeapMem() {
-		return heapMem;
-	}
-
-	public void setHeapMem(float heapMem) {
-		this.heapMem = heapMem;
-	}
-
-	public String getReqEventId() {
-		return reqEventId;
-	}
-
-	public void setReqEventId(String reqEventId) {
-		this.reqEventId = reqEventId;
-	}
-
-	public String getHostString() {
-		return hostString;
-	}
-
-	public void setHostString(String hostString) {
-		this.hostString = hostString;
-	}
+	
 
 }
