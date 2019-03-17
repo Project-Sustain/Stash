@@ -553,6 +553,7 @@ public class StorageNode implements RequestListener {
 				
 			}
 			
+			// ADDING ALL THE SELECTED CLIQUES INTO THE GUEST CACHE TREE
 			fs.addToGuestTree(cliquesToAdd, nodeString);
 			
 			

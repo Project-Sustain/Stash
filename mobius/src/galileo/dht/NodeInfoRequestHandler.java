@@ -69,6 +69,13 @@ public class NodeInfoRequestHandler implements MessageListener {
 	private long elapsedTime;
 	private GeospatialFileSystem fs;
 	
+	private Map<String, CliqueContainer> topKCliques;
+	
+	private Partitioner<Metadata> partitioner;
+	
+	// IF THIS IS THE FIRST TIME REQUESTING FOR HELPER NODES
+	private boolean firstTry = true;
+	
 	
 	private NetworkDestination currentNode;
 	
@@ -96,6 +103,12 @@ public class NodeInfoRequestHandler implements MessageListener {
 		this.fs = fs;
 		this.currentNode = currentNode;
 		this.WAIT_TIME = waitTime;
+		
+		// FIND TOP N CLIQUES
+		// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
+		topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
+		partitioner = fs.getPartitioner();
+		
 	}
 
 	
@@ -131,6 +144,9 @@ public class NodeInfoRequestHandler implements MessageListener {
 							// REMOVE THIS CLIQUE FROM TOP CLIQUE
 							// ADD THIS ENTRY TO THE ROUTING TABLE
 							
+							String cliqueKey = eventResponse.getGeohashOfClique().get(i);
+							topKCliques.remove(cliqueKey);
+							
 						} else {
 							// FAILED TO REPLICATE THIS, TRY ANOTHER NODE
 							// KEEP THIS ENTRY IN TOP CLIQUES
@@ -139,6 +155,10 @@ public class NodeInfoRequestHandler implements MessageListener {
 							
 						}
 						
+					}
+					
+					if(topKCliques.size() > 0) {
+						handleRequest();
 					}
 					
 				
@@ -155,12 +175,12 @@ public class NodeInfoRequestHandler implements MessageListener {
 		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
-		try {
+		/*try {
 			afterHeartbeatCheck();
 		} catch (HashException | PartitionException e) {
 			// TODO Auto-generated catch block
 			logger.severe("RIKI: ERROR AFTER SUCCESSFUL HEARTBEAT");
-		}
+		}*/
 		
 	}
 
@@ -171,7 +191,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 	 * @throws PartitionException 
 	 * @throws HashException 
 	 */
-	private void afterHeartbeatCheck() throws HashException, PartitionException {
+	/*private void afterHeartbeatCheck() throws HashException, PartitionException {
 		
 		// FIND TOP N CLIQUES
 		Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
@@ -252,7 +272,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 		// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
 		
 		
-	}
+	}*/
 
 
 	@Override
@@ -276,6 +296,30 @@ public class NodeInfoRequestHandler implements MessageListener {
 				
 		}
 	}
+	
+	
+	public NodeInfo getNodeForGeoHash(String geoHashAntipode) {
+		
+		// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
+		SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
+		
+		SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
+		Metadata metadata = new Metadata();
+		metadata.setName(geoHashAntipode);
+		metadata.setSpatialProperties(spatialProperties);
+		
+		NodeInfo targetNode = null;
+		try {
+			targetNode = partitioner.locateData(metadata);
+		} catch (HashException | PartitionException e) {
+			logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+		}
+	
+		//String nodeString = targetNode.stringRepresentation();
+		
+		return targetNode;
+		
+	}
 
 	/**
 	 * Handles the client request on behalf of the node that received the
@@ -292,14 +336,10 @@ public class NodeInfoRequestHandler implements MessageListener {
 		
 		try {
 			
-
+			
 			/**
 			 * STEP 1: FIND TOP K CLIQUES IN THE NODE
 			 */
-			
-			// FIND TOP N CLIQUES
-			// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
-			Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
 			
 			// MAP OF WHICH CLIQUE GOES TO WHICH NODE
 			Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
@@ -311,30 +351,64 @@ public class NodeInfoRequestHandler implements MessageListener {
 				// EAST OR WEST
 				int randDirection = ThreadLocalRandom.current().nextInt(3,5);
 				
+				
 				String geohashKey = entry.getKey();
 				CliqueContainer clique = entry.getValue();
 				
 				String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
 				
-				// TILL A SUITABLE NODE HAS BEEN FOUND
-					
-				Partitioner<Metadata> partitioner = fs.getPartitioner();
-				
-				// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
-				SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
-				
-				SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
-				Metadata metadata = new Metadata();
-				metadata.setName(geoHashAntipode);
-				metadata.setSpatialProperties(spatialProperties);
-				
 				NodeInfo targetNode = null;
 				
-				try {
-					targetNode = partitioner.locateData(metadata);
-				} catch (HashException | PartitionException e) {
-					logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+				if(!firstTry) {
+					
+					// GET THE GEOHASH ANTIPODE
+					// GET ITS NEIGHBOR
+					// LOOP TILL THE NODE IS DIFFERENT FROM THE OLD ANTIPODE
+					
+					randDirection = clique.getDirection();
+					
+					geoHashAntipode = clique.getGeohashAntipode();
+					
+					String newGeohashAntipode = geoHashAntipode;
+					
+					NodeInfo tempTargetNode = getNodeForGeoHash(geoHashAntipode);
+					
+					String oldNode = tempTargetNode.stringRepresentation();
+					
+					String newNode = oldNode;
+					
+					while(newNode.equals(oldNode)) {
+						// KEEP SHIFTING TILL A NEW CANDIDATE NODE HAS BEEN FOUND
+						newGeohashAntipode = GeoHash.getNeighbours(newGeohashAntipode)[randDirection];
+						
+						tempTargetNode = getNodeForGeoHash(newGeohashAntipode);
+						newNode = tempTargetNode.stringRepresentation();
+					}
+					
+					targetNode = tempTargetNode;
+					
+				} else {
+					
+					// TILL A SUITABLE NODE HAS BEEN FOUND
+					
+					
+					// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
+					SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
+					
+					SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
+					Metadata metadata = new Metadata();
+					metadata.setName(geoHashAntipode);
+					metadata.setSpatialProperties(spatialProperties);
+					
+					try {
+						targetNode = partitioner.locateData(metadata);
+					} catch (HashException | PartitionException e) {
+						logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+					}
+					
 				}
+				
+				
 				
 				String nodeString = targetNode.stringRepresentation();
 				
@@ -357,6 +431,11 @@ public class NodeInfoRequestHandler implements MessageListener {
 				
 			}
 			
+			if(!firstTry) {
+				expectedResponses = new AtomicInteger(nodeToCliquesMap.size());
+			}
+			
+			firstTry = false;
 			// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
 			// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
 			
