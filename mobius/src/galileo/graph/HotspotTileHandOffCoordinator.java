@@ -14,7 +14,7 @@ import galileo.dataset.Metadata;
 import galileo.dataset.SpatialProperties;
 import galileo.dataset.SpatialRange;
 import galileo.dht.NodeInfo;
-import galileo.dht.NodeInfoRequestHandler;
+import galileo.dht.TileHandoffHandler;
 import galileo.dht.NodeResourceInfo;
 import galileo.dht.PartitionException;
 import galileo.dht.Partitioner;
@@ -24,7 +24,7 @@ import galileo.fs.GeospatialFileSystem;
 import galileo.net.NetworkDestination;
 import galileo.util.GeoHash;
 
-public class HotspotTransferCoordinator implements Runnable{
+public class HotspotTileHandOffCoordinator implements Runnable{
 	
 	// ALL NODES OTHER THAN THE CURRENT NODE IN QUESTION
 	private List<NetworkDestination> allOtherNodes;
@@ -33,7 +33,7 @@ public class HotspotTransferCoordinator implements Runnable{
 	
 	private GeospatialFileSystem fs;
 	// THE MAIN REQUEST HANDLER
-	private NodeInfoRequestHandler reqHandler;
+	private TileHandoffHandler reqHandler;
 	
 	private static final Logger logger = Logger.getLogger("galileo");
 	
@@ -49,7 +49,7 @@ public class HotspotTransferCoordinator implements Runnable{
 	 * @param fs 
 	 * @param blockingQueue 
 	 */
-	public HotspotTransferCoordinator(StorageNode storageNode, List<NodeInfo> allNodes, GeospatialFileSystem fs, String currentHostName, String currentCanonicalHostName) {
+	public HotspotTileHandOffCoordinator(StorageNode storageNode, List<NodeInfo> allNodes, GeospatialFileSystem fs, String currentHostName, String currentCanonicalHostName) {
 		
 		try {
 			
@@ -73,7 +73,7 @@ public class HotspotTransferCoordinator implements Runnable{
 				allOtherNodes.add(nd);
 			}
 
-			reqHandler = new NodeInfoRequestHandler(allOtherNodes, fs, currentNode, WAIT_TIME);
+			reqHandler = new TileHandoffHandler(allOtherNodes, fs, currentNode, WAIT_TIME);
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

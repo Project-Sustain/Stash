@@ -51,7 +51,7 @@ import galileo.util.GeoHash;
  * 
  * @author sapmitra
  */
-public class NodeInfoRequestHandler implements MessageListener {
+public class TileHandoffHandler implements MessageListener {
 
 	private static final Logger logger = Logger.getLogger("galileo");
 	
@@ -80,7 +80,7 @@ public class NodeInfoRequestHandler implements MessageListener {
 	private NetworkDestination currentNode;
 	
 
-	public NodeInfoRequestHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime) throws IOException {
+	public TileHandoffHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime) throws IOException {
 		
 		
 		this.nodes = allOtherNodes;
@@ -122,8 +122,6 @@ public class NodeInfoRequestHandler implements MessageListener {
 	 */
 	public void closeRequest() {
 		
-		silentClose(); // closing the router to make sure that no new responses are added.
-		
 		int responseCount = 0;
 		
 		for (GalileoMessage gresponse : this.responses) {
@@ -157,11 +155,6 @@ public class NodeInfoRequestHandler implements MessageListener {
 						
 					}
 					
-					if(topKCliques.size() > 0) {
-						handleRequest();
-					}
-					
-				
 				}
 			} catch (IOException | SerializationException e) {
 				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
@@ -170,6 +163,19 @@ public class NodeInfoRequestHandler implements MessageListener {
 				logger.log(Level.SEVERE, "An unknown exception occurred while processing the response message. Details follow:"
 								+ e.getMessage(), e);
 			}
+		}
+		
+		// IF NOT ALL CLIQUES HAVE FOUND A HOME, REDO THE PROCESS
+		if(topKCliques.size() > 0) {
+			handleRequest();
+		} else {
+			silentClose(); // closing the router to make sure that no new responses are added.
+			
+			
+			
+			// POPULATE ROUTING TABLE WITH CLIQUES THAT GOT REPLICATED
+			
+			
 		}
 			
 		

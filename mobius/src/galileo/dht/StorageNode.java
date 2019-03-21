@@ -125,7 +125,7 @@ import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
 import galileo.graph.CliqueContainer;
-import galileo.graph.HotspotTransferCoordinator;
+import galileo.graph.HotspotTileHandOffCoordinator;
 import galileo.graph.Path;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
@@ -192,12 +192,6 @@ public class StorageNode implements RequestListener {
 	private boolean pruningNeeded;
 	
 	
-	/* RESOURCE TRACKING RELATED*/
-	private ResourceTracker resourceTracker;
-		// WHETHER THIS NODE IS THE RESOURCE TRACKER OR NOT
-	private boolean isTracker;
-	
-	
 	/*HOTSPOT HANDLING RELATED*/
 	private static int MESSAGE_QUEUE_THRESHOLD = 100;
 	private static long COOLDOWN_TIME = 30*1000l; // 30secs
@@ -240,7 +234,6 @@ public class StorageNode implements RequestListener {
 		this.surveyHandlers = new CopyOnWriteArrayList<SurveyRequestHandler>();
 		this.fsToBePruned = new ArrayList<String>();
 		this.pruningNeeded = false;
-		this.isTracker = false;
 	}
 	
 	
@@ -553,7 +546,6 @@ public class StorageNode implements RequestListener {
 				
 			}
 			
-			// ADDING ALL THE SELECTED CLIQUES INTO THE GUEST CACHE TREE
 			fs.addToGuestTree(cliquesToAdd, nodeString);
 			
 			
@@ -1047,7 +1039,7 @@ public class StorageNode implements RequestListener {
 			// SEND OUT PROBES TO ALL OTHER NODES IN CLUSTER 
 			// TO CHECK THEIR STATISTICS
 			
-			HotspotTransferCoordinator hh = new HotspotTransferCoordinator(this, network.getAllNodes(), fs, this.hostname, this.canonicalHostname);
+			HotspotTileHandOffCoordinator hh = new HotspotTileHandOffCoordinator(this, network.getAllNodes(), fs, this.hostname, this.canonicalHostname);
 			
 			Thread hThread = new Thread(hh);
 			
@@ -1588,9 +1580,6 @@ public class StorageNode implements RequestListener {
 
 			for (GeospatialFileSystem fs : fsMap.values())
 				fs.shutdown();
-
-			if(resourceTracker != null)
-				resourceTracker.kill();
 			
 			System.out.println("Goodbye!");
 		}

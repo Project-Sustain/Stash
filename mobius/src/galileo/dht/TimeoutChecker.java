@@ -3,10 +3,10 @@ package galileo.dht;
 public class TimeoutChecker implements Runnable{
 
 	private long wait_time;
-	private NodeInfoRequestHandler nr;
+	private TileHandoffHandler nr;
 	private long startTime;
 	
-	public TimeoutChecker(NodeInfoRequestHandler nr, long WAIT_TIME) {
+	public TimeoutChecker(TileHandoffHandler nr, long WAIT_TIME) {
 		startTime = System.currentTimeMillis();
 		wait_time = WAIT_TIME;
 		
