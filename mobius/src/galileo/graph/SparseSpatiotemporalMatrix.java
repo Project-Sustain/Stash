@@ -97,8 +97,18 @@ public class SparseSpatiotemporalMatrix {
 		
 	}
 	
-	
-	public void addGuestCell(SummaryStatistics[] summ, String key, long qt1, long qt2, String eventId, long eventTime) {
+	/**
+	 * POPULATES THE GUEST CACHE TREE WITH SUMMARIES IN THE CORRECT LOCATION
+	 * @author sapmitra
+	 * @param summ
+	 * @param key
+	 * @param qt1
+	 * @param qt2
+	 * @param eventId
+	 * @param eventTime
+	 * @return
+	 */
+	public boolean addGuestCell(SummaryStatistics[] summ, String key, long qt1, long qt2, String eventId, long eventTime) {
 		
 		boolean newEntry = false;
 		// The new summary replaces the old cache summary, whatever may be the case
@@ -111,6 +121,8 @@ public class SparseSpatiotemporalMatrix {
 		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime);
 		
 		cells.put(key, c);
+		
+		return newEntry;
 			
 	}
 	

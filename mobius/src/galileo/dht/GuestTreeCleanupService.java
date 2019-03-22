@@ -1,4 +1,4 @@
-/*package galileo.dht;
+package galileo.dht;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,7 +13,7 @@ import galileo.fs.GeospatialFileSystem;
 import galileo.net.GalileoMessage;
 import galileo.net.NetworkDestination;
 
-public class ResourceTracker implements Runnable{
+public class GuestTreeCleanupService implements Runnable{
 	
 	private List<NetworkDestination> allOtherNodes;
 	private NetworkDestination currentNode;
@@ -22,9 +22,6 @@ public class ResourceTracker implements Runnable{
 	
 	private Map<String,NodeResourceInfo> nodesResourceMap = new HashMap<String,NodeResourceInfo>();
 	
-	// THE MAIN REQUEST HANDLER
-	private NodeInfoRequestHandler reqHandler;
-	
 	private static final Logger logger = Logger.getLogger("galileo");
 	
 	private boolean stop_flag = false;
@@ -32,15 +29,10 @@ public class ResourceTracker implements Runnable{
 	// TIME INTERVAL IN MILLISECONDS
 	private static final long WAIT_TIME = 10*1000;
 	
-	*//**
-	 * TAKE ALL NODES EXCEPT THE LAST ONE, WHICH SHOULD BE THE CURRENT NODE
-	 * @param allNodes
-	 * @param fsMap 
-	 * @param blockingQueue 
-	 *//*
-	public ResourceTracker(List<NodeInfo> allNodes, BlockingQueue<GalileoMessage> blockingQueue, Map<String, GeospatialFileSystem> fsMap) {
+	
+	public GuestTreeCleanupService(List<NodeInfo> allNodes, BlockingQueue<GalileoMessage> blockingQueue, Map<String, GeospatialFileSystem> fsMap) {
 		
-		try {
+		
 			
 			this.currentQueue = blockingQueue;
 			this.fsMap = fsMap;
@@ -63,12 +55,8 @@ public class ResourceTracker implements Runnable{
 			}
 
 			currentNode = (NetworkDestination) (allNodes.get(allNodes.size() - 1));
-			reqHandler = new NodeInfoRequestHandler(allOtherNodes, nodesResourceMap);
 			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		
 		
 	}
 	
@@ -81,7 +69,6 @@ public class ResourceTracker implements Runnable{
 				logger.info("RIKI: ABOUT TO SEND OUT HEARTBEATS");
 				
 				// SENDING OF HEARTBEAT REQUEST AND COMBINING OF THE RESPONSES
-				handleHeartbeatEvent();
 				
 				logger.info("RIKI: ABOUT TO START WAITING FOR 10 SECS");
 				
@@ -98,31 +85,14 @@ public class ResourceTracker implements Runnable{
 		
 	}
 	
-	private void handleHeartbeatEvent() {
-		
-		// IF ALREADY A SET OF HEARTBEATS IS BEING DEALT WITH,
-		// DO NOT SEND OUT A NEW SET OF HEARTBEATS
-		if(!reqHandler.isCurrentlyBusy()) {
-			
-			String queryId = String.valueOf(System.currentTimeMillis());
-			
-			HeartbeatRequest hbEvent= new HeartbeatRequest(queryId);
-			
-			// FOR THE RESOURCE TRACKER MACHINE, JUST QUERY ITSELF
-			// NO NEED TO SEND OUT A REQUEST
-			NodeResourceInfo nr_current = getCurrentMachineInfo();
-			
-			 Sending out heartbeats to all nodes 
-			reqHandler.handleRequest(hbEvent, currentNode.stringRepresentation(), nr_current);
-		}
-	}
+	
 	
 	private NodeResourceInfo getCurrentMachineInfo() {
 		
 		int totalGuestTreeSize = 0;
 		for(GeospatialFileSystem fs : fsMap.values()) {
 			
-			totalGuestTreeSize+=fs.getGuestCache().getTotalRooms();
+			
 		}
 		
 		int messageQueueSize = currentQueue.size();
@@ -180,4 +150,3 @@ public class ResourceTracker implements Runnable{
 
 
 }
-*/

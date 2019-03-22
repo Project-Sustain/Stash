@@ -273,9 +273,13 @@ public class SpatiotemporalHierarchicalCache {
 		this.totalRooms = totalRooms;
 	}
 	
+	public void decrementTotalRooms(int rem) {
+		this.totalRooms -= rem;
+	}
 	
 	
-	public void populateClique(List<CliqueContainer> cliquesToAdd) {
+	
+	public void populateClique(List<CliqueContainer> cliquesToAdd, long eventTime) {
 		
 		
 		for(CliqueContainer cc : cliquesToAdd) {
@@ -286,7 +290,9 @@ public class SpatiotemporalHierarchicalCache {
 				List<CacheCell> cellsToAdd = cc.getCells().get(count);
 				
 				for(CacheCell c : cellsToAdd) {
-					cacheLevels[l].addGuestCell(c.getStats(), c.getCellKey(), c.getSpatialResolution(), c.getTemporalResolution(), "guest", 0l);
+					boolean newEntry = cacheLevels[l].addGuestCell(c.getStats(), c.getCellKey(), c.getSpatialResolution(), c.getTemporalResolution(), "guest", eventTime);
+					if(newEntry)
+						totalRooms++;
 				}
 				
 				

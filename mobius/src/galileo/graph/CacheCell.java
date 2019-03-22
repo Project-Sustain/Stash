@@ -174,6 +174,24 @@ public class CacheCell implements ByteSerializable{
 	}
 	
 	/**
+	 * SEE IF THIS IS STALE FOR THE GUEST CACHE
+	 * @author sapmitra
+	 * @param currentTime
+	 * @param hELPER_TIME 
+	 * @return
+	 */
+	public boolean checkForFreshness(long currentTime, long HELPER_TIME) {
+		
+		boolean toRemove = false;
+		long timeInt = currentTime - lastAccessed;
+		
+		if (timeInt >= HELPER_TIME)
+			toRemove = true;
+		
+		return toRemove;
+	}
+	
+	/**
 	 * ADDED TIME DECAY
 	 * @author sapmitra
 	 * @param currentTime 

@@ -303,7 +303,12 @@ public class TileHandoffHandler implements MessageListener {
 		}
 	}
 	
-	
+	/**
+	 * Given a geohash, find the node that houses it
+	 * @author sapmitra
+	 * @param geoHashAntipode
+	 * @return
+	 */
 	public NodeInfo getNodeForGeoHash(String geoHashAntipode) {
 		
 		// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
@@ -318,7 +323,7 @@ public class TileHandoffHandler implements MessageListener {
 		try {
 			targetNode = partitioner.locateData(metadata);
 		} catch (HashException | PartitionException e) {
-			logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+			logger.severe("RIKI: CANNOT FIND DESTINATION FOR GEOHASH: "+ geoHashAntipode);
 		}
 	
 		//String nodeString = targetNode.stringRepresentation();
@@ -449,12 +454,14 @@ public class TileHandoffHandler implements MessageListener {
 			
 			for(Entry<String, List<CliqueContainer>> entry : nodeToCliquesMap.entrySet()) {
 				
+				long eventTime = System.currentTimeMillis();
 				String nodeKey = entry.getKey();
 				List<CliqueContainer> cliquesToSend = entry.getValue();
 				
 				NetworkDestination nodeToSendTo = nodeStringToNodeMap.get(nodeKey);
 				
-				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend, nodeKey);
+				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend, nodeKey, eventTime);
+				
 				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
 				
 				this.router.sendMessage(nodeToSendTo, mrequest);

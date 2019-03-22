@@ -87,6 +87,7 @@ import galileo.dataset.feature.FeatureSet;
 import galileo.dataset.feature.FeatureType;
 import galileo.dht.CacheCleanupService;
 import galileo.dht.GroupInfo;
+import galileo.dht.GuestCacheCleaner;
 import galileo.dht.LocalParallelQueryProcessor;
 import galileo.dht.NeighborDataParallelQueryProcessor;
 import galileo.dht.NetworkInfo;
@@ -204,6 +205,12 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final String TEMPORAL_HOUR_FEATURE = "x__hour__x";
 	private static final String SPATIAL_FEATURE = "x__spatial__x";
 	
+	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
+	private static final long HELPER_TIMEOUT = 7500l;
+	private static final long DISTRESS_TIMEOUT = 5*1000l;
+	
+	
+	
 	// HOW FAR SPATIAL NEIGHBORS ARE INFLUENCED
 	public static final int SPATIAL_SPREAD = 1;
 	// HOW FAR TEMPORAL NEIGHBORS ARE INFLUENCED
@@ -226,6 +233,8 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	// LIST OF PROCESSES ENTERED
 	public List<String> peList = new ArrayList<String>();
+	
+	public List<String> guestPeList = new ArrayList<String>();
 	
 	
 
@@ -3545,6 +3554,23 @@ public class GeospatialFileSystem extends FileSystem {
 		
 	}
 	
+	
+	/**
+	 * CLEANING GUEST CACHE. THIS HAS TO BE IN A SEPARATE THREAD.
+	 * @author sapmitra
+	 */
+	public void handleGuestCacheCleaning() {
+		
+		// RIKI-REMOVE
+		logger.info("RIKI: CACHE CLEANUP STARTED");
+		
+		//ExecutorService executor = Executors.newFixedThreadPool(1);
+		GuestCacheCleaner c = new GuestCacheCleaner(cleanUpInitiated, guestPeList, guestCache, 0, HELPER_TIMEOUT);
+		
+		c.clean();
+		
+	}
+	
 
 	/**
 	 * 
@@ -3712,9 +3738,13 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @author sapmitra
 	 * @param cliquesToAdd
 	 * @param nodeString
+	 * @param eventTime 
 	 */
 
-	public void addToGuestTree(List<CliqueContainer> cliquesToAdd, String nodeString) {
+	public void addToGuestTree(List<CliqueContainer> cliquesToAdd, String nodeString, long eventTime) {
+		
+		if(cliquesToAdd == null || cliquesToAdd.size() == 0)
+			return;
 		
 		synchronized(guestCache) {
 			SpatiotemporalHierarchicalCache cache = null;
@@ -3728,7 +3758,7 @@ public class GeospatialFileSystem extends FileSystem {
 				cache = guestCache.get(nodeString);
 			}
 			
-			cache.populateClique(cliquesToAdd);
+			cache.populateClique(cliquesToAdd, eventTime);
 		}
 		
 	}

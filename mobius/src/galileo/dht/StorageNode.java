@@ -38,29 +38,23 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.Map.Entry;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -77,7 +71,6 @@ import galileo.comm.BlockResponse;
 import galileo.comm.DataIntegrationEvent;
 import galileo.comm.DataIntegrationFinalResponse;
 import galileo.comm.DataIntegrationRequest;
-import galileo.comm.DataIntegrationResponse;
 import galileo.comm.FilesystemAction;
 import galileo.comm.FilesystemEvent;
 import galileo.comm.FilesystemRequest;
@@ -95,12 +88,9 @@ import galileo.comm.QueryResponse;
 import galileo.comm.StorageEvent;
 import galileo.comm.StorageRequest;
 import galileo.comm.SurveyEvent;
-import galileo.comm.SurveyEventResponse;
 import galileo.comm.SurveyRequest;
 import galileo.comm.SurveyResponse;
 import galileo.comm.TemporalType;
-import galileo.comm.TrainingDataEvent;
-import galileo.comm.TrainingDataResponse;
 import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
@@ -109,7 +99,6 @@ import galileo.config.SystemConfig;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
 import galileo.dataset.Metadata;
-import galileo.dataset.SpatialHint;
 import galileo.dataset.SpatialProperties;
 import galileo.dataset.SpatialRange;
 import galileo.dataset.TemporalProperties;
@@ -123,15 +112,10 @@ import galileo.event.EventHandler;
 import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
-import galileo.graph.CacheCell;
 import galileo.graph.CliqueContainer;
 import galileo.graph.HotspotTileHandOffCoordinator;
 import galileo.graph.Path;
-import galileo.graph.SparseSpatiotemporalMatrix;
-import galileo.graph.SpatiotemporalHierarchicalCache;
-import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
-import galileo.graph.TopCliqueFinder;
 import galileo.net.ClientConnectionPool;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
@@ -140,15 +124,10 @@ import galileo.net.RequestListener;
 import galileo.net.ServerMessageRouter;
 import galileo.query.Query;
 import galileo.serialization.SerializationException;
-import galileo.util.BorderingProperties;
-import galileo.util.CellRequirements;
 import galileo.util.GeoHash;
-import galileo.util.PathFragments;
 import galileo.util.PathRequirements;
-import galileo.util.PathsAndOrientations;
 import galileo.util.Requirements;
 import galileo.util.SuperCube;
-import galileo.util.SuperPolygon;
 import galileo.util.Version;
 
 /**
@@ -190,6 +169,14 @@ public class StorageNode implements RequestListener {
 	private List<SurveyRequestHandler> surveyHandlers;
 	private List<String> fsToBePruned;
 	private boolean pruningNeeded;
+	
+	
+	/* GUEST TREE MAINTAINENCE*/
+	private Timer guestTreeClearer = new Timer();
+	
+	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
+	private static final long HELPER_TIMEOUT = 7500l;
+	private static final long DISTRESS_TIMEOUT = 5*1000l;
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
@@ -238,7 +225,7 @@ public class StorageNode implements RequestListener {
 	
 	
 	/**
-	 * IS THIS CURRENT NODE HOTSPOTTED
+	 * IS THIS CURRENT NODE HOTSPOTTED?
 	 * @author sapmitra
 	 * @return
 	 */
@@ -359,6 +346,29 @@ public class StorageNode implements RequestListener {
 		messageRouter.addListener(eventReactor);
 		messageRouter.listen(port);
 		nodeStatus.set("Online");
+		
+		
+		/* STARTING GUEST CACHE CLEANUP SERVICE*/
+		
+		guestTreeClearer.scheduleAtFixedRate(new TimerTask() {
+			@Override
+			public void run() {
+				
+				if(fsMap != null && fsMap.size() > 0) {
+					Set<Entry<String, GeospatialFileSystem>> entrySet = fsMap.entrySet();
+					
+					Entry<String, GeospatialFileSystem> fsEntry = entrySet.iterator().next();
+					
+					GeospatialFileSystem fs = fsEntry.getValue();
+					
+					fs.handleGuestCacheCleaning();
+				}
+			}
+		}, HELPER_TIMEOUT, HELPER_TIMEOUT);
+		
+		
+		
+		
 
 		/* Start processing the message loop */
 		while (true) {
@@ -527,8 +537,6 @@ public class StorageNode implements RequestListener {
 				
 				if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
 					
-					// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
-					// SEPARATE TREE FOR EACH DISTRESS NODE
 					cliquesToAdd.add(cc);
 					
 					// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
@@ -546,7 +554,9 @@ public class StorageNode implements RequestListener {
 				
 			}
 			
-			fs.addToGuestTree(cliquesToAdd, nodeString);
+			// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
+			// SEPARATE TREE FOR EACH DISTRESS NODE
+			fs.addToGuestTree(cliquesToAdd, nodeString, request.getEventTime());
 			
 			
 			context.sendReply(hbr);

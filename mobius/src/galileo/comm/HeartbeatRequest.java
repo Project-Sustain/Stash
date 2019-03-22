@@ -12,20 +12,24 @@ import galileo.serialization.SerializationOutputStream;
 
 public class HeartbeatRequest implements Event {
 	
+	private long eventTime;
+	
 	private String nodeString;
 
 	private List<CliqueContainer> cliquesToSend;
 	
-	public HeartbeatRequest(List<CliqueContainer> cliquesToSend, String nodeString) {
+	public HeartbeatRequest(List<CliqueContainer> cliquesToSend, String nodeString, long eventTime) {
 		
 		this.nodeString = nodeString;
 		this.cliquesToSend = cliquesToSend;
+		this.eventTime = eventTime;
 		
 	}
 	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		
+		out.writeLong(eventTime);
 		out.writeString(nodeString);
 		out.writeSerializableCollection(cliquesToSend);
 		
@@ -34,6 +38,7 @@ public class HeartbeatRequest implements Event {
 	@Deserialize
 	public HeartbeatRequest(SerializationInputStream in) throws IOException, SerializationException {
 		
+		eventTime = in.readLong();
 		nodeString = in.readString();
 		cliquesToSend = new ArrayList<CliqueContainer>();
 		in.readSerializableCollection(CliqueContainer.class, cliquesToSend);
@@ -54,6 +59,14 @@ public class HeartbeatRequest implements Event {
 
 	public void setNodeString(String nodeString) {
 		this.nodeString = nodeString;
+	}
+
+	public long getEventTime() {
+		return eventTime;
+	}
+
+	public void setEventTime(long eventTime) {
+		this.eventTime = eventTime;
 	}
 
 }
