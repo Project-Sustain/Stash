@@ -81,6 +81,24 @@ public class SpatiotemporalHierarchicalCache {
 		return levelNum;
 	}
 	
+	
+	/**
+	 * Given a level number, return the individual spatial and temporal resolution of this level.
+	 * @author sapmitra
+	 * @param spatioTemporalLevel
+	 * @return
+	 */
+	
+	public int[] getSpatioTemporalResolutionsFromLevel(int spatioTemporalLevel) {
+		
+		int spatialResolution = (spatioTemporalLevel%totalSpatialLevels) + 1;
+		int temporalResolution = (spatioTemporalLevel/totalSpatialLevels) + 1;
+		
+		int[] levels = {spatialResolution, temporalResolution};
+		return levels;
+		
+	}
+	
 	/**
 	 * RETURNED AS SPATIAL, TEMPORAL, SPATIOTEMPORAL
 	 * @author sapmitra

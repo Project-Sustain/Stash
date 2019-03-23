@@ -18,6 +18,7 @@ public class TopCliqueFinder {
 	public static Map<String, CliqueContainer> getTopKCliques(SpatiotemporalHierarchicalCache searchCache, int spatialPartitioning) {
 		
 		long currentTime = System.currentTimeMillis();
+		
 		synchronized(searchCache) {
 			
 			return scanCacheForTopN(searchCache, spatialPartitioning, currentTime);

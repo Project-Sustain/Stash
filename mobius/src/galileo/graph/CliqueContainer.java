@@ -4,9 +4,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
+import galileo.bmp.CorrectedBitmap;
+import galileo.comm.TemporalType;
+import galileo.fs.GeospatialFileSystem;
 import galileo.serialization.ByteSerializable;
 import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
+import galileo.util.GeoHash;
 
 public class CliqueContainer implements ByteSerializable{
 	
@@ -35,6 +42,88 @@ public class CliqueContainer implements ByteSerializable{
 		
 		totalCliqueSize += cells.size();
 		
+		
+	}
+	
+	/**
+	 * CREATES A LEVEL-WISE BITMAP OF ALL THE CELLS CONTAINED IN A CLIQUE 
+	 * @author sapmitra
+	 * @param fs
+	 * @return
+	 */
+	
+	
+	public List<CorrectedBitmap> calculateBitmap(GeospatialFileSystem fs) {
+		
+		List<CorrectedBitmap> bitmaps = new ArrayList<CorrectedBitmap>();
+		
+		int count = 0;
+		
+		for(List<CacheCell> cellRow: cells) {
+			
+			int currentLevel = levels.get(count);
+			
+			int[] levels = fs.getStCache().getSpatioTemporalResolutionsFromLevel(currentLevel);
+			
+			// CREATE A SET OF TEMPORARY BITMAPS
+			CorrectedBitmap bm = createBitmapForCLique(fs, currentLevel, levels[0], levels[1], cellRow);
+			
+			bitmaps.add(bm);
+			count++;
+			
+		}
+		
+		
+		return bitmaps;
+	}
+	
+	
+	/**
+	 * POPULATES A BITMAP FOR A SINGLE LEVEL OF CACHE CELLS IN A CLIQUE
+	 * 
+	 * @author sapmitra
+	 * @param temporaryBitmap
+	 * @param currentLevel
+	 * @param spatialLevel
+	 * @param temporalLevel
+	 * @param cellsInThisLevel
+	 */
+	public CorrectedBitmap createBitmapForCLique(GeospatialFileSystem fs, int currentLevel, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
+		
+		CorrectedBitmap temporaryBitmap = new CorrectedBitmap();
+		
+		for(CacheCell cells : cellsInThisLevel) {
+			
+			int spatialSize = (int)java.lang.Math.pow(32, spatialLevel);
+			
+			String tokens[] = cells.getCellKey().split("\\$\\$");
+			
+			String choppedGeohash = tokens[0];
+			String dateString = tokens[1];
+			
+			String timeTokens[] = dateString.split("-");
+			
+			// THE START TIME FOR THE BLOCK ASSOSSIATED WITH THIS CLIQUE
+			long cliqueStartTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], fs.getTemporalType());
+			
+			long cellTimestamp = GeoHash.getStartTimeStamp(dateString, TemporalType.getTypeFromLevel(temporalLevel));
+			
+			// returns a number between 0 and 31 for single character
+			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
+			
+			DateTime startDate = new DateTime(cliqueStartTimeStamp, DateTimeZone.UTC);
+			
+			long temporalIndex = TemporalType.getTemporalIndex(startDate, cellTimestamp, temporalLevel);
+			
+			int bitIndex = (int)(temporalIndex*spatialSize + spatialIndex);
+			
+			temporaryBitmap.set(bitIndex);
+				
+			
+		}
+		
+		return temporaryBitmap;
+				
 		
 	}
 	

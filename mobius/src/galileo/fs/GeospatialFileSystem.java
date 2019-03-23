@@ -745,6 +745,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 			try {
+				// BITMAP POPULATION HAPPENS HERE AS WELL
 				readBlockData(block.getData(), bitmaps, geohash, time);
 			} catch (Exception e) {
 				throw new FileSystemException("Error populating sub-block bitmaps: " + e);

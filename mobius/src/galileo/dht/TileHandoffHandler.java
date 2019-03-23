@@ -34,6 +34,7 @@ import galileo.event.Event;
 import galileo.event.EventContext;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CliqueContainer;
+import galileo.graph.SubBlockLevelBitmaps;
 import galileo.graph.SummaryStatistics;
 import galileo.graph.SummaryWrapper;
 import galileo.graph.TopCliqueFinder;
@@ -55,7 +56,11 @@ public class TileHandoffHandler implements MessageListener {
 
 	private static final Logger logger = Logger.getLogger("galileo");
 	
-	private long WAIT_TIME = 0l;
+	private long WAIT_TIME = 3000l;
+	
+	// WE ARE GOING TO RETRY FOR NEW HELPER NODES THIS MANY TIMES
+	private int RETRY_COUNT = 10;
+	
 	private boolean waitTimeCheck = true;
 	
 	private GalileoEventMap eventMap;
@@ -65,11 +70,14 @@ public class TileHandoffHandler implements MessageListener {
 	private Collection<NetworkDestination> nodes;
 	private Map<String, NetworkDestination> nodeStringToNodeMap;
 	private List<GalileoMessage> responses;
-	private Event response;
 	private long elapsedTime;
-	private GeospatialFileSystem fs;
 	
 	private Map<String, CliqueContainer> topKCliques;
+	
+	// A MASTER COPY OF THE ORIGINAL TOP K CLIQUES
+	private Map<String, CliqueContainer> topKCliquesMasterCopy;
+	
+	private Map<String, SubBlockLevelBitmaps> cliqueBitmaps;
 	
 	private Partitioner<Metadata> partitioner;
 	
@@ -81,7 +89,6 @@ public class TileHandoffHandler implements MessageListener {
 	
 
 	public TileHandoffHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime) throws IOException {
-		
 		
 		this.nodes = allOtherNodes;
 
@@ -100,13 +107,36 @@ public class TileHandoffHandler implements MessageListener {
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
-		this.fs = fs;
 		this.currentNode = currentNode;
 		this.WAIT_TIME = waitTime;
 		
 		// FIND TOP N CLIQUES
 		// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
 		topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
+		
+		topKCliquesMasterCopy = new HashMap<String, CliqueContainer>();
+		
+		for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
+			
+			String geohashKey = entry.getKey();
+			CliqueContainer clique = entry.getValue();
+			
+			topKCliquesMasterCopy.put(geohashKey, clique);
+			
+		}
+		
+		
+		cliqueBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
+		
+		// CALCULATING THE BITMAP COVERED BY THE TILES IN EACH PARTICULAR CLIQUE
+		for(String k : topKCliques.keySet()) {
+			
+			CliqueContainer clique = topKCliques.get(k);
+			SubBlockLevelBitmaps bitmap = clique.calculateBitmap(fs);
+			cliqueBitmaps.put(k, bitmap);
+			
+		}
+		
 		partitioner = fs.getPartitioner();
 		
 	}
@@ -166,7 +196,9 @@ public class TileHandoffHandler implements MessageListener {
 		}
 		
 		// IF NOT ALL CLIQUES HAVE FOUND A HOME, REDO THE PROCESS
-		if(topKCliques.size() > 0) {
+		if(topKCliques.size() > 0 && RETRY_COUNT >= 0) {
+			logger.info("RIKI: NOT ALL CLIQUES FOUND HOME....RETRYING FOR REMAINING CLIQUES");
+			RETRY_COUNT--;
 			handleRequest();
 		} else {
 			silentClose(); // closing the router to make sure that no new responses are added.
