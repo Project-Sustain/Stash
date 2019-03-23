@@ -21,10 +21,14 @@ public class CliqueContainer implements ByteSerializable{
 	private List<Integer> levels = null;
 	private List<List<CacheCell>> cells = null;
 	
+	private List<CorrectedBitmap> bitmaps;
+	
 	private String geohashAntipode;
 	private int direction;
 	
 	private int totalCliqueSize = 0;
+	
+	private boolean isReplicated = false;
 	
 	public CliqueContainer(String key) {
 		
@@ -53,7 +57,7 @@ public class CliqueContainer implements ByteSerializable{
 	 */
 	
 	
-	public List<CorrectedBitmap> calculateBitmap(GeospatialFileSystem fs) {
+	public void calculateBitmap(GeospatialFileSystem fs) {
 		
 		List<CorrectedBitmap> bitmaps = new ArrayList<CorrectedBitmap>();
 		
@@ -73,8 +77,7 @@ public class CliqueContainer implements ByteSerializable{
 			
 		}
 		
-		
-		return bitmaps;
+		this.bitmaps = bitmaps;
 	}
 	
 	
@@ -196,6 +199,22 @@ public class CliqueContainer implements ByteSerializable{
 	@Deserialize
 	public CliqueContainer(SerializationInputStream in) {
 		
+	}
+
+	public List<CorrectedBitmap> getBitmaps() {
+		return bitmaps;
+	}
+
+	public void setBitmaps(List<CorrectedBitmap> bitmaps) {
+		this.bitmaps = bitmaps;
+	}
+
+	public boolean isReplicated() {
+		return isReplicated;
+	}
+
+	public void setReplicated(boolean isReplicated) {
+		this.isReplicated = isReplicated;
 	}
 	
 

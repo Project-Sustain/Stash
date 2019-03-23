@@ -74,11 +74,6 @@ public class TileHandoffHandler implements MessageListener {
 	
 	private Map<String, CliqueContainer> topKCliques;
 	
-	// A MASTER COPY OF THE ORIGINAL TOP K CLIQUES
-	private Map<String, CliqueContainer> topKCliquesMasterCopy;
-	
-	private Map<String, SubBlockLevelBitmaps> cliqueBitmaps;
-	
 	private Partitioner<Metadata> partitioner;
 	
 	// IF THIS IS THE FIRST TIME REQUESTING FOR HELPER NODES
@@ -114,26 +109,17 @@ public class TileHandoffHandler implements MessageListener {
 		// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
 		topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
 		
-		topKCliquesMasterCopy = new HashMap<String, CliqueContainer>();
-		
-		for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
-			
-			String geohashKey = entry.getKey();
-			CliqueContainer clique = entry.getValue();
-			
-			topKCliquesMasterCopy.put(geohashKey, clique);
-			
-		}
-		
-		
-		cliqueBitmaps = new HashMap<String, SubBlockLevelBitmaps>();
 		
 		// CALCULATING THE BITMAP COVERED BY THE TILES IN EACH PARTICULAR CLIQUE
 		for(String k : topKCliques.keySet()) {
 			
 			CliqueContainer clique = topKCliques.get(k);
-			SubBlockLevelBitmaps bitmap = clique.calculateBitmap(fs);
-			cliqueBitmaps.put(k, bitmap);
+			
+			// POPULATES A BITMAP INSIDE THE CLIQUE CONTAINER
+			// STRICTLY MEANT TO BE HOUSED IN THE DISTRESSED NODE
+			// NOT MEANT FOR THE HELPING NODE
+			clique.calculateBitmap(fs);
+			
 			
 		}
 		
@@ -173,7 +159,7 @@ public class TileHandoffHandler implements MessageListener {
 							// ADD THIS ENTRY TO THE ROUTING TABLE
 							
 							String cliqueKey = eventResponse.getGeohashOfClique().get(i);
-							topKCliques.remove(cliqueKey);
+							topKCliques.get(cliqueKey).setReplicated(true);
 							
 						} else {
 							// FAILED TO REPLICATE THIS, TRY ANOTHER NODE
@@ -202,8 +188,6 @@ public class TileHandoffHandler implements MessageListener {
 			handleRequest();
 		} else {
 			silentClose(); // closing the router to make sure that no new responses are added.
-			
-			
 			
 			// POPULATE ROUTING TABLE WITH CLIQUES THAT GOT REPLICATED
 			
@@ -394,9 +378,12 @@ public class TileHandoffHandler implements MessageListener {
 				// EAST OR WEST
 				int randDirection = ThreadLocalRandom.current().nextInt(3,5);
 				
-				
 				String geohashKey = entry.getKey();
 				CliqueContainer clique = entry.getValue();
+				
+				// IN CASE OF RETRY, AVOID CLIQUES THAT HAVE ALREADY FOUND A HOME
+				if(clique.isReplicated())
+					continue;
 				
 				String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
 				
