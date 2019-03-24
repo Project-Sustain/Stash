@@ -94,6 +94,7 @@ import galileo.dht.NetworkInfo;
 import galileo.dht.NodeInfo;
 import galileo.dht.PartitionException;
 import galileo.dht.Partitioner;
+import galileo.dht.RoutingEntry;
 import galileo.dht.SelfJoinThread;
 import galileo.dht.SpatialHierarchyPartitioner;
 import galileo.dht.StandardDHTPartitioner;
@@ -234,7 +235,12 @@ public class GeospatialFileSystem extends FileSystem {
 	// LIST OF PROCESSES ENTERED
 	public List<String> peList = new ArrayList<String>();
 	
+	
+	// LIST OF GUEST PROCESSES BEING PROCESSED
 	public List<String> guestPeList = new ArrayList<String>();
+	
+	
+	public Map<String, RoutingEntry> routingTable;
 	
 	
 
@@ -374,6 +380,7 @@ public class GeospatialFileSystem extends FileSystem {
 			this.needSublevelBitmaps = false;
 		}
 		
+		routingTable = new HashMap<String, RoutingEntry>();
 		
 		createMetadataGraph();
 	}
@@ -3760,6 +3767,30 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 			cache.populateClique(cliquesToAdd, eventTime);
+		}
+		
+	}
+
+	public Map<String, RoutingEntry> getRoutingTable() {
+		return routingTable;
+	}
+
+	public void setRoutingTable(Map<String, RoutingEntry> routingTable) {
+		this.routingTable = routingTable;
+	}
+
+	/**
+	 * TAKES THE CURRENT ROUTING TABLE AND UPDATES IT WITH THE NEW CLIQUES THAT HAVE BEEN REPLICATED
+	 * @author sapmitra
+	 * @param topKCliques
+	 */
+	public void populateRoutingTable(Map<String, CliqueContainer> topKCliques) {
+		
+		for(String key : topKCliques.keySet()) {
+			
+			if(routingTable.get(key) == null) {
+				RoutingEntry re = new RoutingEntry();
+			}
 		}
 		
 	}

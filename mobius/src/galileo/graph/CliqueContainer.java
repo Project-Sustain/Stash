@@ -10,6 +10,7 @@ import org.joda.time.DateTimeZone;
 import galileo.bmp.CorrectedBitmap;
 import galileo.comm.TemporalType;
 import galileo.fs.GeospatialFileSystem;
+import galileo.net.NetworkDestination;
 import galileo.serialization.ByteSerializable;
 import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
@@ -28,7 +29,7 @@ public class CliqueContainer implements ByteSerializable{
 	
 	private int totalCliqueSize = 0;
 	
-	private boolean isReplicated = false;
+	private NetworkDestination replicatedNode = null;
 	
 	public CliqueContainer(String key) {
 		
@@ -209,13 +210,15 @@ public class CliqueContainer implements ByteSerializable{
 		this.bitmaps = bitmaps;
 	}
 
-	public boolean isReplicated() {
-		return isReplicated;
+	public NetworkDestination getReplicatedNode() {
+		return replicatedNode;
 	}
 
-	public void setReplicated(boolean isReplicated) {
-		this.isReplicated = isReplicated;
+	public void setReplicatedNode(NetworkDestination replicatedNode) {
+		this.replicatedNode = replicatedNode;
 	}
+
+	
 	
 
 }

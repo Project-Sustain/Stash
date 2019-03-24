@@ -15,6 +15,7 @@ public class HeartbeatResponse implements Event {
 	private List<String> geohashOfClique;
 	private List<String> geohashAntipodeOfClique;
 	private List<Integer> direction;
+	private String nodeString;
 	
 	public HeartbeatResponse() {
 		
@@ -31,6 +32,7 @@ public class HeartbeatResponse implements Event {
 		out.writeStringCollection(geohashOfClique);
 		out.writeStringCollection(geohashAntipodeOfClique);
 		out.writeIntegerCollection(direction);
+		out.writeString(nodeString);
 		
 	}
 
@@ -46,6 +48,8 @@ public class HeartbeatResponse implements Event {
 		in.readStringCollection(this.geohashOfClique);
 		in.readStringCollection(this.geohashAntipodeOfClique);
 		in.readIntegerCollection(direction);
+		
+		this.nodeString = in.readString();
 		
 	}
 
@@ -89,6 +93,14 @@ public class HeartbeatResponse implements Event {
 
 	public void setDirection(List<Integer> direction) {
 		this.direction = direction;
+	}
+
+	public String getNodeString() {
+		return nodeString;
+	}
+
+	public void setNodeString(String nodetring) {
+		this.nodeString = nodetring;
 	}
 	
 	

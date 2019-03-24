@@ -4,45 +4,30 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import galileo.comm.DataIntegrationFinalResponse;
-import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
 import galileo.comm.HeartbeatRequest;
 import galileo.comm.HeartbeatResponse;
-import galileo.comm.MetadataResponse;
-import galileo.comm.QueryResponse;
-import galileo.comm.VisualizationEventResponse;
-import galileo.comm.VisualizationResponse;
 import galileo.dataset.Metadata;
-import galileo.dataset.SpatialHint;
 import galileo.dataset.SpatialProperties;
 import galileo.dataset.SpatialRange;
 import galileo.dht.hash.HashException;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
-import galileo.event.EventContext;
 import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CliqueContainer;
-import galileo.graph.SubBlockLevelBitmaps;
-import galileo.graph.SummaryStatistics;
-import galileo.graph.SummaryWrapper;
 import galileo.graph.TopCliqueFinder;
 import galileo.net.ClientMessageRouter;
 import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
-import galileo.net.RequestListener;
 import galileo.serialization.SerializationException;
 import galileo.util.GeoHash;
 
@@ -73,6 +58,8 @@ public class TileHandoffHandler implements MessageListener {
 	private long elapsedTime;
 	
 	private Map<String, CliqueContainer> topKCliques;
+	
+	private GeospatialFileSystem fs;
 	
 	private Partitioner<Metadata> partitioner;
 	
@@ -125,6 +112,8 @@ public class TileHandoffHandler implements MessageListener {
 		
 		partitioner = fs.getPartitioner();
 		
+		this.fs = fs;
+		
 	}
 
 	
@@ -159,7 +148,11 @@ public class TileHandoffHandler implements MessageListener {
 							// ADD THIS ENTRY TO THE ROUTING TABLE
 							
 							String cliqueKey = eventResponse.getGeohashOfClique().get(i);
-							topKCliques.get(cliqueKey).setReplicated(true);
+							
+							String nodeKey = eventResponse.getNodeString();
+							
+							NetworkDestination nd = nodeStringToNodeMap.get(nodeKey);
+							topKCliques.get(cliqueKey).setReplicatedNode(nd);
 							
 						} else {
 							// FAILED TO REPLICATE THIS, TRY ANOTHER NODE
@@ -190,7 +183,7 @@ public class TileHandoffHandler implements MessageListener {
 			silentClose(); // closing the router to make sure that no new responses are added.
 			
 			// POPULATE ROUTING TABLE WITH CLIQUES THAT GOT REPLICATED
-			
+			fs.populateRoutingTable(topKCliques);
 			
 		}
 			
@@ -382,7 +375,7 @@ public class TileHandoffHandler implements MessageListener {
 				CliqueContainer clique = entry.getValue();
 				
 				// IN CASE OF RETRY, AVOID CLIQUES THAT HAVE ALREADY FOUND A HOME
-				if(clique.isReplicated())
+				if(clique.getReplicatedNode() != null)
 					continue;
 				
 				String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);

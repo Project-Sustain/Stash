@@ -527,7 +527,9 @@ public class StorageNode implements RequestListener {
 			
 			List<CliqueContainer> cliquesToSend = request.getCliquesToSend();
 			
-			HeartbeatResponse hbr = new HeartbeatResponse();
+			HeartbeatResponse hbrsp = new HeartbeatResponse();
+			
+			hbrsp.setNodeString(hostname+":"+port);
 			
 			String nodeString = request.getNodeString();
 			
@@ -543,12 +545,12 @@ public class StorageNode implements RequestListener {
 					
 					totalGuestTreeSize += cc.getTotalCliqueSize();
 					
-					hbr.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+					hbrsp.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
 					
 				} else {
 					
 					// SEND BACK FAILED RESPONSE
-					hbr.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+					hbrsp.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
 					
 				}
 				
@@ -559,7 +561,7 @@ public class StorageNode implements RequestListener {
 			fs.addToGuestTree(cliquesToAdd, nodeString, request.getEventTime());
 			
 			
-			context.sendReply(hbr);
+			context.sendReply(hbrsp);
 		}
 		
 		
