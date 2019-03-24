@@ -67,10 +67,10 @@ public class TileHandoffHandler implements MessageListener {
 	private boolean firstTry = true;
 	
 	
-	private NetworkDestination currentNode;
+	private StorageNode currentNode;
 	
 
-	public TileHandoffHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime) throws IOException {
+	public TileHandoffHandler(List<NetworkDestination> allOtherNodes, GeospatialFileSystem fs, NetworkDestination currentNode, long waitTime, StorageNode thisNode) throws IOException {
 		
 		this.nodes = allOtherNodes;
 
@@ -89,7 +89,7 @@ public class TileHandoffHandler implements MessageListener {
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		
 		this.expectedResponses = new AtomicInteger(this.nodes.size());
-		this.currentNode = currentNode;
+		this.currentNode = thisNode;
 		this.WAIT_TIME = waitTime;
 		
 		// FIND TOP N CLIQUES
@@ -186,9 +186,12 @@ public class TileHandoffHandler implements MessageListener {
 			fs.populateRoutingTable(topKCliques);
 			
 		}
-			
+		
+		currentNode.setHotspotHasBeenHandledTime(System.currentTimeMillis());
 		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
+		
+		currentNode.setHotspotBeingHandled(false);
 		
 		/*try {
 			afterHeartbeatCheck();

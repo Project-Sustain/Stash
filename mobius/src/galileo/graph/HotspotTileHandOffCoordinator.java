@@ -73,7 +73,7 @@ public class HotspotTileHandOffCoordinator implements Runnable{
 				allOtherNodes.add(nd);
 			}
 
-			reqHandler = new TileHandoffHandler(allOtherNodes, fs, currentNode, WAIT_TIME);
+			reqHandler = new TileHandoffHandler(allOtherNodes, fs, currentNode, WAIT_TIME, storageNode);
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

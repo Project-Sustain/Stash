@@ -175,15 +175,18 @@ public class StorageNode implements RequestListener {
 	private Timer guestTreeClearer = new Timer();
 	
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
+	
+	// TIME AFTER WHICH HELPER NODE PURGES ITS OLD TILES
 	private static final long HELPER_TIMEOUT = 7500l;
-	private static final long DISTRESS_TIMEOUT = 5*1000l;
+	
+	// TIME AFTER WHICH NODE HANDLED HOTSPOT AGAIN AFTER A PREVIOUS HANDLE
+	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; // 10 secs
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
 	private static int MESSAGE_QUEUE_THRESHOLD = 100;
-	private static long COOLDOWN_TIME = 30*1000l; // 30secs
-	private long hotspotHandledTime = -1;
-	private boolean hotspotHasBeenHandled = false;
+	
+	private long hotspotHasBeenHandledTime = 0l;
 	private boolean hotspotBeingHandled = false;
 
 	private ConcurrentHashMap<String, QueryTracker> queryTrackers = new ConcurrentHashMap<>();
@@ -525,7 +528,7 @@ public class StorageNode implements RequestListener {
 			totalGuestTreeSize+=fs.getGuestCacheSize();
 			
 			
-			List<CliqueContainer> cliquesToSend = request.getCliquesToSend();
+			List<CliqueContainer> cliquesToHouse = request.getCliquesToSend();
 			
 			HeartbeatResponse hbrsp = new HeartbeatResponse();
 			
@@ -533,32 +536,44 @@ public class StorageNode implements RequestListener {
 			
 			String nodeString = request.getNodeString();
 			
-			List<CliqueContainer> cliquesToAdd = new ArrayList<CliqueContainer>();
 			
-			for(CliqueContainer cc : cliquesToSend) {
+			// NOT STORING ANYTHING IS THIS ITSELF IS HOTSPOTTED
+			if(!isHotspotted()) {
+			
+				List<CliqueContainer> cliquesToAdd = new ArrayList<CliqueContainer>();
+				for(CliqueContainer cc : cliquesToHouse) {
+					
+					if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
+						
+						cliquesToAdd.add(cc);
+						
+						// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
+						
+						totalGuestTreeSize += cc.getTotalCliqueSize();
+						
+						hbrsp.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+						
+					} else {
+						
+						// SEND BACK FAILED RESPONSE
+						hbrsp.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
+						
+					}
+					
+				}	
 				
-				if(totalGuestTreeSize + cc.getTotalCliqueSize() <= GUEST_TREE_SIZE_LIMIT) {
-					
-					cliquesToAdd.add(cc);
-					
-					// SEND BACK SUCCESSFUL HEARTBEAT RESPONSE
-					
-					totalGuestTreeSize += cc.getTotalCliqueSize();
-					
-					hbrsp.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
-					
-				} else {
-					
+				// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
+				// SEPARATE TREE FOR EACH DISTRESS NODE
+				fs.addToGuestTree(cliquesToAdd, nodeString, request.getEventTime());
+				
+			} else {
+				
+				for(CliqueContainer cc : cliquesToHouse) {
 					// SEND BACK FAILED RESPONSE
 					hbrsp.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
-					
 				}
 				
 			}
-			
-			// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
-			// SEPARATE TREE FOR EACH DISTRESS NODE
-			fs.addToGuestTree(cliquesToAdd, nodeString, request.getEventTime());
 			
 			
 			context.sendReply(hbrsp);
@@ -954,31 +969,32 @@ public class StorageNode implements RequestListener {
 		// TELLS WHETHER MESSAGE NEEDS TO BE REROUTED TO ANOTHER NODE
 		boolean needRedirection = false;
 		
+		long timeDiff = eventTime - hotspotHasBeenHandledTime;
+		
 		if(isHotspot) {
 			
 			// DEFINITELY HOTSPOTTED. 
 			// NOW CHECK WHETHER IT NEEDS HANDLING
 			
 			// HAS THE HOTSPOT BEEN HANDLED?
-			if(hotspotHasBeenHandled) {
+			if(hotspotHasBeenHandledTime > 0 && timeDiff < HOTSPOT_COOLDOWN_TIME) {
 				
-				// HOTSPOTTED, AND HAS NOT BEEN HANDLED
+				// HOTSPOTTED, AND HAS BEEN HANDLED
 				// REQUEST NEEDS REDIRECTION USING ROUTING TABLE
 				
 				needRedirection = true;
 				
 				
-			} else if(!hotspotHasBeenHandled && hotspotBeingHandled) {
-				// HOTSPOT ALREADY BEING HANDLED
+			} else if(timeDiff > HOTSPOT_COOLDOWN_TIME && hotspotBeingHandled) {
+				// HOTSPOT DETECTED AND ALREADY BEING HANDLED
 				// WORK AS USUAL TILL TE HANDLING HAS BEEN COMPLETED
 				
 				needRedirection = false;
 				
-			} else if(!hotspotHasBeenHandled && !hotspotBeingHandled) {
+			} else if(timeDiff > HOTSPOT_COOLDOWN_TIME && !hotspotBeingHandled) {
 				// HOTSPOT NOT HANDLED
-				needRedirection = false;
-				
 				hotspotBeingHandled = true;
+				needRedirection = false;
 				
 				// NEEDS HOTSPOT HANDLING
 				handleHotspot();
@@ -986,19 +1002,20 @@ public class StorageNode implements RequestListener {
 			
 		}  else {
 			// NOT HOTSPOTTED
-			
+			needRedirection = false;
+			/*
 			// CHECK IF HANDLED FLAG IS ON AND SET IT OFF
-			if(hotspotHasBeenHandled) {
+			if(hotspotHasBeenHandledTime) {
 				
 				// HOTSPOT GONE, PAST COOLDOWN TIME
 				
-				if(eventTime - hotspotHandledTime > COOLDOWN_TIME) {
+				if(eventTime - hotspotHandledTime > HOTSPOT_COOLDOWN_TIME) {
 					
 					// REMOVE ENTRIES FROM ROUTING TABLE
 					handleHotspotRemoval();
 					
-					// NO LONGER HOTSPOT
-					hotspotHasBeenHandled = false;
+					// NO LONGER HOTSPOT....THIS NEEDS TO BE PUT INSIDE handleHotspotRemoval
+					hotspotHasBeenHandledTime = false;
 					hotspotBeingHandled = false;
 					
 					hotspotHandledTime = -1;
@@ -1009,7 +1026,7 @@ public class StorageNode implements RequestListener {
 				// NO HOTSPOT HAS BEEN HANDLED, NOT NEEDED
 				needRedirection = false;
 			}
-			
+			*/
 		}
 		
 		return needRedirection;
@@ -2377,6 +2394,26 @@ public class StorageNode implements RequestListener {
 		} catch (Exception e) {
 			logger.log(Level.SEVERE, "Could not start StorageNode.", e);
 		}
+	}
+
+
+	public long getHotspotHasBeenHandledTime() {
+		return hotspotHasBeenHandledTime;
+	}
+
+
+	public void setHotspotHasBeenHandledTime(long hotspotHasBeenHandledTime) {
+		this.hotspotHasBeenHandledTime = hotspotHasBeenHandledTime;
+	}
+
+
+	public boolean isHotspotBeingHandled() {
+		return hotspotBeingHandled;
+	}
+
+
+	public void setHotspotBeingHandled(boolean hotspotBeingHandled) {
+		this.hotspotBeingHandled = hotspotBeingHandled;
 	}
 	
 

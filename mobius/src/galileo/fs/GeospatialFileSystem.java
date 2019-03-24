@@ -3788,8 +3788,30 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		for(String key : topKCliques.keySet()) {
 			
+			CliqueContainer cl = topKCliques.get(key);
+			
+			if(cl.getReplicatedNode() == null)
+				continue;
+			
+			long insertTime = System.currentTimeMillis();
 			if(routingTable.get(key) == null) {
-				RoutingEntry re = new RoutingEntry();
+				
+				// IF THIS CLIQUE DOES NOT EXIST IN THE CURRENT ROUTING TABLE
+				// COPY THE CLIQUE INFO
+				
+				RoutingEntry re = new RoutingEntry(cl, cl.getReplicatedNode(), insertTime);
+				
+				routingTable.put(key, re);
+				
+			} else {
+				// IF THIS CLIQUE EXISTS IN THIS ROUTING TABLE, MERGE THE ROUTING TABLE
+				RoutingEntry re = routingTable.get(key);
+				re.setInsertTime(insertTime);
+				
+				// MERGE TILES
+				
+				combineRoutingEntry(re, cl);
+				
 			}
 		}
 		
