@@ -1130,26 +1130,30 @@ public class StorageNode implements RequestListener {
 			
 			if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
 				
-				VisualizationEventResponse rsp = redirectRequest(event);
+				VisualizationEventResponse rsp = new VisualizationEventResponse();
+				
+				// ARE THE NECESSARY STUFF REPLICATED ON SOME OTHER NODE? 
+				boolean possible = redirectRequest(event, rsp);
 				
 				logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
 				
 				
-				try {
-					
-					context.sendReply(rsp);
-					
-					return;
-					
-				} catch (IOException ioe) {
-					logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
+				if(possible) {
+					try {
+						
+						context.sendReply(rsp);
+						
+						return;
+						
+					} catch (IOException ioe) {
+						logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
+					}
 				}
 				
 				
 			} 
 			
 			freshnessMultiplier = HOTSPOT_REDIRECTION_CHANCE;
-			
 			
 		}
 		
@@ -1163,6 +1167,7 @@ public class StorageNode implements RequestListener {
 		event.setEventId(eventString);
 		
 		try {
+			
 			logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
 			GeospatialFileSystem fs = fsMap.get(fsName);
@@ -1284,9 +1289,38 @@ public class StorageNode implements RequestListener {
 	}
 	
 	
-	private VisualizationEventResponse redirectRequest(VisualizationEvent event) {
+	private boolean redirectRequest(VisualizationEvent event, VisualizationEventResponse rsp) {
 		
-		return null;
+		boolean isPossible = true;
+		
+		boolean subBlockLevel = true;
+		
+		GeospatialFileSystem fs = fsMap.get(event.getFilesystemName());
+		TemporalType temporalType = fs.getTemporalType();
+		
+		int fsSpatialResolution = fs.getGeohashPrecision();
+		int fsTemporalResolution = temporalType.getType();
+		if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
+			subBlockLevel = false;
+		}
+		
+		
+		// RIKI-REMOVE
+		logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
+		
+		try {
+			Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+					event.getSpatialResolution(), event.getTemporalResolution());
+			
+			
+			
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			logger.severe("RIKI: SOMETHING WENT WRONG WITH REDIRECTION");
+		}
+		
+		
+		return isPossible;
 		
 	}
 

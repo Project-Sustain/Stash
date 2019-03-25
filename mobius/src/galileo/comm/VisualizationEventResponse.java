@@ -26,6 +26,10 @@ public class VisualizationEventResponse implements Event{
 		
 	}
 	
+	public VisualizationEventResponse() {
+		// TODO Auto-generated constructor stub
+	}
+	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
 		// TODO Auto-generated method stub
