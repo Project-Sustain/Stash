@@ -174,13 +174,21 @@ public class StorageNode implements RequestListener {
 	/* GUEST TREE MAINTAINENCE*/
 	private Timer guestTreeClearer = new Timer();
 	
+	/* ROUTING TABLE MAINTAINENCE*/
+	private Timer routingTableClearer = new Timer();
+	
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
+	
+	// TIME AFTER WHICH DISTRESSED NODE CHECKS AND PURGES ITS ROUTING TABLE
+	private static final long ROUTING_TABLE_CHECKUP = 5000l;
 	
 	// TIME AFTER WHICH HELPER NODE PURGES ITS OLD TILES
 	private static final long HELPER_TIMEOUT = 7500l;
 	
 	// TIME AFTER WHICH NODE HANDLED HOTSPOT AGAIN AFTER A PREVIOUS HANDLE
 	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; // 10 secs
+	
+	private static final int HOTSPOT_REDIRECTION_CHANCE = 5;
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
@@ -368,6 +376,25 @@ public class StorageNode implements RequestListener {
 				}
 			}
 		}, HELPER_TIMEOUT, HELPER_TIMEOUT);
+		
+		
+		/* STARTING DISTERSSED NODE ROUTING TABLE CLEANUP SERVICE*/
+		
+		routingTableClearer.scheduleAtFixedRate(new TimerTask() {
+			@Override
+			public void run() {
+				
+				if(fsMap != null && fsMap.size() > 0) {
+					Set<Entry<String, GeospatialFileSystem>> entrySet = fsMap.entrySet();
+					
+					Entry<String, GeospatialFileSystem> fsEntry = entrySet.iterator().next();
+					
+					GeospatialFileSystem fs = fsEntry.getValue();
+					
+					fs.handleRoutingTableCleaning();
+				}
+			}
+		}, ROUTING_TABLE_CHECKUP, ROUTING_TABLE_CHECKUP);
 		
 		
 		
@@ -1089,18 +1116,43 @@ public class StorageNode implements RequestListener {
 	
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
+		
 		long eventTime = System.currentTimeMillis();
 		
 		// HOTSPOT CHECK
 		boolean needsRedirection = checkAndHandleHotspot(eventTime);
+		
 		// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
+		
+		int freshnessMultiplier = 1;
 		
 		if(needsRedirection) {
 			
-			redirectRequest();
-			return;
+			if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
+				
+				VisualizationEventResponse rsp = redirectRequest(event);
+				
+				logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
+				
+				
+				try {
+					
+					context.sendReply(rsp);
+					
+					return;
+					
+				} catch (IOException ioe) {
+					logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
+				}
+				
+				
+			} 
+			
+			freshnessMultiplier = HOTSPOT_REDIRECTION_CHANCE;
+			
 			
 		}
+		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
@@ -1174,7 +1226,7 @@ public class StorageNode implements RequestListener {
 					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
 					// LOAD EXISTING CACHE CELLS USING CELL KEY
 					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
-					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event);
+					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event, freshnessMultiplier);
 					
 				} else {
 					
@@ -1197,7 +1249,7 @@ public class StorageNode implements RequestListener {
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
 					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
-					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event);
+					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event, freshnessMultiplier);
 					
 				}
 				
@@ -1232,8 +1284,9 @@ public class StorageNode implements RequestListener {
 	}
 	
 	
-	private void redirectRequest() {
-		// TODO Auto-generated method stub
+	private VisualizationEventResponse redirectRequest(VisualizationEvent event) {
+		
+		return null;
 		
 	}
 

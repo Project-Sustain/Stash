@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
 import galileo.bmp.Bitmap;
@@ -3301,6 +3302,25 @@ public class GeoHash {
 	public static void main(String arg[]) {
 		
 		GeoHash.getAntipodeGeohash("u");
+	}
+	
+	
+	/**
+	 * 1 IN 'TRIALS' CHANCE OF RETURNING TRUE
+	 * @author sapmitra
+	 * @param trials
+	 * @return
+	 */
+	public static boolean getChance(int trials) {
+		
+		int random = ThreadLocalRandom.current().nextInt(0, trials);
+		
+		if(random == 0) {
+			return true;
+		}
+		
+		return false;
+		
 	}
 	
 	

@@ -202,96 +202,6 @@ public class TileHandoffHandler implements MessageListener {
 		
 	}
 
-	
-	/**
-	 * ONCE HEARTBEAT RESPONSES HAVE BEEN ACCUMULATED
-	 * @author sapmitra
-	 * @throws PartitionException 
-	 * @throws HashException 
-	 */
-	/*private void afterHeartbeatCheck() throws HashException, PartitionException {
-		
-		// FIND TOP N CLIQUES
-		Map<String, CliqueContainer> topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
-		
-		// MAP OF WHICH CLIQUE GOES TO WHICH NODE
-		Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
-		
-		// FOR EACH CLIQUE, FIND A SUITABLE NODE TO SEND IT TO
-		// THE NODE HAS TO BE THE ANTIPODE OF THE GEOHASH IN QUESTION
-		for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
-			
-			String geohashKey = entry.getKey();
-			CliqueContainer clique = entry.getValue();
-			
-			
-			String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
-			
-			boolean looking = true;
-			
-			int shift = 0;
-			
-			// EAST OR WEST
-			int randDirection = ThreadLocalRandom.current().nextInt(3,5);
-			
-			// TILL A SUITABLE NODE HAS BEEN FOUND
-			while(looking) {
-				
-				Partitioner<Metadata> partitioner = fs.getPartitioner();
-				
-				SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
-				
-				SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
-				Metadata metadata = new Metadata();
-				metadata.setName(geoHashAntipode);
-				metadata.setSpatialProperties(spatialProperties);
-				
-				NodeInfo targetNode = partitioner.locateData(metadata);
-				
-				String nodeString = targetNode.stringRepresentation();
-				NodeResourceInfo nodeResourceInfo = nodesResourceMap.get(nodeString);
-				
-				shift++;
-				
-				if(nodeResourceInfo.getGuestTreeSize() > clique.getTotalCliqueSize()) {
-					
-					looking = false;
-					
-					nodeResourceInfo.decrementGuestTreeSize(clique.getTotalCliqueSize());
-					
-					// ASSIGN THIS CLIQUE TO THIS NODE
-					if(nodeToCliquesMap.get(nodeString) == null) {
-						
-						List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
-						cliques.add(clique);
-						nodeToCliquesMap.put(nodeString, cliques);
-					} else {
-						
-						List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
-						cliques.add(clique);
-					}
-					
-					
-				} else {
-					// WE NEED TO FIND ANOTHER NODE
-					
-					geoHashAntipode = GeoHash.getNeighbours(geoHashAntipode)[randDirection];
-					
-					if(shift > Math.pow(2, geohashKey.length()*3)) {
-						looking = false;
-					}
-					
-				}
-			}
-			
-		}
-		
-		// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
-		// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
-		
-		
-	}*/
-
 
 	@Override
 	public void onMessage(GalileoMessage message) {
@@ -359,10 +269,10 @@ public class TileHandoffHandler implements MessageListener {
 		
 		try {
 			
-			
 			/**
 			 * STEP 1: FIND TOP K CLIQUES IN THE NODE
 			 */
+			Map<String, List<RoutingEntry>> routingTable = fs.getRoutingTable();
 			
 			// MAP OF WHICH CLIQUE GOES TO WHICH NODE
 			Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
@@ -371,87 +281,100 @@ public class TileHandoffHandler implements MessageListener {
 			// THE NODE HAS TO BE THE ANTIPODE OF THE GEOHASH IN QUESTION
 			for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
 				
-				// EAST OR WEST
-				int randDirection = ThreadLocalRandom.current().nextInt(3,5);
+				boolean keepLooping = true;
 				
-				String geohashKey = entry.getKey();
-				CliqueContainer clique = entry.getValue();
+				// THE TARGET HELPER NODE NODE
+				String nodeString = null;
 				
-				// IN CASE OF RETRY, AVOID CLIQUES THAT HAVE ALREADY FOUND A HOME
-				if(clique.getReplicatedNode() != null)
-					continue;
-				
-				String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
-				
-				NodeInfo targetNode = null;
-				
-				if(!firstTry) {
+				while(keepLooping) {
 					
-					// GET THE GEOHASH ANTIPODE
-					// GET ITS NEIGHBOR
-					// LOOP TILL THE NODE IS DIFFERENT FROM THE OLD ANTIPODE
+					// EAST OR WEST
+					int randDirection = ThreadLocalRandom.current().nextInt(3,5);
 					
-					randDirection = clique.getDirection();
+					String geohashKey = entry.getKey();
+					CliqueContainer clique = entry.getValue();
 					
-					geoHashAntipode = clique.getGeohashAntipode();
+					// IN CASE OF RETRY, AVOID CLIQUES THAT HAVE ALREADY FOUND A HOME
+					if(clique.getReplicatedNode() != null)
+						continue;
 					
-					String newGeohashAntipode = geoHashAntipode;
+					String geoHashAntipode = GeoHash.getAntipodeGeohash(geohashKey);
 					
-					NodeInfo tempTargetNode = getNodeForGeoHash(geoHashAntipode);
+					NodeInfo targetNode = null;
 					
-					String oldNode = tempTargetNode.stringRepresentation();
-					
-					String newNode = oldNode;
-					
-					while(newNode.equals(oldNode)) {
-						// KEEP SHIFTING TILL A NEW CANDIDATE NODE HAS BEEN FOUND
-						newGeohashAntipode = GeoHash.getNeighbours(newGeohashAntipode)[randDirection];
+					if(!firstTry) {
 						
-						tempTargetNode = getNodeForGeoHash(newGeohashAntipode);
-						newNode = tempTargetNode.stringRepresentation();
+						// GET THE GEOHASH ANTIPODE
+						// GET ITS NEIGHBOR
+						// LOOP TILL THE NODE IS DIFFERENT FROM THE OLD ANTIPODE
+						
+						randDirection = clique.getDirection();
+						
+						geoHashAntipode = clique.getGeohashAntipode();
+						
+						String newGeohashAntipode = geoHashAntipode;
+						
+						NodeInfo tempTargetNode = getNodeForGeoHash(geoHashAntipode);
+						
+						String oldNode = tempTargetNode.stringRepresentation();
+						
+						String newNode = oldNode;
+						
+						while(newNode.equals(oldNode)) {
+							// KEEP SHIFTING TILL A NEW CANDIDATE NODE HAS BEEN FOUND
+							newGeohashAntipode = GeoHash.getNeighbours(newGeohashAntipode)[randDirection];
+							
+							tempTargetNode = getNodeForGeoHash(newGeohashAntipode);
+							newNode = tempTargetNode.stringRepresentation();
+						}
+						
+						targetNode = tempTargetNode;
+						
+					} else {
+						
+						// TILL A SUITABLE NODE HAS BEEN FOUND
+						
+						
+						// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
+						SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
+						
+						SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
+						Metadata metadata = new Metadata();
+						metadata.setName(geoHashAntipode);
+						metadata.setSpatialProperties(spatialProperties);
+						
+						try {
+							targetNode = partitioner.locateData(metadata);
+						} catch (HashException | PartitionException e) {
+							logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+						}
+						
 					}
 					
-					targetNode = tempTargetNode;
+					nodeString = targetNode.stringRepresentation();
 					
-				} else {
+					// KEEPS TRACK OF WHICH ANTIPODE IS CURRENTLY BEING DEALT WITH
+					clique.setGeohashAntipode(geoHashAntipode);
+					clique.setDirection(randDirection);
 					
-					// TILL A SUITABLE NODE HAS BEEN FOUND
+					keepLooping = checkIfEntryExistsInRoutingTable(routingTable, nodeString, geohashKey);
 					
-					
-					// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
-					SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
-					
-					SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
-					Metadata metadata = new Metadata();
-					metadata.setName(geoHashAntipode);
-					metadata.setSpatialProperties(spatialProperties);
-					
-					try {
-						targetNode = partitioner.locateData(metadata);
-					} catch (HashException | PartitionException e) {
-						logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
+					if(keepLooping) {
+						continue;
+					} else {
+						if(nodeToCliquesMap.get(nodeString) == null) {
+							
+							List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
+							
+							cliques.add(clique);
+							nodeToCliquesMap.put(nodeString, cliques);
+						} else {
+							
+							List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
+							cliques.add(clique);
+						}
+						break;
 					}
-					
-				}
-				
-				
-				
-				String nodeString = targetNode.stringRepresentation();
-				
-				// KEEPS TRACK OF WHICH ANTIPODE IS CURRENTLY BEING DEALT WITH
-				clique.setGeohashAntipode(geoHashAntipode);
-				clique.setDirection(randDirection);
-				
-				if(nodeToCliquesMap.get(nodeString) == null) {
-					
-					List<CliqueContainer> cliques = new ArrayList<CliqueContainer>();
-					
-					cliques.add(clique);
-					nodeToCliquesMap.put(nodeString, cliques);
-				} else {
-					
-					List<CliqueContainer> cliques = nodeToCliquesMap.get(nodeString);
-					cliques.add(clique);
 				}
 				
 				
@@ -497,9 +420,39 @@ public class TileHandoffHandler implements MessageListener {
 					"Failed to send request to other nodes in the network. Details follow: " + e.getMessage());
 		}
 		
-		
-		
 	}
+
+	
+	/**
+	 * CHECKS IF A PARTICULAR NODE ALREADY HOUSES A PARTICULAR CLIQUE ALREADY
+	 * IF SO, FIND ANOTHER NODE TO REPLICATE IN....TO MAKE MULTIPLE COPIES OF THE REPLICA
+	 * 
+	 * @author sapmitra
+	 * @param routingTable
+	 * @param nodeString
+	 * @param geohashKey
+	 * @return
+	 */
+	private boolean checkIfEntryExistsInRoutingTable(Map<String, List<RoutingEntry>> routingTable, String nodeString,
+			String geohashKey) {
+		
+		
+		if(routingTable.containsKey(geohashKey)) {
+			
+			List<RoutingEntry> relist = routingTable.get(geohashKey);
+			if(relist != null && relist.size()>0) {
+				for(RoutingEntry re : relist) {
+					
+					if(re.getHelperNode().stringRepresentation().equals(nodeString)) {
+						return true;
+					}
+				}
+			}
+			
+		}
+		return false;
+	}
+
 
 	public void silentClose() {
 		try {

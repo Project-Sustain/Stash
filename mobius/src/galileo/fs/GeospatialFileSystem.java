@@ -208,6 +208,8 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
 	private static final long HELPER_TIMEOUT = 7500l;
+	
+	// TIME AFTER WHICH ROUTING ENTRIES IN DISTRESSED NODE GET PURGED
 	private static final long DISTRESS_TIMEOUT = 5*1000l;
 	
 	
@@ -240,7 +242,7 @@ public class GeospatialFileSystem extends FileSystem {
 	public List<String> guestPeList = new ArrayList<String>();
 	
 	
-	public Map<String, RoutingEntry> routingTable;
+	public Map<String, List<RoutingEntry>> routingTable;
 	
 	
 
@@ -380,7 +382,7 @@ public class GeospatialFileSystem extends FileSystem {
 			this.needSublevelBitmaps = false;
 		}
 		
-		routingTable = new HashMap<String, RoutingEntry>();
+		routingTable = new HashMap<String, List<RoutingEntry>>();
 		
 		createMetadataGraph();
 	}
@@ -3358,13 +3360,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param spatialResolution
 	 * @param temporalResolution
 	 * @param existingCacheKeys 
+	 * @param freshnessMultiplier 
 	 * @param string 
 	 * @param string 
 	 * @param string 
 	 * @param list 
 	 */
 	public boolean fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
-			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys) {
+			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys, int freshnessMultiplier) {
 		
 		synchronized(stCache) {
 			
@@ -3404,7 +3407,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					
 					// THIS IS A NEW CELL GETTING INSERTED
-					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 					
 					// RIKI-REMOVE
 					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution+" "+newEntry);
@@ -3413,7 +3416,7 @@ public class GeospatialFileSystem extends FileSystem {
 				} else {
 					logger.info("RIKI: CELL " + key+ " HAS BEEN VISITED ONCE ");
 					// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
-					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime);
+					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 				}
 				
 			}
@@ -3463,10 +3466,11 @@ public class GeospatialFileSystem extends FileSystem {
 	 * IN CASE OF SUPER RESOLUTION
 	 * @author sapmitra
 	 * @param event 
+	 * @param freshnessMultiplier 
 	 * @param fetchedSummaries 
 	 * @throws InterruptedException 
 	 */
-	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, VisualizationEvent event) throws InterruptedException {
+	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, VisualizationEvent event, int freshnessMultiplier) throws InterruptedException {
 		
 		//int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
@@ -3535,7 +3539,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
 		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
-				event.getTimeString(), event.getEventId(), existingCacheKeys);
+				event.getTimeString(), event.getEventId(), existingCacheKeys, freshnessMultiplier);
 		
 		if(cleanUpNeeded)
 			handleCacheCleaning();
@@ -3579,16 +3583,71 @@ public class GeospatialFileSystem extends FileSystem {
 		
 	}
 	
+	
+	/**
+	 * CLEANING ROUTING TABLE. THIS HAS TO BE IN A SEPARATE THREAD.
+	 * @author sapmitra
+	 */
+	public void handleRoutingTableCleaning() {
+		
+		// RIKI-REMOVE
+		logger.info("RIKI: ROUTING TABLE CLEANUP STARTED");
+		
+		//ExecutorService executor = Executors.newFixedThreadPool(1);
+		//GuestCacheCleaner c = new GuestCacheCleaner(cleanUpInitiated, guestPeList, guestCache, 0, HELPER_TIMEOUT);
+		
+		long currentTime = System.currentTimeMillis();
+		
+		synchronized(routingTable) {
+			
+			List<String> entriesToRemove = new ArrayList<>();
+			
+			for(Entry<String, List<RoutingEntry>> entry : routingTable.entrySet()) {
+				
+				List<RoutingEntry> values = entry.getValue();
+				String key = entry.getKey();
+				
+				List<Integer> indices = new ArrayList<Integer>();
+				
+				int cnt = 0;
+				for(RoutingEntry re : values) {
+					if(currentTime - re.getInsertTime() > DISTRESS_TIMEOUT)
+						indices.add(cnt);
+					cnt ++;
+				}
+				
+				
+				for(int i : indices) {
+					values.remove(i);
+				}
+				
+				if(values.size() == 0) {
+					entriesToRemove.add(key);
+				}
+				
+			}
+			
+			
+			for(String s : entriesToRemove) {
+				routingTable.remove(s);
+			}
+		}
+		
+		logger.info("RIKI: ROUTING TABLE CLEANUP ENDED");
+		
+	}
+	
 
 	/**
 	 * 
 	 * @author sapmitra
 	 * @param blockRequirements
 	 * @param event
+	 * @param freshnessMultiplier 
 	 * @return
 	 */
 	public Map<String, SummaryWrapper> fetchRemainingSUBCellsFromFilesystem(
-			Map<String, PathRequirements> blockRequirements, VisualizationEvent event) throws InterruptedException {
+			Map<String, PathRequirements> blockRequirements, VisualizationEvent event, int freshnessMultiplier) throws InterruptedException {
 		// TODO Auto-generated method stub
 
 		// int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
@@ -3672,7 +3731,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// RIKI-REMOVE
 		logger.info("RIKI: CACHE POPULATION STARTED ");
 		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
-				event.getPolygon(), event.getTimeString(), event.getEventId(), availableCacheKeys);
+				event.getPolygon(), event.getTimeString(), event.getEventId(), availableCacheKeys, freshnessMultiplier);
 		
 		if(cleanUpNeeded) 
 			handleCacheCleaning();
@@ -3771,11 +3830,11 @@ public class GeospatialFileSystem extends FileSystem {
 		
 	}
 
-	public Map<String, RoutingEntry> getRoutingTable() {
+	public Map<String, List<RoutingEntry>> getRoutingTable() {
 		return routingTable;
 	}
 
-	public void setRoutingTable(Map<String, RoutingEntry> routingTable) {
+	public void setRoutingTable(Map<String, List<RoutingEntry>> routingTable) {
 		this.routingTable = routingTable;
 	}
 
@@ -3794,6 +3853,7 @@ public class GeospatialFileSystem extends FileSystem {
 				continue;
 			
 			long insertTime = System.currentTimeMillis();
+			
 			if(routingTable.get(key) == null) {
 				
 				// IF THIS CLIQUE DOES NOT EXIST IN THE CURRENT ROUTING TABLE
@@ -3801,16 +3861,20 @@ public class GeospatialFileSystem extends FileSystem {
 				
 				RoutingEntry re = new RoutingEntry(cl, cl.getReplicatedNode(), insertTime);
 				
-				routingTable.put(key, re);
+				List<RoutingEntry> res = new ArrayList<RoutingEntry>();
+				res.add(re);
+				
+				routingTable.put(key, res);
 				
 			} else {
 				// IF THIS CLIQUE EXISTS IN THIS ROUTING TABLE, MERGE THE ROUTING TABLE
-				RoutingEntry re = routingTable.get(key);
+				List<RoutingEntry> res = routingTable.get(key);
+				
+				RoutingEntry re = new RoutingEntry(cl, cl.getReplicatedNode(), insertTime);
 				re.setInsertTime(insertTime);
 				
-				// MERGE TILES
+				res.add(re);
 				
-				combineRoutingEntry(re, cl);
 				
 			}
 		}

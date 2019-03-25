@@ -71,7 +71,7 @@ public class CliqueContainer implements ByteSerializable{
 			int[] levels = fs.getStCache().getSpatioTemporalResolutionsFromLevel(currentLevel);
 			
 			// CREATE A SET OF TEMPORARY BITMAPS
-			CorrectedBitmap bm = createBitmapForCLique(fs, currentLevel, levels[0], levels[1], cellRow);
+			CorrectedBitmap bm = createBitmapForClique(fs, currentLevel, levels[0], levels[1], cellRow);
 			
 			bitmaps.add(bm);
 			count++;
@@ -92,7 +92,7 @@ public class CliqueContainer implements ByteSerializable{
 	 * @param temporalLevel
 	 * @param cellsInThisLevel
 	 */
-	public CorrectedBitmap createBitmapForCLique(GeospatialFileSystem fs, int currentLevel, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
+	public CorrectedBitmap createBitmapForClique(GeospatialFileSystem fs, int currentLevel, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
 		
 		CorrectedBitmap temporaryBitmap = new CorrectedBitmap();
 		

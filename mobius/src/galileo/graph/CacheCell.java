@@ -68,10 +68,11 @@ public class CacheCell implements ByteSerializable{
 	 * @param eventTime 
 	 * @param eventId 
 	 * @param eventId 
+	 * @param freshnessMultiplier 
 	 */
 	
 	public CacheCell(SpatiotemporalHierarchicalCache cache, SummaryStatistics[] stats, String spatiotemporalInfo,
-			int spatialResolution, int temporalResolution, String eventId, long eventTime) {
+			int spatialResolution, int temporalResolution, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		this.cache = cache;
 		this.stats = stats;
@@ -120,7 +121,7 @@ public class CacheCell implements ByteSerializable{
 		if(spatialChildren == null && temporalChildren == null)
 			hasChildren = false;
 		
-		this.freshness = 1;
+		this.freshness = 1*freshnessMultiplier;
 		
 		this.lastEvent = eventId;
 		this.lastAccessed = eventTime;
@@ -325,13 +326,14 @@ public class CacheCell implements ByteSerializable{
 	 * @param qt2
 	 * @param eventTime 
 	 * @param eventId 
+	 * @param freshnessMultiplier 
 	 * @return
 	 */
-	public void freshenUpRelativesForCell(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public void freshenUpRelativesForCell(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime, int freshnessMultiplier) {
 		
-		freshenUpParents(eventId, eventTime);
-		freshenUpChildren(eventId, eventTime);
-		freshenUpNeighbors(polygon, qt1, qt2, eventId, eventTime);
+		freshenUpParents(eventId, eventTime, freshnessMultiplier);
+		freshenUpChildren(eventId, eventTime, freshnessMultiplier);
+		freshenUpNeighbors(polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		
 		
 	}
@@ -352,7 +354,7 @@ public class CacheCell implements ByteSerializable{
 	 * @param eventId 
 	 */
 	
-	private void freshenUpNeighbors(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	private void freshenUpNeighbors(List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		int cacheLevel = cache.getCacheLevel(spatialResolution, temporalResolution);
 		// Only at the level of the current cell
@@ -362,7 +364,7 @@ public class CacheCell implements ByteSerializable{
 		for(String s: refinedSpatialNeighbors) {
 			for(String t: refinedTemporalNeighbors) {
 				
-				cache.disperseToCell(t+"$$"+s, cacheLevel, eventId, eventTime);
+				cache.disperseToCell(t+"$$"+s, cacheLevel, eventId, eventTime, freshnessMultiplier);
 			}
 		}
 	}
@@ -373,8 +375,9 @@ public class CacheCell implements ByteSerializable{
 	 * @author sapmitra
 	 * @param eventId
 	 * @param eventTime
+	 * @param freshnessMultiplier 
 	 */
-	private void freshenUpChildren(String eventId, long eventTime) {
+	private void freshenUpChildren(String eventId, long eventTime, int freshnessMultiplier) {
 		
 		if(spatialChildren != null) {
 			
@@ -382,7 +385,7 @@ public class CacheCell implements ByteSerializable{
 			
 			for(String sc : spatialChildren) {
 				
-				cache.disperseToCell(temporalInfo+"$$"+sc, cacheLevel, eventId, eventTime);
+				cache.disperseToCell(temporalInfo+"$$"+sc, cacheLevel, eventId, eventTime, freshnessMultiplier);
 				
 			}
 			
@@ -395,7 +398,7 @@ public class CacheCell implements ByteSerializable{
 			
 			for(String tc: temporalChildren) {
 				
-				cache.disperseToCell(tc+"$$"+spatialInfo, cacheLevel, eventId, eventTime);
+				cache.disperseToCell(tc+"$$"+spatialInfo, cacheLevel, eventId, eventTime, freshnessMultiplier);
 				
 			}
 			
@@ -408,9 +411,10 @@ public class CacheCell implements ByteSerializable{
 	 * @author sapmitra
 	 * @param eventTime 
 	 * @param eventId 
+	 * @param freshnessMultiplier 
 	 * @return
 	 */
-	public void freshenUpParents(String eventId, long eventTime) {
+	public void freshenUpParents(String eventId, long eventTime, int freshnessMultiplier) {
 		
 		String sp = getSpatialParent();
 		String tp = getTemporalParent();
@@ -420,14 +424,14 @@ public class CacheCell implements ByteSerializable{
 			// - 1 because we are loking for parents
 			int cacheLevel = cache.getCacheLevel(spatialResolution-1, temporalResolution);
 			
-			cache.disperseToCell(temporalInfo+"$$"+sp, cacheLevel, eventId, eventTime);
+			cache.disperseToCell(temporalInfo+"$$"+sp, cacheLevel, eventId, eventTime, freshnessMultiplier);
 			
 		} 
 		
 		if(tp != null) {
 			
 			int cacheLevel = cache.getCacheLevel(spatialResolution, temporalResolution-1);
-			cache.disperseToCell(tp+"$$"+spatialInfo, cacheLevel, eventId, eventTime);
+			cache.disperseToCell(tp+"$$"+spatialInfo, cacheLevel, eventId, eventTime, freshnessMultiplier);
 			
 		}
 		

@@ -173,13 +173,15 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt2 
 	 * @param qt1 
 	 * @param polygon 
+	 * @param freshnessMultiplier 
 	 */
-	public boolean addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public boolean addCell(SummaryStatistics[] summ, String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, 
+			String eventId, long eventTime, int freshnessMultiplier) {
 		
 		boolean newEntry = false;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
 			logger.info("RIKI: REACHED INSIDE");
-			newEntry = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime);
+			newEntry = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		}
 		
 		return newEntry;
@@ -196,11 +198,12 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt2 
 	 * @param qt1 
 	 * @param polygon 
+	 * @param freshnessMultiplier 
 	 */
-	public void incrementCell(String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public void incrementCell(String key, int cacheLevel, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].updateCellFreshness(key, polygon, qt1, qt2, eventId, eventTime);
+			cacheLevels[cacheLevel].updateCellFreshness(key, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		}
 		
 	}
@@ -218,12 +221,13 @@ public class SpatiotemporalHierarchicalCache {
 	 * @param qt2
 	 * @param eventId
 	 * @param eventTime
+	 * @param freshnessMultiplier 
 	 */
 	
-	public void disperseToCell(String key, int cacheLevel, String eventId, long eventTime) {
+	public void disperseToCell(String key, int cacheLevel, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			cacheLevels[cacheLevel].disperseCellFreshness(key, eventId, eventTime);
+			cacheLevels[cacheLevel].disperseCellFreshness(key, eventId, eventTime, freshnessMultiplier);
 		}
 		
 	}

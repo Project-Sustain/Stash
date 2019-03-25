@@ -76,7 +76,7 @@ public class SparseSpatiotemporalMatrix {
 	 * @param spatialResolution2 
 	 */
 	
-	public boolean addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public boolean addCell(SummaryStatistics[] summ, String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		boolean newEntry = false;
 		// The new summary replaces the old cache summary, whatever may be the case
@@ -86,12 +86,12 @@ public class SparseSpatiotemporalMatrix {
 			newEntry = true;
 		
 		// This cell is empty
-		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime);
+		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime, freshnessMultiplier);
 		
 		cells.put(key, c);
 			
 		// THIS IS WHERE ALL RELEVANT RELATIVES ARE DISPERSED WITH FRESHNESS VALUE
-		c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime);
+		c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		
 		return newEntry;
 		
@@ -118,7 +118,7 @@ public class SparseSpatiotemporalMatrix {
 			newEntry = true;
 		
 		// This cell is empty
-		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime);
+		c = new CacheCell(cache, summ, key, spatialResolution, temporalResolution, eventId, eventTime, 1);
 		
 		cells.put(key, c);
 		
@@ -137,8 +137,9 @@ public class SparseSpatiotemporalMatrix {
 	 * @param qt2
 	 * @param eventId
 	 * @param eventTime
+	 * @param freshnessMultiplier 
 	 */
-	public void updateCellFreshness(String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime) {
+	public void updateCellFreshness(String key, List<Coordinates> polygon, long qt1, long qt2, String eventId, long eventTime, int freshnessMultiplier) {
 		
 		CacheCell c = cells.get(key);
 		
@@ -146,7 +147,7 @@ public class SparseSpatiotemporalMatrix {
 			c.incrementFreshness(1f, eventId, eventTime);
 			c.setLastEvent(eventId);
 			c.setLastAccessed(eventTime);
-			c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime);
+			c.freshenUpRelativesForCell(polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		}
 		
 	}
@@ -189,12 +190,13 @@ public class SparseSpatiotemporalMatrix {
 	 * @param key
 	 * @param eventId
 	 * @param eventTime
+	 * @param freshnessMultiplier 
 	 */
-	public void disperseCellFreshness(String key, String eventId, long eventTime) {
+	public void disperseCellFreshness(String key, String eventId, long eventTime, int freshnessMultiplier) {
 		CacheCell c = cells.get(key);
 		
 		if(c != null && !c.getLastEvent().equals(eventId)) {
-			c.incrementFreshness(1f*GeospatialFileSystem.SPATIAL_WANE, eventId, eventTime);
+			c.incrementFreshness(1f*(float)freshnessMultiplier*GeospatialFileSystem.SPATIAL_WANE, eventId, eventTime);
 			c.setLastEvent(eventId);
 			c.setLastAccessed(eventTime);
 		}
