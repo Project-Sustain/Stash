@@ -12,10 +12,15 @@ import galileo.serialization.SerializationOutputStream;
 
 public class VisualizationEventResponse implements Event{
 
+	private boolean needsRedirection = false;
+	
 	private List<SummaryWrapper> summaries;
 	private List<String> keys;
 	private String hostName;
 	private int hostPort;
+	
+	private String nodeString;
+	private List<String> helperNodes;
 	
 	public VisualizationEventResponse(List<SummaryWrapper> summaries, List<String> keys, String hostname, int port) {
 		
@@ -26,28 +31,52 @@ public class VisualizationEventResponse implements Event{
 		
 	}
 	
+	public VisualizationEventResponse(List<String> nodes, String currentNode) {
+		needsRedirection = true;
+		this.helperNodes = nodes;
+		this.nodeString = currentNode;
+	}
+	
 	public VisualizationEventResponse() {
 		// TODO Auto-generated constructor stub
 	}
 	
 	@Override
 	public void serialize(SerializationOutputStream out) throws IOException {
-		// TODO Auto-generated method stub
-		out.writeSerializableCollection(summaries);
-		out.writeStringCollection(keys);
-		out.writeString(hostName);
-		out.writeInt(hostPort);
+		
+		out.writeBoolean(needsRedirection);
+		
+		if(!needsRedirection) {
+			out.writeSerializableCollection(summaries);
+			out.writeStringCollection(keys);
+			out.writeString(hostName);
+			out.writeInt(hostPort);
+		} else {
+			
+			out.writeString(nodeString);
+			out.writeStringCollection(helperNodes);
+		}
 	}
 	
 	@Deserialize
 	public VisualizationEventResponse(SerializationInputStream in) throws IOException, SerializationException {
-		summaries = new ArrayList<SummaryWrapper>();
-		in.readSerializableCollection(SummaryWrapper.class, summaries);
 		
-		keys = new ArrayList<String>();
-		in.readStringCollection(keys);
-		this.hostName = in.readString();
-		this.hostPort = in.readInt();
+		this.needsRedirection = in.readBoolean();
+		
+		if(!needsRedirection) {
+			summaries = new ArrayList<SummaryWrapper>();
+			in.readSerializableCollection(SummaryWrapper.class, summaries);
+			
+			keys = new ArrayList<String>();
+			in.readStringCollection(keys);
+			this.hostName = in.readString();
+			this.hostPort = in.readInt();
+		} else {
+			this.nodeString = in.readString();
+			helperNodes = new ArrayList<String>();
+			in.readStringCollection(helperNodes);
+		}
+		
 	}
 
 	public List<SummaryWrapper> getSummaries() {

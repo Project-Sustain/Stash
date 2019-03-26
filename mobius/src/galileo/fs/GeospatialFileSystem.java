@@ -1387,7 +1387,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return -1 means nothing found 0 means full intersection 1 means partial found
 	 * @throws ParseException 
 	 */
-	private CorrectedBitmap checkForAvailableBlockCells(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
+	public CorrectedBitmap checkForAvailableBlockCells(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
 			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision,
 			List<Coordinates> polygon, String queryTimeString) throws ParseException {
 		
@@ -3879,6 +3879,71 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 		}
 		
+	}
+
+	
+	/**
+	 * A BITMAP OF ALL THE RELEVANT CACHE CELLS CONTAINED IN THIS NODE
+	 * 
+	 * @author sapmitra
+	 * @param ultimateBlockBitmap
+	 * @param nodeStrings
+	 * @param polygon
+	 * @param j 
+	 * @param i 
+	 * @return
+	 */
+	public boolean getGuestBitmap(CorrectedBitmap ultimateBlockBitmap, List<String> nodeStrings, List<Coordinates> polygon, int cacheLevel) {
+		// TODO Auto-generated method stub
+		
+		CorrectedBitmap guestBitmap = new CorrectedBitmap();
+		
+		int cnt = 0;
+		
+		for(String geohashKey : routingTable.keySet()) {
+			
+			boolean isRelevant = GeoHash.checkIntersection(polygon, geohashKey);
+			
+			// THIS CLIQUE IS OF INTEREST
+			if(isRelevant) {
+				
+				List<RoutingEntry> entries = routingTable.get(geohashKey);
+				
+				int rIndex = 0;
+				
+				rIndex = GeoHash.getRandom(entries.size());
+				
+				RoutingEntry selectedRE = entries.get(rIndex);
+				
+				CorrectedBitmap cb = selectedRE.getClique().getBitmapAtLevel(cacheLevel);
+				
+				if(cnt == 0 && cb != null) {
+					
+					guestBitmap = cb;
+					
+					nodeStrings.add(selectedRE.getHelperNode().stringRepresentation());
+					cnt ++;
+					
+				} else if(cb != null){
+					
+					guestBitmap = new CorrectedBitmap(guestBitmap.or(cb));
+					nodeStrings.add(selectedRE.getHelperNode().stringRepresentation());
+					
+				}
+				
+			}
+			
+			
+		}
+		
+		CorrectedBitmap andNot = new CorrectedBitmap(ultimateBlockBitmap.andNot(guestBitmap));
+		
+		if(andNot.toArray().length == 0) {
+			return true;
+		}
+		
+		
+		return false;
 	}
 	
 	

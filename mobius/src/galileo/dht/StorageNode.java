@@ -63,6 +63,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import galileo.bmp.Bitmap;
+import galileo.bmp.CorrectedBitmap;
 import galileo.bmp.GeoavailabilityGrid;
 import galileo.bmp.GeoavailabilityQuery;
 import galileo.bmp.QueryTransform;
@@ -112,6 +113,7 @@ import galileo.event.EventHandler;
 import galileo.event.EventReactor;
 import galileo.fs.FileSystemException;
 import galileo.fs.GeospatialFileSystem;
+import galileo.graph.CacheCell;
 import galileo.graph.CliqueContainer;
 import galileo.graph.HotspotTileHandOffCoordinator;
 import galileo.graph.Path;
@@ -1288,7 +1290,13 @@ public class StorageNode implements RequestListener {
 		}
 	}
 	
-	
+	/**
+	 * RETURNS TRUE IF REDIRECTION IS POSSIBLE AND CREATES A VISUALIZATION RESPONSE
+	 * @author sapmitra
+	 * @param event
+	 * @param rsp
+	 * @return
+	 */
 	private boolean redirectRequest(VisualizationEvent event, VisualizationEventResponse rsp) {
 		
 		boolean isPossible = true;
@@ -1300,6 +1308,9 @@ public class StorageNode implements RequestListener {
 		
 		int fsSpatialResolution = fs.getGeohashPrecision();
 		int fsTemporalResolution = temporalType.getType();
+		
+		int cacheLevel = fs.getStCache().getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
+		
 		if(event.getSpatialResolution() <= fsSpatialResolution && event.getTemporalResolution() <= fsTemporalResolution) {
 			subBlockLevel = false;
 		}
@@ -1312,9 +1323,118 @@ public class StorageNode implements RequestListener {
 			Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 					event.getSpatialResolution(), event.getTemporalResolution());
 			
+			CorrectedBitmap ultimateBlockBitmap = new CorrectedBitmap();
+			
+			if(subBlockLevel) {
+				
+				// A MAP OF ALL CELLS CONTAINED IN THE FILESYSTEM
+				// THAT MATCH THE QUERY
+				
+				int c = 0;
+				
+				for(String blockKey: blockMap.keySet()) {
+					
+					List<String> blocks = blockMap.get(blockKey);
+					
+					for(String blockPath : blocks) {
+						
+						CorrectedBitmap bm = fs.checkForAvailableBlockCells(blockKey, blockPath, event.getSpatialResolution(), event.getTemporalResolution(),
+								TemporalType.getTypeFromLevel(event.getTemporalResolution()), fsSpatialResolution, fsTemporalResolution, event.getPolygon(), 
+								event.getTimeString());
+						
+						if(c == 0 && ultimateBlockBitmap != null) {
+							ultimateBlockBitmap = bm;
+							c++;
+						} else {
+							ultimateBlockBitmap = new CorrectedBitmap(ultimateBlockBitmap.or(bm));
+						}
+					}
+				}
+				
+				// CONTACT THE FOLLOWING NODES, IF REDIRECTION IS POSSIBLE
+				List<String> nodeStrings = new ArrayList<>();
+				
+				isPossible = fs.getGuestBitmap(ultimateBlockBitmap, nodeStrings, event.getPolygon(), cacheLevel);
+				
+				
+				if(isPossible) {
+					
+					rsp = new VisualizationEventResponse(nodeStrings, hostname+":"+port);
+					
+				}
+				
+				return isPossible;
+				
+				
+			} else {
+				// SUPER BLOCK LEVEL
+				
+				List<String> nodeStrings = new ArrayList<>();
+				
+				for(String blockKey : blockMap.keySet()) {
+					
+					boolean matchFound = false;
+					
+					String tokens[] = blockKey.split("\\$\\$");
+					
+					String geohash = tokens[0];
+					String timeString = tokens[1];
+					
+					
+					String partialGeohash = geohash.substring(0,event.getSpatialResolution());
+					String partialTimeString = GeoHash.getTimeStringForLevel(timeString, TemporalType.getTypeFromLevel(event.getTemporalResolution()));
+					
+					String partitionGeohash = geohash.substring(0, fs.getSpatialPartitioningType());
+					
+					List<RoutingEntry> entries = fs.getRoutingTable().get(partitionGeohash);
+						
+					if(entries == null) {
+						// SOMETHING IS MISSING
+						// NOT POSSIBLE 
+						return false;
+						
+					} else {
+						
+						int rIndex = 0;
+						
+						rIndex = GeoHash.getRandom(entries.size());
+						
+						RoutingEntry selectedRE = entries.get(rIndex);
+						
+						List<CacheCell> cells = selectedRE.getClique().getCacheCellsAtLevel(cacheLevel);
+						
+						
+						for(CacheCell cell : cells) {
+							if(cell.getSpatialInfo().equals(partialGeohash) && cell.getTemporalInfo().equals(partialTimeString)) {
+								matchFound = true;
+								
+								nodeStrings.add(selectedRE.getHelperNode().stringRepresentation());
+								break;
+							}
+							
+						}
+						
+						if(!matchFound) {
+							return false;
+						}
+						
+					}
+					
+					
+					
+				}
+					
+				rsp = new VisualizationEventResponse(nodeStrings, hostname+":"+port);
+				return true;
+				
+				
+				
+				
+			}
 			
 			
-		} catch (InterruptedException e) {
+			
+		} catch (InterruptedException|ParseException e) {
 			// TODO Auto-generated catch block
 			logger.severe("RIKI: SOMETHING WENT WRONG WITH REDIRECTION");
 		}

@@ -3181,6 +3181,49 @@ public class GeoHash {
 		
 	}
 	
+	/**
+	 * GO UP A FEW TEMPORAL LEVELS, IF NEEDED
+	 * @author sapmitra
+	 * @param timestamp
+	 * @param temporalType
+	 * @return
+	 */
+	public static String getTimeStringForLevel(String timestring, TemporalType temporalType){
+		
+		String[] tokens = timestring.split("-");
+		
+		//calendar.setLenient(false);
+		String temporalString = "";
+		String year = tokens[0];
+		String month = tokens[1];
+		String day = tokens[2];
+		String hour = tokens[3];
+		
+		switch (temporalType) {
+			case HOUR_OF_DAY:
+				temporalString = year+"-"+month+"-"+day+"-"+hour;
+			    break;
+			case DAY_OF_MONTH:
+				temporalString = year+"-"+month+"-"+day+"-xx";
+			    break;
+			case MONTH:
+				temporalString = year+"-"+month+"-xx-xx";
+			    break;
+			case YEAR:
+				temporalString = String.valueOf(year)+"-xx-xx-xx";
+			    break;
+			    
+		}
+		
+	    return temporalString;
+		
+	}
+	
+	
+	
+	
+	
+	
 	public static void main3(String arg[]) {
 		
 		System.out.println(getSpatialOrientationSimplified("9zh0", "9z5b1"));
@@ -3320,6 +3363,14 @@ public class GeoHash {
 		}
 		
 		return false;
+		
+	}
+	
+	public static int getRandom(int trials) {
+		
+		int random = ThreadLocalRandom.current().nextInt(0, trials);
+		
+		return random;
 		
 	}
 	

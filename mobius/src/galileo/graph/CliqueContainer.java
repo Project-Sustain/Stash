@@ -39,6 +39,44 @@ public class CliqueContainer implements ByteSerializable{
 		
 	}
 	
+	/**
+	 * FOR A SPATIOTEMPORAL LEVEL, RETURN THE BITMAP AT THAT LEVEL
+	 * @author sapmitra
+	 * @return
+	 */
+	public CorrectedBitmap getBitmapAtLevel(int level) {
+		
+		CorrectedBitmap ret = null;
+		
+		int index = levels.indexOf(level);
+		
+		if(index >= 0) {
+			
+			return bitmaps.get(index);
+			
+		}
+		
+		return ret;
+		
+		
+	}
+	
+	
+	public List<CacheCell> getCacheCellsAtLevel(int level) {
+		
+		List<CacheCell> retCells = null;
+		
+		int index = levels.indexOf(level);
+		
+		if(index >= 0) {
+			
+			return cells.get(index);
+			
+		}
+		
+		return retCells;
+	}
+	
 	public void addCells(int level, List<CacheCell> cells) {
 
 		this.levels.add(level);
