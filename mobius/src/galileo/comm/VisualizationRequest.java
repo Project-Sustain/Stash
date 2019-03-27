@@ -23,6 +23,8 @@ public class VisualizationRequest implements Event {
 	private int spatialResolution;
 	private int temporalResolution;
 	
+	private String guestTreeOnly = "";
+	
 	// What features to return as summaries
 	private List<String> reqFeatures;
 	
@@ -122,6 +124,8 @@ public class VisualizationRequest implements Event {
 		reqFeatures = new ArrayList<String>();
 		in.readStringCollection(reqFeatures);
 		
+		this.guestTreeOnly = in.readString();
+		
 	}
 
 	@Override
@@ -141,6 +145,8 @@ public class VisualizationRequest implements Event {
 		
 		//this cannot be null
 		out.writeStringCollection(reqFeatures);
+		
+		out.writeString(guestTreeOnly);
 		
 	}
 
@@ -194,6 +200,14 @@ public class VisualizationRequest implements Event {
 
 	public void setReqFeatures(List<String> reqFeatures) {
 		this.reqFeatures = reqFeatures;
+	}
+
+	public String getGuestTreeOnly() {
+		return guestTreeOnly;
+	}
+
+	public void setGuestTreeOnly(String guestTreeOnly) {
+		this.guestTreeOnly = guestTreeOnly;
 	}
 
 }

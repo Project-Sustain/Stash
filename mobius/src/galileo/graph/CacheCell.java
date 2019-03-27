@@ -7,6 +7,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
+import galileo.comm.TemporalType;
 import galileo.dataset.Coordinates;
 import galileo.fs.GeospatialFileSystem;
 import galileo.serialization.ByteSerializable;
@@ -575,6 +576,34 @@ public class CacheCell implements ByteSerializable{
 			hasChildren = false;
 		
 		this.freshness = 0;
+		
+	}
+	
+	/**
+	 * Checks if this cell is contained in the query area
+	 * @author sapmitra
+	 * @param polygon
+	 * @param timeString
+	 * @param tresolution
+	 * @return
+	 * @throws ParseException
+	 */
+	public boolean checkIntersection (List<Coordinates> polygon, String timeString) throws ParseException {
+		
+		boolean sInt = GeoHash.checkIntersection(polygon, spatialInfo);
+		
+		long qt1 = GeoHash.getStartTimeStamp(temporalInfo, TemporalType.getTypeFromLevel(temporalResolution));
+		
+		long qt2 = GeoHash.getEndTimeStamp(temporalInfo, TemporalType.getTypeFromLevel(temporalResolution));
+		
+		boolean tInt = GeoHash.checkTemporalIntersection(timeString, qt1, qt2);
+		
+		if(sInt && tInt)
+			return true;
+		
+		return false;
+		
+		
 		
 	}
 

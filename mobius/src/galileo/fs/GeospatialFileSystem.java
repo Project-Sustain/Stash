@@ -74,6 +74,8 @@ import galileo.bmp.QueryTransform;
 import galileo.comm.SpatialGrid;
 import galileo.comm.TemporalType;
 import galileo.comm.VisualizationEvent;
+import galileo.comm.VisualizationEventResponse;
+import galileo.comm.VisualizationRequest;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
 import galileo.dataset.Metadata;
@@ -105,6 +107,7 @@ import galileo.dht.VisualizationSummaryProcessor;
 import galileo.dht.hash.HashException;
 import galileo.dht.hash.HashTopologyException;
 import galileo.dht.hash.TemporalHash;
+import galileo.event.EventContext;
 import galileo.graph.CacheCell;
 import galileo.graph.CliqueContainer;
 import galileo.graph.FeaturePath;
@@ -3944,6 +3947,67 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		
 		return false;
+	}
+	
+	/**
+	 * GET ENTRIES MATCHING THE QUERY IN THE GUEST TREE
+	 * 
+	 * @author sapmitra
+	 * @param request
+	 * @param context 
+	 * @throws ParseException 
+	 */
+	public void fetchGuestTreeEntries(VisualizationRequest request, String hostName, int port, EventContext context) throws ParseException {
+		
+		String requestingNode = request.getGuestTreeOnly();
+
+		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
+		
+		
+		SpatiotemporalHierarchicalCache guestEntries = guestCache.get(requestingNode);
+		
+		
+		int cacheLevel = guestEntries.getCacheLevel(request.getSpatialResolution(), request.getTemporalResolution());
+		
+		
+		SparseSpatiotemporalMatrix specificCache = guestEntries.getSpecificCache(cacheLevel);
+		
+		if(specificCache != null) {
+			
+			HashMap<String, CacheCell> cells = specificCache.getCells();
+			
+			for(String key: cells.keySet()) {
+				CacheCell cell = cells.get(key);
+				boolean intersection = cell.checkIntersection(request.getPolygon(), request.getTimeString());
+				
+				if(intersection) {
+					SummaryWrapper sw = new SummaryWrapper(false, cell.getStats());
+					finalSummaries.put(cell.getCellKey(),sw);
+				}
+				
+			}
+			
+		}
+		
+		
+		
+		
+		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
+				,hostName, port);
+		
+		
+		try {
+			
+			logger.info("RIKI: GUEST TREE SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
+			
+			context.sendReply(response);
+			
+			// RIKI-REMOVE
+			logger.info("RIKI: VISUALIZATION RESPONSE SENT OUT.");
+			
+		} catch (IOException ioe) {
+			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
+		}
 	}
 	
 	

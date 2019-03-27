@@ -910,6 +910,17 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualizationRequest(VisualizationRequest request, EventContext context) {
 		
+		if(request.getGuestTreeOnly() != null && request.getGuestTreeOnly().length() > 0) {
+			
+			GeospatialFileSystem gfs = this.fsMap.get(request.getFilesystemName());
+			try {
+				gfs.fetchGuestTreeEntries(request, hostname, port, context);
+			} catch (ParseException e) {
+				logger.log(Level.SEVERE, "RIKI: GUEST SEARCH FAILURE");
+			}
+			return;
+		}
+		
 		String featureQueryString = request.getFeatureQueryString();
 		logger.log(Level.INFO, "Feature query request: {0}", featureQueryString);
 		
@@ -1403,7 +1414,6 @@ public class StorageNode implements RequestListener {
 						
 						List<CacheCell> cells = selectedRE.getClique().getCacheCellsAtLevel(cacheLevel);
 						
-						
 						for(CacheCell cell : cells) {
 							if(cell.getSpatialInfo().equals(partialGeohash) && cell.getTemporalInfo().equals(partialTimeString)) {
 								matchFound = true;
@@ -1426,8 +1436,6 @@ public class StorageNode implements RequestListener {
 					
 				rsp = new VisualizationEventResponse(nodeStrings, hostname+":"+port);
 				return true;
-				
-				
 				
 				
 			}
