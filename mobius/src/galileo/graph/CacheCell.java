@@ -592,8 +592,8 @@ public class CacheCell implements ByteSerializable{
 		
 		boolean sInt = GeoHash.checkIntersection(polygon, spatialInfo);
 		
+		// START AND END TIME OF THE TILE
 		long qt1 = GeoHash.getStartTimeStamp(temporalInfo, TemporalType.getTypeFromLevel(temporalResolution));
-		
 		long qt2 = GeoHash.getEndTimeStamp(temporalInfo, TemporalType.getTypeFromLevel(temporalResolution));
 		
 		boolean tInt = GeoHash.checkTemporalIntersection(timeString, qt1, qt2);

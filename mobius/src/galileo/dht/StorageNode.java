@@ -194,8 +194,9 @@ public class StorageNode implements RequestListener {
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
-	private static int MESSAGE_QUEUE_THRESHOLD = 100;
+	private static final int MESSAGE_QUEUE_THRESHOLD = 100;
 	
+	// THE LAST TIME THE HOTSPOT WAS HANDLED
 	private long hotspotHasBeenHandledTime = 0l;
 	private boolean hotspotBeingHandled = false;
 
@@ -910,7 +911,10 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualizationRequest(VisualizationRequest request, EventContext context) {
 		
+		// THIS IS IN CASE OF A REQUEST FOR GUEST TREE ENTRIES
 		if(request.getGuestTreeOnly() != null && request.getGuestTreeOnly().length() > 0) {
+			
+			logger.info("RIKI: RECEIVED A GUEST TREE REQUEST");
 			
 			GeospatialFileSystem gfs = this.fsMap.get(request.getFilesystemName());
 			try {
@@ -920,6 +924,9 @@ public class StorageNode implements RequestListener {
 			}
 			return;
 		}
+		
+		
+		// THIS IS IN CASE OF A NORMAL VISUALIZATION REQUEST FOR ACTUAL FS DATA
 		
 		String featureQueryString = request.getFeatureQueryString();
 		logger.log(Level.INFO, "Feature query request: {0}", featureQueryString);
@@ -935,10 +942,11 @@ public class StorageNode implements RequestListener {
 			if (request.isSpatial()) {
 				logger.log(Level.INFO, "Spatial query: {0}", request.getPolygon());
 			}
+			
 			StandardDHTPartitioner partitioner = (StandardDHTPartitioner)gfs.getPartitioner();
 			List<NodeInfo> nodes;
 			try {
-				/* TemporalHierarchyPartitioner */
+				
 				/* ===================Finding the nodes that satisfy the query================== */
 				
 				Metadata data = new Metadata();
@@ -1040,33 +1048,6 @@ public class StorageNode implements RequestListener {
 				handleHotspot();
 			}
 			
-		}  else {
-			// NOT HOTSPOTTED
-			needRedirection = false;
-			/*
-			// CHECK IF HANDLED FLAG IS ON AND SET IT OFF
-			if(hotspotHasBeenHandledTime) {
-				
-				// HOTSPOT GONE, PAST COOLDOWN TIME
-				
-				if(eventTime - hotspotHandledTime > HOTSPOT_COOLDOWN_TIME) {
-					
-					// REMOVE ENTRIES FROM ROUTING TABLE
-					handleHotspotRemoval();
-					
-					// NO LONGER HOTSPOT....THIS NEEDS TO BE PUT INSIDE handleHotspotRemoval
-					hotspotHasBeenHandledTime = false;
-					hotspotBeingHandled = false;
-					
-					hotspotHandledTime = -1;
-					
-					needRedirection = false;
-				} 
-			} else {
-				// NO HOTSPOT HAS BEEN HANDLED, NOT NEEDED
-				needRedirection = false;
-			}
-			*/
 		}
 		
 		return needRedirection;
@@ -1074,17 +1055,6 @@ public class StorageNode implements RequestListener {
 		
 	}
 	
-	
-	/**
-	 * REMOVE HOTSPOT
-	 * REMOVE ENTRIES FROM ROUTING TABLE
-	 * @author sapmitra
-	 */
-	private void handleHotspotRemoval() {
-		// TODO Auto-generated method stub
-		
-	}
-
 
 	/**
 	 * HANDLE THE CALCULATION AND MOVEMENT OF HOTSPOT REPLICAS

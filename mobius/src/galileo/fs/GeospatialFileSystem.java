@@ -3963,34 +3963,35 @@ public class GeospatialFileSystem extends FileSystem {
 
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
-		
-		SpatiotemporalHierarchicalCache guestEntries = guestCache.get(requestingNode);
-		
-		
-		int cacheLevel = guestEntries.getCacheLevel(request.getSpatialResolution(), request.getTemporalResolution());
-		
-		
-		SparseSpatiotemporalMatrix specificCache = guestEntries.getSpecificCache(cacheLevel);
-		
-		if(specificCache != null) {
+		synchronized(guestCache) {
 			
-			HashMap<String, CacheCell> cells = specificCache.getCells();
+			SpatiotemporalHierarchicalCache guestEntries = guestCache.get(requestingNode);
 			
-			for(String key: cells.keySet()) {
-				CacheCell cell = cells.get(key);
-				boolean intersection = cell.checkIntersection(request.getPolygon(), request.getTimeString());
+			if(guestEntries != null) {
 				
-				if(intersection) {
-					SummaryWrapper sw = new SummaryWrapper(false, cell.getStats());
-					finalSummaries.put(cell.getCellKey(),sw);
+				int cacheLevel = guestEntries.getCacheLevel(request.getSpatialResolution(), request.getTemporalResolution());
+				
+				SparseSpatiotemporalMatrix specificCache = guestEntries.getSpecificCache(cacheLevel);
+				
+				if(specificCache != null) {
+					
+					HashMap<String, CacheCell> cells = specificCache.getCells();
+					
+					for(String key: cells.keySet()) {
+						
+						CacheCell cell = cells.get(key);
+						boolean intersection = cell.checkIntersection(request.getPolygon(), request.getTimeString());
+						
+						if(intersection) {
+							SummaryWrapper sw = new SummaryWrapper(false, cell.getStats());
+							finalSummaries.put(cell.getCellKey(),sw);
+						}
+						
+					}
+					
 				}
-				
 			}
-			
 		}
-		
-		
-		
 		
 		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
 				,hostName, port);

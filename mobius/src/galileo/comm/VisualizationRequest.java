@@ -23,6 +23,7 @@ public class VisualizationRequest implements Event {
 	private int spatialResolution;
 	private int temporalResolution;
 	
+	// NAME OF THE NODE FOR WHICH A GUEST TREE IS STORED ON THIS HELPER NODE
 	private String guestTreeOnly = "";
 	
 	// What features to return as summaries
