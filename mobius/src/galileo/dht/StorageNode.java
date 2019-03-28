@@ -1116,7 +1116,7 @@ public class StorageNode implements RequestListener {
 				VisualizationEventResponse rsp = new VisualizationEventResponse();
 				
 				// ARE THE NECESSARY STUFF REPLICATED ON SOME OTHER NODE? 
-				boolean possible = redirectRequest(event, rsp);
+				boolean possible = createRedirectionInfoIfPossible(event, rsp);
 				
 				logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
 				
@@ -1278,7 +1278,7 @@ public class StorageNode implements RequestListener {
 	 * @param rsp
 	 * @return
 	 */
-	private boolean redirectRequest(VisualizationEvent event, VisualizationEventResponse rsp) {
+	private boolean createRedirectionInfoIfPossible(VisualizationEvent event, VisualizationEventResponse rsp) {
 		
 		boolean isPossible = true;
 		
