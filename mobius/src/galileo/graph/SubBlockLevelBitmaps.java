@@ -222,7 +222,7 @@ public class SubBlockLevelBitmaps {
 	 */
 	public void populateBitmapUsingRecord(DateTime startTime, long recordTimestamp, String choppedGeohash, CorrectedBitmap[] temporaryBitmaps) {
 		
-		
+		logger.info("===========CHOPPER GEOHASH:"+choppedGeohash+"===================");
 		// Update each bitmap corresponding to a record
 		for(int i = 0; i < spatialSubLevels; i++) {
 			
@@ -239,7 +239,7 @@ public class SubBlockLevelBitmaps {
 				
 				// THIS SPATIAL INDEX IS THE INDEX WITHIN AN INDIVIDUAL BITMAP 
 				// AND SHOULD NOT BE CONFUSED WITH BITMAP ARRAY INDEX
-				long spatialIndex = 0;
+				long spatialBitIndex = 0;
 				
 				// If we do not go down the spatial resolution but only in temporal resolution
 				if(i > 0) {
@@ -247,17 +247,17 @@ public class SubBlockLevelBitmaps {
 					String partialGeohash = choppedGeohash.substring(0, i);
 					
 					// returns a number between 0 and 31 for single character
-					spatialIndex = GeoHash.hashToLong(partialGeohash);
+					spatialBitIndex = GeoHash.hashToLong(partialGeohash);
 					
 					// RIKI-REMOVE
-					logger.info("RIKI: PARTIAL GEOHASH " + partialGeohash + " SPATIAL INDEX: "+spatialIndex);
+					logger.info("RIKI: PARTIAL GEOHASH " + partialGeohash + " SPATIAL INDEX: "+spatialBitIndex);
 				}
 				
-				long temporalIndex = 0;
+				long temporalBitIndex = 0;
 				
 				if(j > 0) {
 					
-					temporalIndex = TemporalType.getTemporalIndex(startTime, recordTimestamp, currentTemporalLevel);
+					temporalBitIndex = TemporalType.getTemporalIndex(startTime, recordTimestamp, currentTemporalLevel);
 					
 				}
 				
@@ -275,9 +275,11 @@ public class SubBlockLevelBitmaps {
 				// RIKI-REMOVE
 				//logger.info("RIKI: HERE1");
 				
-				int bitIndex = (int)(temporalIndex*spatialSize + spatialIndex);
+				int bitIndex = (int)(temporalBitIndex*spatialSize + spatialBitIndex);
 				
 				bm.set(bitIndex);
+				
+				logger.info("RIKI: POPULATING BITMAP ARRAY LEVEL: "+bitmapArrayIndx+" SP "+spatialBitIndex+" TEMP: "+temporalBitIndex);
 				
 			}
 		}

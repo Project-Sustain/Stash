@@ -76,7 +76,7 @@ public enum TemporalType {
 			tmpIndex = Hours.hoursBetween(d1, d2).getHours();
 		
 		// RIKI-REMOVE
-		System.out.println("RIKI: START TIME "+d1+" END TIME: "+d2+" TEMPORAL INDEX: "+tmpIndex + " TEMPORAL TYPE "+desiredLevel);
+		// System.out.println("RIKI: START TIME "+d1+" END TIME: "+d2+" TEMPORAL INDEX: "+tmpIndex + " TEMPORAL TYPE "+desiredLevel);
 		return tmpIndex;
 		
 	}

@@ -690,6 +690,8 @@ public class GeospatialFileSystem extends FileSystem {
 		/* Name of the block to be saved */
 		String name = String.format("%s-%s", time, geohash);
 		
+		logger.info("RIKI: NAME OF NEW BLOCK: "+name);
+		
 		if (meta.getName() != null && !meta.getName().isEmpty())
 			name = meta.getName();
 		
@@ -725,6 +727,7 @@ public class GeospatialFileSystem extends FileSystem {
 		meta.setAttributes(newfs);
 
 		Serializer.persist(block.getMetadata(), metadataPath);
+		
 		File gblock = new File(blockPath);
 		boolean newLine = gblock.exists();
 		
@@ -796,7 +799,6 @@ public class GeospatialFileSystem extends FileSystem {
 		// TODO Auto-generated method stub
 		
 		String[] timeTokens = fileTime.split("-");
-		
 		
 		// The starting timestamp of the block at the given resolution
 		long startTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], temporalType);

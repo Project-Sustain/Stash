@@ -111,6 +111,7 @@ public class CliqueContainer implements ByteSerializable{
 			// CREATE A SET OF TEMPORARY BITMAPS
 			CorrectedBitmap bm = createBitmapForClique(fs, currentLevel, levels[0], levels[1], cellRow);
 			
+			
 			bitmaps.add(bm);
 			count++;
 			
@@ -163,6 +164,7 @@ public class CliqueContainer implements ByteSerializable{
 				
 			
 		}
+		temporaryBitmap.applyUpdates();
 		
 		return temporaryBitmap;
 				

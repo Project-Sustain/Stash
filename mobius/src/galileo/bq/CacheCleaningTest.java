@@ -100,7 +100,7 @@ public class CacheCleaningTest {
 				
 				
 				
-				shc.addCell(summaries, key, i, cs1, qt1, qt2, "ee", 5l);
+				//shc.addCell(summaries, key, i, cs1, qt1, qt2, "ee", 5l);
 			}
 			
 			//System.out.println(randomKeys.get(i).size());

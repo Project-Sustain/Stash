@@ -1,5 +1,7 @@
 ./initiate.sh allmachines
 
+./galileo-teardown.sh allmachines (TEARS DOWN A PREVIOUS EXISTING GALILEO CLUSTER)
+
 gstart
 
 cd ~/git/lassofinal/galileo-spacetime
