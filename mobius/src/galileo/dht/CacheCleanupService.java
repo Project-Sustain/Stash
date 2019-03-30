@@ -9,7 +9,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 
+import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
@@ -23,14 +25,15 @@ import galileo.graph.SpatiotemporalHierarchicalCache;
 
 public class CacheCleanupService implements Runnable{
 	
-	private AtomicBoolean cleanUpInitiated ;
+	private GeospatialFileSystem fs ;
 	private List<String> peList;
 	private SpatiotemporalHierarchicalCache stCache;
 	private int total_allowed;
+	private static final Logger logger = Logger.getLogger("galileo");
 	
-	public CacheCleanupService(AtomicBoolean cleanUpInitiated, List<String> peList, SpatiotemporalHierarchicalCache stCache, int total_allowed) {
+	public CacheCleanupService(GeospatialFileSystem fs, List<String> peList, SpatiotemporalHierarchicalCache stCache, int total_allowed) {
 		
-		this.cleanUpInitiated = cleanUpInitiated;
+		this.fs = fs;
 		this.peList = peList;
 		this.stCache = stCache;
 		this.total_allowed = total_allowed;
@@ -39,27 +42,38 @@ public class CacheCleanupService implements Runnable{
 	@Override
 	public void run() {
 		
-		if(!(cleanUpInitiated.get())) {
+		logger.info("RIKI: CACHE CLEANUP STARTED");
+		
+		if(!(fs.cleanUpInitiated.get())) {
 			
-			cleanUpInitiated.set(true);
+			fs.cleanUpInitiated.set(true);
 			
+			logger.info("RIKI: BEFORE THIS");
 			while(checkPE()) {
 				// blocking
 			}
 			
+			logger.info("RIKI: AFTER THIS");
 			pruneCache();
 			
-			cleanUpInitiated.set(false);
+			fs.cleanUpInitiated.set(false);
 			
 		}
+		
+		logger.info("RIKI: CACHE CLEANUP ENDED");
 		
 		
 	}
 	
+	/**
+	 * RETURNS TRUE IF >=1 PROCESSES ARE IN ENTERED STATE
+	 * @author sapmitra
+	 * @return
+	 */
 	public boolean checkPE() {
 		
 		synchronized(peList) {
-			if(peList.size() <= 0)
+			if(peList.size() > 0)
 				return true;
 			return false;
 		}

@@ -210,10 +210,12 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final String SPATIAL_FEATURE = "x__spatial__x";
 	
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
-	private static final long HELPER_TIMEOUT = 7500l;
 	
-	// TIME AFTER WHICH ROUTING ENTRIES IN DISTRESSED NODE GET PURGED
-	private static final long DISTRESS_TIMEOUT = 5*1000l;
+	// TIME AFTER WHICH TILES IN A HELPER NODE ARE CLASSIFIED AS STALE
+	private static final long HELPER_TIMEOUT = 40*1000l;	// 40 secs
+	
+	// TIME AFTER WHICH ROUTING ENTRIES IN DISTRESSED NODE ARE CLASSIFIED AS STALE
+	private static final long DISTRESS_TIMEOUT = 30*1000l;	// 30 secs
 	
 	
 	
@@ -235,6 +237,8 @@ public class GeospatialFileSystem extends FileSystem {
 	public static final int TEMPORAL_MOVE_DOWN = 1;
 	
 	public AtomicBoolean cleanUpInitiated = new AtomicBoolean(false);
+	public AtomicBoolean guestCleanUpInitiated = new AtomicBoolean(false);
+	
 	public AtomicBoolean peListEmpty = new AtomicBoolean(true);
 	
 	// LIST OF PROCESSES ENTERED
@@ -1221,12 +1225,13 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param savedSummaries
 	 * @param queryTimeString - Two timestamps
 	 * @param polygon - Query polygon
+	 * @param string 
 	 * @return
 	 * @throws InterruptedException
 	 * @throws ParseException
 	 */
 	public Map<String, PathRequirements> listMatchingCellsForSUBBlockResolution(Map<String, List<String>> blockMap, int reqSpatialResolution, int reqTemporalResolution, 
-			String queryTimeString, List<Coordinates> polygon) throws InterruptedException, ParseException {
+			String queryTimeString, List<Coordinates> polygon, String dateString) throws InterruptedException, ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
 		long qt1 = Long.valueOf(timeTokens[0]);
@@ -1272,14 +1277,23 @@ public class GeospatialFileSystem extends FileSystem {
 			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 			DateTime blockTime = new DateTime(blockTimeStamp);
 			
+			
+			logger.info("RIKI: CACHE KEYS FOR EXISTING TILES IS: "+cache.getCells().keySet());
+			
 			CorrectedBitmap cacheBitmap = null;
 			
 			// ***************CACHE BITMAP - WHAT'S ALREADY IN CACHE ? THAT LIES IN THE QUERY AREA AND THE BLOCK EXTENT ***************
+			
+			// FIND WHATEVER CELLS ARE ALREADY IN CACHE AND STORE THEIR KEYS
+			List<String> cachekeysFound = new ArrayList<String>();
+			
 			synchronized(cache) {
 				cacheBitmap = createBitmapFromCacheForGivenBlock(blockTime, tokens[0], tokens[1], cache.getCells().keySet(),
-						reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2);
+						reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2, cachekeysFound);
 			}
 			
+			
+			logger.info("RIKI: CACHE BITMAP FOR EXISTING TILES IS: "+cacheBitmap);
 			
 			boolean cacheIsEmpty = false;
 			
@@ -1292,16 +1306,16 @@ public class GeospatialFileSystem extends FileSystem {
 				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE IS EMPTY");
 			}
 			
-			// FIND WHATEVER CELLS ARE ALREADY IN CACHE AND STORE THEIR KEYS
-			List<String> cachekeysFound = new ArrayList<String>();
+			logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
 			
-			if(!cacheIsEmpty) {
+			/*if(!cacheIsEmpty) {
 				
 				cachekeysFound = fetchCacheKeysUsingBitmap(cacheBitmap, geohashPrecision, blockBitmapResolutionSpatial, 
 						temporalLevel, blockBitmapResolutionTemporal, tokens[1], blockTimeStamp);
 				
 				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
-			}
+			}*/
+			
 			required.setCacheCellKeys(cachekeysFound);
 				
 			// ************** NOW LOOK IN BLOCK MAP TO FIND BLOCK CELLS NEEDED BY QUERY ****************
@@ -1318,7 +1332,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					// WHAT CELLS ARE IN THE ACTUAL BLOCK
 					CorrectedBitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, blockBitmapResolutionSpatial, blockBitmapResolutionTemporal, 
-							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, queryTimeString);
+							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, dateString);
 					
 					// WHAT PART OF THE REQUIREMENT IS NOT IN MEMORY
 					CorrectedBitmap andNot = new CorrectedBitmap(blockRequirement.andNot(cacheBitmap));
@@ -1420,6 +1434,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// ***************QUERY BITMAP***************
 		boolean spatialEnclosure = GeoHash.checkEnclosure(polygon, tokens[1]);
+		
+		logger.info("RIKI: QUERY TIME STRING: " + queryTimeString);
+		
 		String temporalEnclosure = GeoHash.getTemporalOrientationSimplified(queryTimeString, tokens[0], temporalType, reqTemporalType);
 		
 		if(spatialEnclosure && (temporalEnclosure.equals("full")||temporalEnclosure.equals("full-st"))) {
@@ -1496,12 +1513,13 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param blockKey
 	 * @param cache
 	 * @param currentTemporalLevel - The temporal level for each bitmap cell
+	 * @param cachekeysFound 
 	 * @return
 	 * @throws ParseException 
 	 */
 	
 	private CorrectedBitmap createBitmapFromCacheForGivenBlock(DateTime blockTimeObject, String blockTime, String blockGeoHash, Set<String> cacheCells, 
-			TemporalType cellType, TemporalType blockType, int currentTemporalLevel, List<Coordinates> polygon, long qt1, long qt2) throws ParseException {
+			TemporalType cellType, TemporalType blockType, int currentTemporalLevel, List<Coordinates> polygon, long qt1, long qt2, List<String> cachekeysFound) throws ParseException {
 		
 		// This is at block's bitmap level, representing which cells of the block are covered by cache entries
 		CorrectedBitmap blockBitmap = new CorrectedBitmap();
@@ -1527,7 +1545,7 @@ public class GeospatialFileSystem extends FileSystem {
 			// full-st means block extent encloses cache extent
 			// full-rev means cache extent encloses block extent
 			
-			logger.info("RIKI: THESE ARE THE GEOHASHES "+ blockGeoHash+" "+cellGeohashString);
+			logger.info("RIKI: THESE ARE THE GEOHASHES FOR BLOCK AND CELL"+ blockGeoHash+" "+cellGeohashString);
 			
 			String spatialOrientation = GeoHash.getSpatialOrientationSimplified(blockGeoHash, cellGeohashString);
 			
@@ -1550,6 +1568,7 @@ public class GeospatialFileSystem extends FileSystem {
 				// Cache cell dimension is lesser than block extent
 				if(spatialOrientation.equals("full-st") && temporalOrientation.equals("full-st")) {
 					
+					logger.info("RIKI: HEREEEEE1");
 					// START CREATING THE BITMAP
 					
 					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
@@ -1559,6 +1578,8 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					if(partialGeohash.length() > 0)
 						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					
+					logger.info("RIKI: <<<<PARTIAL GEOHASH: "+partialGeohash + " "+spatialIndex);
 					
 					int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
 					
@@ -1572,11 +1593,39 @@ public class GeospatialFileSystem extends FileSystem {
 					blockBitmap.set(spatiotemporalIndex);
 					somethingFound = true;
 					
+					cachekeysFound.add(key);
+					
 				} else if(spatialOrientation.equals("full") || spatialOrientation.equals("full-st")) {
 					
-					// Spatially the cache cell is larger or equal to a block, but temporally, it is below block level
+					logger.info("RIKI: HEREEEEE2 "+spatialOrientation);
+					
+					// Spatially the cache cell is smaller or equal to a block, but temporally, it is below block level
 					// The block bitmap in this case would only consider temporal level, since spatial level is the entire block
 					
+					// START CREATING THE BITMAP
+					
+					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
+					
+					String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
+					
+					int spatialIndex = 0;
+					
+					if(partialGeohash.length() > 0)
+						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
+					
+					int spatiotemporalIndex = (int)(spatialIndex);
+					
+					blockBitmap.set(spatiotemporalIndex);
+					somethingFound = true;
+					cachekeysFound.add(key);
+					
+					
+				} else if(temporalOrientation.equals("full") || temporalOrientation.equals("full-st")) {
+					
+					logger.info("RIKI: HEREEEEE3");
+					
+					// Temporally the cache cell is smaller or equal to a block, but spatially, it is below block level
+					// The block bitmap in this case would only consider spatial level, since temporal level is the entire block
 					// START CREATING THE BITMAP
 					
 					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
@@ -1591,26 +1640,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					blockBitmap.set(spatiotemporalIndex);
 					somethingFound = true;
-					
-					
-				} else if(temporalOrientation.equals("full") || temporalOrientation.equals("full-st")) {
-					
-					// Temporally the cache cell is larger or equal to a block, but spatially, it is below block level
-					// The block bitmap in this case would only consider spatial level, since temporal level is the entire block
-					// START CREATING THE BITMAP
-					
-					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
-					String partialGeohash = cellGeohashString.replaceFirst(blockGeoHash, "");
-					
-					int spatialIndex = 0;
-					
-					if(partialGeohash.length() > 0)
-						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
-					
-					int spatiotemporalIndex = (int)(spatialIndex);
-					
-					blockBitmap.set(spatiotemporalIndex);
-					somethingFound = true;
+					cachekeysFound.add(key);
 				}
 				
 				
@@ -3559,11 +3589,8 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	public void handleCacheCleaning() {
 		
-		// RIKI-REMOVE
-		logger.info("RIKI: CACHE CLEANUP STARTED");
-		
 		//ExecutorService executor = Executors.newFixedThreadPool(1);
-		CacheCleanupService c = new CacheCleanupService(cleanUpInitiated, peList, stCache, total_reduced_entries);
+		CacheCleanupService c = new CacheCleanupService(this, peList, stCache, total_reduced_entries);
 		
 		Thread ct = new Thread(c);
 		//executor.execute(c);
@@ -3579,10 +3606,10 @@ public class GeospatialFileSystem extends FileSystem {
 	public void handleGuestCacheCleaning() {
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: CACHE CLEANUP STARTED");
+		//logger.info("RIKI: CACHE CLEANUP STARTED");
 		
 		//ExecutorService executor = Executors.newFixedThreadPool(1);
-		GuestCacheCleaner c = new GuestCacheCleaner(cleanUpInitiated, guestPeList, guestCache, 0, HELPER_TIMEOUT);
+		GuestCacheCleaner c = new GuestCacheCleaner(this, guestPeList, guestCache, 0, HELPER_TIMEOUT);
 		
 		c.clean();
 		

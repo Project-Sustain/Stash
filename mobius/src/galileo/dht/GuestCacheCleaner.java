@@ -9,7 +9,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 
+import galileo.fs.GeospatialFileSystem;
 import galileo.graph.CacheCell;
 import galileo.graph.SparseSpatiotemporalMatrix;
 import galileo.graph.SpatiotemporalHierarchicalCache;
@@ -22,14 +24,15 @@ import galileo.graph.SpatiotemporalHierarchicalCache;
 
 public class GuestCacheCleaner{
 	
-	private AtomicBoolean cleanUpInitiated ;
+	private GeospatialFileSystem fs ;
 	private List<String> peList;
 	private Map<String, SpatiotemporalHierarchicalCache> guestCache;
 	private long HELPER_TIME;
+	private static final Logger logger = Logger.getLogger("galileo");
 	
-	public GuestCacheCleaner(AtomicBoolean cleanUpInitiated, List<String> peList, Map<String, SpatiotemporalHierarchicalCache> guestCache, int total_allowed, long helperTimeout) {
+	public GuestCacheCleaner(GeospatialFileSystem fs, List<String> peList, Map<String, SpatiotemporalHierarchicalCache> guestCache, int total_allowed, long helperTimeout) {
 		
-		this.cleanUpInitiated = cleanUpInitiated;
+		this.fs = fs;
 		this.peList = peList;
 		this.guestCache = guestCache;
 		this.HELPER_TIME = helperTimeout;
@@ -37,9 +40,11 @@ public class GuestCacheCleaner{
 
 	public void clean() {
 		
-		if(!(cleanUpInitiated.get())) {
+		logger.info("RIKI: GUEST CACHE CLEANUP STARTED");
+		
+		if(!(fs.guestCleanUpInitiated.get())) {
 			
-			cleanUpInitiated.set(true);
+			fs.guestCleanUpInitiated.set(true);
 			
 			while(checkPE()) {
 				// blocking
@@ -47,17 +52,24 @@ public class GuestCacheCleaner{
 			
 			pruneCache();
 			
-			cleanUpInitiated.set(false);
+			fs.guestCleanUpInitiated.set(false);
 			
 		}
+		
+		logger.info("RIKI: GUEST CACHE CLEANUP ENDED");
 		
 		
 	}
 	
+	/**
+	 * RETURNS TRUE IF >=1 PROCESSES ARE IN ENTERED STATE
+	 * @author sapmitra
+	 * @return
+	 */
 	public boolean checkPE() {
 		
 		synchronized(peList) {
-			if(peList.size() <= 0)
+			if(peList.size() > 0)
 				return true;
 			return false;
 		}

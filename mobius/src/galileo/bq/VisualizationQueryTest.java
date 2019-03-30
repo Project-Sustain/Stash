@@ -34,11 +34,11 @@ public class VisualizationQueryTest {
 		VisualizationRequest vr = new VisualizationRequest(); 
 		vr.setFsName("testfs1");
 		
-		float lat1 = 39.1f;
-		float lat2 = 40.0f;
+		float lat1 = 40.32f;
+		float lat2 = 40.68f;
 		
-		float lon1 = -96.1f;
-		float lon2 = -95.0f;
+		float lon1 = -105.17f;
+		float lon2 = -104.7f;
 		
 		Coordinates c1 = new Coordinates(lat2, lon1);
 		Coordinates c2 = new Coordinates(lat2, lon2);
@@ -50,13 +50,13 @@ public class VisualizationQueryTest {
 		cl.add(c1); cl.add(c2); cl.add(c3); cl.add(c4);
 		
 		vr.setPolygon(cl);
-		vr.setTime("2017-02-xx-xx");
+		vr.setTime("2019-03-25-xx");
 		
 		/*vr.setSpatialResolution(2);
 		vr.setTemporalResolution(2);*/
 		
 		
-		vr.setSpatialResolution(5);
+		vr.setSpatialResolution(6);
 		vr.setTemporalResolution(3);
 		
 		List<String> sumFt = new ArrayList<String>();
@@ -65,8 +65,11 @@ public class VisualizationQueryTest {
 		vr.setReqFeatures(sumFt);
 		
 		try {
-			gc.visualize(vr);
-			Thread.sleep(4000);
+			for(int i=0 ;i < 2; i++) {
+				gc.visualize(vr);
+				Thread.sleep(1000);
+			}
+			
 		} finally {
 			gc.disconnect();
 		}

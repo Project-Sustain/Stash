@@ -182,13 +182,13 @@ public class StorageNode implements RequestListener {
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
 	
 	// TIME AFTER WHICH DISTRESSED NODE CHECKS AND PURGES ITS ROUTING TABLE
-	private static final long ROUTING_TABLE_CHECKUP = 5000l;
+	private static final long ROUTING_TABLE_CHECKUP = 15*1000l;		// 15 secs
 	
 	// TIME AFTER WHICH HELPER NODE PURGES ITS OLD TILES
-	private static final long HELPER_TIMEOUT = 7500l;
+	private static final long HELPER_TIMEOUT = 15*1000l;			// 15 secs
 	
 	// TIME AFTER WHICH NODE HANDLED HOTSPOT AGAIN AFTER A PREVIOUS HANDLE
-	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; // 10 secs
+	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; 	// 10 secs
 	
 	private static final int HOTSPOT_REDIRECTION_CHANCE = 5;
 	
@@ -245,7 +245,9 @@ public class StorageNode implements RequestListener {
 	 */
 	private boolean isHotspotted() {
 	
-		if(eventReactor.getMessageQueue().size() > MESSAGE_QUEUE_THRESHOLD) {
+		logger.info("\nRIKI: MESSAGE QUEUE SIZE: "+eventReactor.getMessageQueue().size());
+		
+		if(eventReactor.getMessageQueue().size() >= MESSAGE_QUEUE_THRESHOLD) {
 			return true;
 		}
 		
@@ -954,7 +956,7 @@ public class StorageNode implements RequestListener {
 				
 				nodes = partitioner.findDestinations(request.getPolygon());
 				
-				logger.info("destinations: " + nodes);
+				logger.info("RIKI: VISUALIZATION DESTINATIONS: " + nodes);
 				
 				VisualizationEvent vEvent = new VisualizationEvent(queryId, request);
 						
@@ -1109,6 +1111,8 @@ public class StorageNode implements RequestListener {
 		
 		int freshnessMultiplier = 1;
 		
+		logger.info("\nRIKI: NEEDS REDIRECTION: "+needsRedirection);
+		
 		if(needsRedirection) {
 			
 			if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
@@ -1140,18 +1144,19 @@ public class StorageNode implements RequestListener {
 			
 		}
 		
+		logger.info("\nRIKI: NOT REDIRECTING");
+		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
 		Random r = new Random();
 		int eventId = r.nextInt();
-		
 		
 		String eventString = eventTime+"$$"+eventId;
 		event.setEventId(eventString);
 		
 		try {
 			
-			logger.info(event.getFeatureQueryString());
+			//logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
 			GeospatialFileSystem fs = fsMap.get(fsName);
 			if (fs != null) {
@@ -1208,7 +1213,7 @@ public class StorageNode implements RequestListener {
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
 					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
-							event.getTemporalResolution(), event.getTimeString(), event.getPolygon());
+							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), event.getTime());
 					
 					// ONCE SUMMARIES HAVE BEEN FETCHED FROM FS,
 					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
