@@ -86,12 +86,14 @@ public class HotspotTileHandOffCoordinator implements Runnable{
 	@Override
 	public void run() {
 		
-		logger.info("RIKI: ABOUT TO SEND OUT HEARTBEATS");
+		logger.info("=====================================================");
+		logger.info("RIKI: ABOUT TO SEND OUT DISTRESS SIGNALS");
 		
 		/* Sending out heartbeats to all nodes */
 		reqHandler.handleRequest();
 
-		logger.info("RIKI: ABOUT TO START WAITING FOR 3 SECS FOR ALL HEARTBEATS TO COME BACK");
+		logger.info("RIKI: FINISHED HANDLING DISTRESS REQUESTS");
+		logger.info("=====================================================");
 		
 		// THE FOLLOWING ARE TO BE TAKEN CARE OF IN THE NodeInfoRequestHandler
 		/**

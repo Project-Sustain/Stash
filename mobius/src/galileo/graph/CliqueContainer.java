@@ -3,6 +3,7 @@ package galileo.graph;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -12,6 +13,7 @@ import galileo.comm.TemporalType;
 import galileo.fs.GeospatialFileSystem;
 import galileo.net.NetworkDestination;
 import galileo.serialization.ByteSerializable;
+import galileo.serialization.SerializationException;
 import galileo.serialization.SerializationInputStream;
 import galileo.serialization.SerializationOutputStream;
 import galileo.util.GeoHash;
@@ -31,12 +33,22 @@ public class CliqueContainer implements ByteSerializable{
 	
 	private NetworkDestination replicatedNode = null;
 	
+	private static final Logger logger = Logger.getLogger("galileo");
+	
 	public CliqueContainer(String key) {
 		
 		this.geohashKey = key;
 		levels = new ArrayList<Integer>();
 		cells = new ArrayList<List<CacheCell>>();
 		
+	}
+	
+	public String toString() {
+		String ret = geohashKey;
+		ret += "****"+levels +"****";
+		ret += cells;
+		
+		return ret;
 	}
 	
 	/**
@@ -106,13 +118,23 @@ public class CliqueContainer implements ByteSerializable{
 			
 			int currentLevel = levels.get(count);
 			
+			CorrectedBitmap bm = null;
+			
 			int[] levels = fs.getStCache().getSpatioTemporalResolutionsFromLevel(currentLevel);
 			
-			// CREATE A SET OF TEMPORARY BITMAPS
-			CorrectedBitmap bm = createBitmapForClique(fs, currentLevel, levels[0], levels[1], cellRow);
+			if(fs.isSubBlockLevel(levels[0], levels[1])) {
+				
+				// CREATE A SET OF TEMPORARY BITMAPS
+				bm = createBitmapForClique(fs, currentLevel, levels[0], levels[1], cellRow);
+				
+				bitmaps.add(bm);
+				
+			} else {
+				bitmaps.add(bm);
+			}
 			
 			
-			bitmaps.add(bm);
+			
 			count++;
 			
 		}
@@ -122,7 +144,8 @@ public class CliqueContainer implements ByteSerializable{
 	
 	
 	/**
-	 * POPULATES A BITMAP FOR A SINGLE LEVEL OF CACHE CELLS IN A CLIQUE
+	 * POPULATES A BITMAP FOR A SINGLE LEVEL OF CACHE CELLS IN A CLIQUE.
+	 * THIS IS TO BE MAINTAINED ON THE DISTRESSED NODE SIDE
 	 * 
 	 * @author sapmitra
 	 * @param temporaryBitmap
@@ -135,14 +158,15 @@ public class CliqueContainer implements ByteSerializable{
 		
 		CorrectedBitmap temporaryBitmap = new CorrectedBitmap();
 		
-		for(CacheCell cells : cellsInThisLevel) {
+		for(CacheCell cell : cellsInThisLevel) {
 			
 			int spatialSize = (int)java.lang.Math.pow(32, spatialLevel);
 			
-			String tokens[] = cells.getCellKey().split("\\$\\$");
+			String tokens[] = cell.getCellKey().split("\\$\\$");
 			
-			String choppedGeohash = tokens[0];
-			String dateString = tokens[1];
+			logger.info("RIKI: CACHE CELL KEY: "+cell.getCellKey());
+			String choppedGeohash = tokens[1];
+			String dateString = tokens[0];
 			
 			String timeTokens[] = dateString.split("-");
 			
@@ -230,7 +254,7 @@ public class CliqueContainer implements ByteSerializable{
 		
 		out.writeIntegerCollection(levels);
 		
-		out.writeInt(levels.size());
+		//out.writeInt(levels.size());
 		
 		for(List<CacheCell> cellRow: cells)
 			out.writeSerializableCollection(cellRow);
@@ -238,7 +262,29 @@ public class CliqueContainer implements ByteSerializable{
 	}
 	
 	@Deserialize
-	public CliqueContainer(SerializationInputStream in) {
+	public CliqueContainer(SerializationInputStream in) throws IOException, SerializationException  {
+		
+		this.geohashKey = in.readString();
+		this.geohashAntipode = in.readString();
+		this.direction = in.readInt();
+		this.totalCliqueSize = in.readInt();
+		
+		levels = new ArrayList<Integer>();
+		
+		in.readIntegerCollection(levels);
+		
+		cells = new ArrayList<List<CacheCell>>();
+		
+		for(int i=0; i< levels.size(); i++) {
+			
+			List<CacheCell> lCells = new ArrayList<>();
+			
+			in.readSerializableCollection(CacheCell.class, lCells);
+			
+			cells.add(lCells);
+			
+		}
+		
 		
 	}
 

@@ -4039,6 +4039,28 @@ public class GeospatialFileSystem extends FileSystem {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
 		}
 	}
+
+	/**
+	 * ARE WE DEALING WITH A SUB-BLOCK LEVEL SCENARIO HERE?
+	 * @author sapmitra
+	 * @param currentLevel
+	 * @param levels 
+	 * @return
+	 */
+	public boolean isSubBlockLevel(int sl, int tl) {
+		
+		boolean subBlockLevel = true;
+		
+		
+		int fsSpatialResolution = getGeohashPrecision();
+		int fsTemporalResolution = temporalType.getType();
+		
+		if(sl <= fsSpatialResolution && tl <= fsTemporalResolution) {
+			subBlockLevel = false;
+		}
+		
+		return subBlockLevel;
+	}
 	
 	
 	

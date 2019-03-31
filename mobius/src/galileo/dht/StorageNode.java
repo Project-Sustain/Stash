@@ -173,6 +173,10 @@ public class StorageNode implements RequestListener {
 	private boolean pruningNeeded;
 	
 	
+	/*HOTSPOT HANDLING RELATED*/
+	private static final int MESSAGE_QUEUE_THRESHOLD = -1;
+	
+	
 	/* GUEST TREE MAINTAINENCE*/
 	private Timer guestTreeClearer = new Timer();
 	
@@ -191,10 +195,6 @@ public class StorageNode implements RequestListener {
 	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; 	// 10 secs
 	
 	private static final int HOTSPOT_REDIRECTION_CHANCE = 5;
-	
-	
-	/*HOTSPOT HANDLING RELATED*/
-	private static final int MESSAGE_QUEUE_THRESHOLD = 100;
 	
 	// THE LAST TIME THE HOTSPOT WAS HANDLED
 	private long hotspotHasBeenHandledTime = 0l;
@@ -559,6 +559,7 @@ public class StorageNode implements RequestListener {
 			
 			totalGuestTreeSize+=fs.getGuestCacheSize();
 			
+			logger.info("RIKI: DISTRESS REQUEST RECEIVED FROM NODE " + request.getNodeString());
 			
 			List<CliqueContainer> cliquesToHouse = request.getCliquesToSend();
 			
@@ -570,7 +571,7 @@ public class StorageNode implements RequestListener {
 			
 			
 			// NOT STORING ANYTHING IS THIS ITSELF IS HOTSPOTTED
-			if(!isHotspotted()) {
+			if(/*!isHotspotted()*/true) {
 			
 				List<CliqueContainer> cliquesToAdd = new ArrayList<CliqueContainer>();
 				for(CliqueContainer cc : cliquesToHouse) {
@@ -600,6 +601,7 @@ public class StorageNode implements RequestListener {
 				
 			} else {
 				
+				logger.info("RIKI: ITSELF HOTSPOTTED !");
 				for(CliqueContainer cc : cliquesToHouse) {
 					// SEND BACK FAILED RESPONSE
 					hbrsp.addEntry(false, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
@@ -609,6 +611,8 @@ public class StorageNode implements RequestListener {
 			
 			
 			context.sendReply(hbrsp);
+			
+			logger.info("RIKI: SENT BACK DISTRESS HANDLING RESPONSE");
 		}
 		
 		
@@ -1032,6 +1036,7 @@ public class StorageNode implements RequestListener {
 				// HOTSPOTTED, AND HAS BEEN HANDLED
 				// REQUEST NEEDS REDIRECTION USING ROUTING TABLE
 				
+				logger.info("RIKI: WE ARE READY FOR REDIRECTION");
 				needRedirection = true;
 				
 				
@@ -1045,6 +1050,8 @@ public class StorageNode implements RequestListener {
 				// HOTSPOT NOT HANDLED
 				hotspotBeingHandled = true;
 				needRedirection = false;
+				
+				logger.info("RIKI: HOTSPOT DETECTED: ABOUT TO HANDLE TILE HANDOFF");
 				
 				// NEEDS HOTSPOT HANDLING
 				handleHotspot();
@@ -1198,6 +1205,7 @@ public class StorageNode implements RequestListener {
 				
 				// RIKI-REMOVE
 				logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
+				
 				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
 						event.getSpatialResolution(), event.getTemporalResolution());
 				

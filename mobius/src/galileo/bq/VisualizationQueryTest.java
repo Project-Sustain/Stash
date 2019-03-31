@@ -67,7 +67,7 @@ public class VisualizationQueryTest {
 		try {
 			for(int i=0 ;i < 2; i++) {
 				gc.visualize(vr);
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 			}
 			
 		} finally {

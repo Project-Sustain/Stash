@@ -21,6 +21,10 @@ public class TimeoutChecker implements Runnable{
 			e.printStackTrace();
 		}
 		
+		if(nr == null) {
+			return;
+		}
+		
 		// IF AFTER WAIT_TIME, NOT ALL RESPONSES HAVE COME IN, TIME TO STOP
 		if(nr.isWaitTimeCheck()) {
 			nr.closeRequest();

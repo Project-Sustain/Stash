@@ -128,6 +128,12 @@ public class CacheCell implements ByteSerializable{
 		this.lastAccessed = eventTime;
 		
 	}
+	
+	
+	public String toString() {
+		
+		return cellKey;
+	}
 
 	public String getSpatialInfo() {
 		return spatialInfo;

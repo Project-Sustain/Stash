@@ -63,6 +63,8 @@ public class TileHandoffHandler implements MessageListener {
 	
 	private Partitioner<Metadata> partitioner;
 	
+	private boolean somethingGotReplicated = false;
+	
 	// IF THIS IS THE FIRST TIME REQUESTING FOR HELPER NODES
 	private boolean firstTry = true;
 	
@@ -88,7 +90,7 @@ public class TileHandoffHandler implements MessageListener {
 		this.eventMap = new GalileoEventMap();
 		this.eventWrapper = new BasicEventWrapper(this.eventMap);
 		
-		this.expectedResponses = new AtomicInteger(this.nodes.size());
+		this.expectedResponses = new AtomicInteger(0);
 		this.currentNode = thisNode;
 		this.WAIT_TIME = waitTime;
 		
@@ -96,6 +98,7 @@ public class TileHandoffHandler implements MessageListener {
 		// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
 		topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
 		
+		logger.info("TOP CLIQUES: "+ topKCliques);
 		
 		// CALCULATING THE BITMAP COVERED BY THE TILES IN EACH PARTICULAR CLIQUE
 		for(String k : topKCliques.keySet()) {
@@ -132,6 +135,7 @@ public class TileHandoffHandler implements MessageListener {
 		for (GalileoMessage gresponse : this.responses) {
 			
 			responseCount++;
+			
 			Event event;
 			
 			try {
@@ -154,6 +158,8 @@ public class TileHandoffHandler implements MessageListener {
 							NetworkDestination nd = nodeStringToNodeMap.get(nodeKey);
 							topKCliques.get(cliqueKey).setReplicatedNode(nd);
 							
+							somethingGotReplicated = true;
+							
 						} else {
 							// FAILED TO REPLICATE THIS, TRY ANOTHER NODE
 							// KEEP THIS ENTRY IN TOP CLIQUES
@@ -174,11 +180,21 @@ public class TileHandoffHandler implements MessageListener {
 			}
 		}
 		
+		int totalHomesFound = 0;
+		
+		for(CliqueContainer clique : topKCliques.values()) {
+
+			if(clique.getReplicatedNode() != null)
+				totalHomesFound++;
+		}
+		
 		// IF NOT ALL CLIQUES HAVE FOUND A HOME, REDO THE PROCESS
-		if(topKCliques.size() > 0 && RETRY_COUNT >= 0) {
+		if(topKCliques.size() == totalHomesFound && RETRY_COUNT >= 0) {
+			
 			logger.info("RIKI: NOT ALL CLIQUES FOUND HOME....RETRYING FOR REMAINING CLIQUES");
 			RETRY_COUNT--;
 			handleRequest();
+			
 		} else {
 			silentClose(); // closing the router to make sure that no new responses are added.
 			
@@ -187,7 +203,9 @@ public class TileHandoffHandler implements MessageListener {
 			
 		}
 		
-		currentNode.setHotspotHasBeenHandledTime(System.currentTimeMillis());
+		// IF AT ALL SOMETHING GOT REPLICATED
+		if(somethingGotReplicated)
+			currentNode.setHotspotHasBeenHandledTime(System.currentTimeMillis());
 		
 		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
 		
@@ -277,6 +295,12 @@ public class TileHandoffHandler implements MessageListener {
 			// MAP OF WHICH CLIQUE GOES TO WHICH NODE
 			Map<String, List<CliqueContainer>> nodeToCliquesMap = new HashMap<String, List<CliqueContainer>>();
 			
+			if(topKCliques.size() <= 0) {
+				
+				currentNode.setHotspotBeingHandled(false);
+				return;
+			}
+			
 			// FOR EACH CLIQUE, FIND A SUITABLE NODE TO SEND IT TO
 			// THE NODE HAS TO BE THE ANTIPODE OF THE GEOHASH IN QUESTION
 			for(Entry<String, CliqueContainer> entry : topKCliques.entrySet()) {
@@ -357,10 +381,15 @@ public class TileHandoffHandler implements MessageListener {
 					clique.setGeohashAntipode(geoHashAntipode);
 					clique.setDirection(randDirection);
 					
+					logger.info("RIKI: CLIQUE: "+geohashKey +" HAS AN ANTIPODE "+geoHashAntipode+" AND CORRESPONDING HELPER NODE IS "+ nodeString);
+					
 					keepLooping = checkIfEntryExistsInRoutingTable(routingTable, nodeString, geohashKey);
 					
 					if(keepLooping) {
+						
+						logger.info("RIKI: WE NEED TO KEEP LOOKING FOR A NEW HELPER NODE FOR CLIQUE: "+geohashKey);
 						continue;
+						
 					} else {
 						if(nodeToCliquesMap.get(nodeString) == null) {
 							
@@ -380,9 +409,9 @@ public class TileHandoffHandler implements MessageListener {
 				
 			}
 			
-			if(!firstTry) {
-				expectedResponses = new AtomicInteger(nodeToCliquesMap.size());
-			}
+			
+			expectedResponses = new AtomicInteger(nodeToCliquesMap.size());
+			
 			
 			firstTry = false;
 			// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
