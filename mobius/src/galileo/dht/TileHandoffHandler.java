@@ -146,6 +146,7 @@ public class TileHandoffHandler implements MessageListener {
 					HeartbeatResponse eventResponse = (HeartbeatResponse) event;
 					for (int i = 0; i< eventResponse.getDirection().size(); i++) {
 						
+						logger.info("RIKI: DISTRESS RESPONSE SAYS: "+eventResponse.getResultFlag());
 						if(eventResponse.getResultFlag().get(i)) {
 							// THIS CLIQUE HAS BEEN REPLICATED SUCCESSFULLY
 							// REMOVE THIS CLIQUE FROM TOP CLIQUE
@@ -189,27 +190,31 @@ public class TileHandoffHandler implements MessageListener {
 		}
 		
 		// IF NOT ALL CLIQUES HAVE FOUND A HOME, REDO THE PROCESS
-		if(topKCliques.size() == totalHomesFound && RETRY_COUNT >= 0) {
+		if(topKCliques.size() != totalHomesFound && RETRY_COUNT >= 0) {
 			
 			logger.info("RIKI: NOT ALL CLIQUES FOUND HOME....RETRYING FOR REMAINING CLIQUES");
 			RETRY_COUNT--;
 			handleRequest();
 			
 		} else {
+			
+			logger.info("RIKI: DISTRESS RESPONSESD GETTING LOADED IN ROUTING TABLE");
 			silentClose(); // closing the router to make sure that no new responses are added.
 			
 			// POPULATE ROUTING TABLE WITH CLIQUES THAT GOT REPLICATED
 			fs.populateRoutingTable(topKCliques);
 			
+			// IF AT ALL SOMETHING GOT REPLICATED
+			if(somethingGotReplicated)
+				currentNode.setHotspotHasBeenHandledTime(System.currentTimeMillis());
+			
+			logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
+			
+			currentNode.setHotspotBeingHandled(false);
+			
 		}
 		
-		// IF AT ALL SOMETHING GOT REPLICATED
-		if(somethingGotReplicated)
-			currentNode.setHotspotHasBeenHandledTime(System.currentTimeMillis());
 		
-		logger.info("RIKI: HEARTBEAT COMPILED WITH "+responseCount+" MESSAGES");
-		
-		currentNode.setHotspotBeingHandled(false);
 		
 		/*try {
 			afterHeartbeatCheck();

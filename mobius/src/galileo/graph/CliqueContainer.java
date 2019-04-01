@@ -125,7 +125,7 @@ public class CliqueContainer implements ByteSerializable{
 			if(fs.isSubBlockLevel(levels[0], levels[1])) {
 				
 				// CREATE A SET OF TEMPORARY BITMAPS
-				bm = createBitmapForClique(fs, currentLevel, levels[0], levels[1], cellRow);
+				bm = createBitmapForClique(fs, levels[0], levels[1], cellRow);
 				
 				bitmaps.add(bm);
 				
@@ -140,6 +140,8 @@ public class CliqueContainer implements ByteSerializable{
 		}
 		
 		this.bitmaps = bitmaps;
+		
+		logger.info("RIKI: BITMAP CALCULATED: "+bitmaps);
 	}
 	
 	
@@ -154,18 +156,24 @@ public class CliqueContainer implements ByteSerializable{
 	 * @param temporalLevel
 	 * @param cellsInThisLevel
 	 */
-	public CorrectedBitmap createBitmapForClique(GeospatialFileSystem fs, int currentLevel, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
+	public CorrectedBitmap createBitmapForClique(GeospatialFileSystem fs, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
 		
 		CorrectedBitmap temporaryBitmap = new CorrectedBitmap();
 		
 		for(CacheCell cell : cellsInThisLevel) {
 			
-			int spatialSize = (int)java.lang.Math.pow(32, spatialLevel);
-			
 			String tokens[] = cell.getCellKey().split("\\$\\$");
 			
 			logger.info("RIKI: CACHE CELL KEY: "+cell.getCellKey());
-			String choppedGeohash = tokens[1];
+			
+			
+			int fsSpatialResolution = fs.getGeohashPrecision();
+			int fsTemporalResolution = fs.getTemporalType().getType();
+			
+			String choppedGeohash = tokens[1].substring(fsSpatialResolution);
+			
+			int spatialSize = (int)java.lang.Math.pow(32, choppedGeohash.length());
+			
 			String dateString = tokens[0];
 			
 			String timeTokens[] = dateString.split("-");
@@ -176,6 +184,8 @@ public class CliqueContainer implements ByteSerializable{
 			long cellTimestamp = GeoHash.getStartTimeStamp(dateString, TemporalType.getTypeFromLevel(temporalLevel));
 			
 			// returns a number between 0 and 31 for single character
+			
+			if()
 			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
 			
 			DateTime startDate = new DateTime(cliqueStartTimeStamp, DateTimeZone.UTC);

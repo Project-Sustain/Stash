@@ -19,7 +19,6 @@ public class VisualizationEventResponse implements Event{
 	private String hostName;
 	private int hostPort;
 	
-	private String nodeString;
 	private List<String> helperNodes;
 	
 	public VisualizationEventResponse(List<SummaryWrapper> summaries, List<String> keys, String hostname, int port) {
@@ -31,10 +30,11 @@ public class VisualizationEventResponse implements Event{
 		
 	}
 	
-	public VisualizationEventResponse(List<String> nodes, String currentNode) {
+	public VisualizationEventResponse(List<String> nodes, String hostname, int port) {
 		needsRedirection = true;
 		this.helperNodes = nodes;
-		this.nodeString = currentNode;
+		this.hostName = hostname;
+		this.hostPort = port;
 	}
 	
 	public VisualizationEventResponse() {
@@ -53,7 +53,8 @@ public class VisualizationEventResponse implements Event{
 			out.writeInt(hostPort);
 		} else {
 			
-			out.writeString(nodeString);
+			out.writeString(hostName);
+			out.writeInt(hostPort);
 			out.writeStringCollection(helperNodes);
 		}
 	}
@@ -72,7 +73,8 @@ public class VisualizationEventResponse implements Event{
 			this.hostName = in.readString();
 			this.hostPort = in.readInt();
 		} else {
-			this.nodeString = in.readString();
+			this.hostName = in.readString();
+			this.hostPort = in.readInt();
 			helperNodes = new ArrayList<String>();
 			in.readStringCollection(helperNodes);
 		}
@@ -109,6 +111,22 @@ public class VisualizationEventResponse implements Event{
 
 	public void setHostPort(int hostPort) {
 		this.hostPort = hostPort;
+	}
+
+	public boolean isNeedsRedirection() {
+		return needsRedirection;
+	}
+
+	public void setNeedsRedirection(boolean needsRedirection) {
+		this.needsRedirection = needsRedirection;
+	}
+
+	public List<String> getHelperNodes() {
+		return helperNodes;
+	}
+
+	public void setHelperNodes(List<String> helperNodes) {
+		this.helperNodes = helperNodes;
 	}
 
 	

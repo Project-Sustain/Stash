@@ -1335,6 +1335,9 @@ public class GeospatialFileSystem extends FileSystem {
 							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, dateString);
 					
 					// WHAT PART OF THE REQUIREMENT IS NOT IN MEMORY
+					
+					logger.info("RIKI: BLOCK AND GUEST CACHE CELL BITMAPS ARE: "+ blockRequirement +" "+cacheBitmap);
+					
 					CorrectedBitmap andNot = new CorrectedBitmap(blockRequirement.andNot(cacheBitmap));
 					
 					if(andNot.toArray().length == 0) {
@@ -3192,7 +3195,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		if (parallelism > 0) {
 			
-			logger.info("RIKI: PARALLELISM > 1");
+			//logger.info("RIKI: PARALLELISM > 1");
 			
 			ExecutorService executor = Executors.newFixedThreadPool(parallelism);
 			
@@ -3462,7 +3465,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			
 			// LOGGING
-			
+			/*
 			for(int i=0; i < stCache.getCacheLevels().length; i++) {
 				
 				SparseSpatiotemporalMatrix stm = stCache.getCacheLevels()[i];
@@ -3478,7 +3481,7 @@ public class GeospatialFileSystem extends FileSystem {
 					}
 				}
 				
-			}
+			}*/
 			
 			if(totalInserted > 0)
 				return stCache.addEntryCount(totalInserted, getTotal_cache_entry_allowed());
@@ -3968,9 +3971,11 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		
+		logger.info("RIKI: BLOCK LEVEL BITMAP AND GUEST CACHE BITMAPS ARE: "+ultimateBlockBitmap+" "+guestBitmap+" "+cacheLevel);
 		CorrectedBitmap andNot = new CorrectedBitmap(ultimateBlockBitmap.andNot(guestBitmap));
 		
 		if(andNot.toArray().length == 0) {
+			logger.info("RIKI: WE ARE ALLOWED TO REDIRECT THIS REQUEST TO A HELPER NODE");
 			return true;
 		}
 		

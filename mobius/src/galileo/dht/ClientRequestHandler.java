@@ -126,10 +126,15 @@ public class ClientRequestHandler implements MessageListener {
 				
 				if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
 					
-					logger.info("RIKI: ENTERED HERE !!!!");
 					VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
 					
 					logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+					
+					if(eventResponse.isNeedsRedirection()) {
+						
+						logger.info("RIKI: THIS IS A REDIRECTION RESPONSE FOR THE FOLLOWING NODES "+ eventResponse.getHelperNodes());
+						continue;
+					}
 					
 					if(eventResponse.getKeys() != null && eventResponse.getKeys().size() > 0) {
 						

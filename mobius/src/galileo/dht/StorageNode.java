@@ -174,7 +174,7 @@ public class StorageNode implements RequestListener {
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
-	private static final int MESSAGE_QUEUE_THRESHOLD = -1;
+	private static final int MESSAGE_QUEUE_THRESHOLD = 1;
 	
 	
 	/* GUEST TREE MAINTAINENCE*/
@@ -571,7 +571,7 @@ public class StorageNode implements RequestListener {
 			
 			
 			// NOT STORING ANYTHING IS THIS ITSELF IS HOTSPOTTED
-			if(/*!isHotspotted()*/true) {
+			if(!isHotspotted()/*true*/) {
 			
 				List<CliqueContainer> cliquesToAdd = new ArrayList<CliqueContainer>();
 				for(CliqueContainer cc : cliquesToHouse) {
@@ -584,6 +584,7 @@ public class StorageNode implements RequestListener {
 						
 						totalGuestTreeSize += cc.getTotalCliqueSize();
 						
+						logger.info("RIKI: ADDING TO GUEST TREE "+cc.getGeohashKey());
 						hbrsp.addEntry(true, cc.getGeohashKey(), cc.getGeohashAntipode(), cc.getDirection());
 						
 					} else {
@@ -597,6 +598,7 @@ public class StorageNode implements RequestListener {
 				
 				// INSERT DATA IN THE GUEST TREE. LOCK GUEST TREE WHILE LOADING
 				// SEPARATE TREE FOR EACH DISTRESS NODE
+				
 				fs.addToGuestTree(cliquesToAdd, nodeString, request.getEventTime());
 				
 			} else {
@@ -1010,12 +1012,6 @@ public class StorageNode implements RequestListener {
 	 */
 	public boolean checkAndHandleHotspot(long eventTime) {
 		
-		/*private static int MESSAGE_QUEUE_THRESHOLD = 100;
-		private static long COOLDOWN_TIME = 30*1000l; // 30secs
-		private long hotspotDetectedTime = -1;
-		private boolean hotspotBeingHandled = false;
-		*/
-		
 		// WHEN A REQUEST COMES IN, CHECK IF NODE IS HOTSPOTTED
 		boolean isHotspot = isHotspotted();
 		
@@ -1135,6 +1131,7 @@ public class StorageNode implements RequestListener {
 				if(possible) {
 					try {
 						
+						logger.info("RIKI: THIS BETTER BE HANDLED BY A HELPER NODE....SENDING BACK HELPER NODE INFO " + rsp.getHostName());
 						context.sendReply(rsp);
 						
 						return;
@@ -1334,7 +1331,7 @@ public class StorageNode implements RequestListener {
 						
 						CorrectedBitmap bm = fs.checkForAvailableBlockCells(blockKey, blockPath, event.getSpatialResolution(), event.getTemporalResolution(),
 								TemporalType.getTypeFromLevel(event.getTemporalResolution()), fsSpatialResolution, fsTemporalResolution, event.getPolygon(), 
-								event.getTimeString());
+								event.getTime());
 						
 						if(c == 0 && ultimateBlockBitmap != null) {
 							ultimateBlockBitmap = bm;
@@ -1353,7 +1350,7 @@ public class StorageNode implements RequestListener {
 				
 				if(isPossible) {
 					
-					rsp = new VisualizationEventResponse(nodeStrings, hostname+":"+port);
+					rsp = new VisualizationEventResponse(nodeStrings, hostname, port);
 					
 				}
 				
@@ -1417,7 +1414,7 @@ public class StorageNode implements RequestListener {
 					
 				}
 					
-				rsp = new VisualizationEventResponse(nodeStrings, hostname+":"+port);
+				rsp = new VisualizationEventResponse(nodeStrings, hostname , port);
 				return true;
 				
 				
