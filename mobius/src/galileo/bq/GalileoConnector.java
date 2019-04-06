@@ -490,7 +490,7 @@ public class GalileoConnector extends GalileoConnectorInterface {
 		FeatureSet features = getFeaturesNAM(values);
 		
 		Metadata metadata = new Metadata();
-		metadata.setName(GeoHash.encode(parseFloat(values[latPosn]), parseFloat(values[lonPosn]), 2));
+		metadata.setName(GeoHash.encode(parseFloat(values[latPosn]), parseFloat(values[lonPosn]), 4));
 		metadata.setTemporalProperties(temporalProperties);
 		metadata.setSpatialProperties(spatialProperties);
 		metadata.setAttributes(features);

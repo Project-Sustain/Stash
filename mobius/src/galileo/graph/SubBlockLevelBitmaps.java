@@ -195,7 +195,7 @@ public class SubBlockLevelBitmaps {
 					
 					temporaryBitmaps[i].applyUpdates();
 					//RIKI-REMOVE
-					logger.info("BITMAP FOR LEVEL "+i+" IS "+temporaryBitmaps[i].toString());
+					//logger.info("BITMAP FOR LEVEL "+i+" IS "+temporaryBitmaps[i].toString());
 					
 					if(spatioTemporalBitmaps[i] == null) {
 						spatioTemporalBitmaps[i] = temporaryBitmaps[i];
@@ -204,10 +204,10 @@ public class SubBlockLevelBitmaps {
 					}
 					
 					//RIKI-REMOVE
-					logger.info("BITMAP FOR LEVEL "+i+" IS POPULATED");
+					//logger.info("BITMAP FOR LEVEL "+i+" IS POPULATED");
 				} else {
 					//RIKI-REMOVE
-					logger.info("BITMAP FOR LEVEL "+i+" IS NOT AVAILABLE");
+					//logger.info("BITMAP FOR LEVEL "+i+" IS NOT AVAILABLE");
 				}
 		}
 		}
@@ -222,7 +222,7 @@ public class SubBlockLevelBitmaps {
 	 */
 	public void populateBitmapUsingRecord(DateTime startTime, long recordTimestamp, String choppedGeohash, CorrectedBitmap[] temporaryBitmaps) {
 		
-		logger.info("===========CHOPPER GEOHASH:"+choppedGeohash+"===================");
+		//logger.info("===========CHOPPER GEOHASH:"+choppedGeohash+"===================");
 		// Update each bitmap corresponding to a record
 		for(int i = 0; i < spatialSubLevels; i++) {
 			
@@ -250,7 +250,7 @@ public class SubBlockLevelBitmaps {
 					spatialBitIndex = GeoHash.hashToLong(partialGeohash);
 					
 					// RIKI-REMOVE
-					logger.info("RIKI: PARTIAL GEOHASH " + partialGeohash + " SPATIAL INDEX: "+spatialBitIndex);
+					//logger.info("RIKI: PARTIAL GEOHASH " + partialGeohash + " SPATIAL INDEX: "+spatialBitIndex);
 				}
 				
 				long temporalBitIndex = 0;
@@ -279,7 +279,7 @@ public class SubBlockLevelBitmaps {
 				
 				bm.set(bitIndex);
 				
-				logger.info("RIKI: POPULATING BITMAP ARRAY LEVEL: "+bitmapArrayIndx+" SP "+spatialBitIndex+" TEMP: "+temporalBitIndex);
+				//logger.info("RIKI: POPULATING BITMAP ARRAY LEVEL: "+bitmapArrayIndx+" SP "+spatialBitIndex+" TEMP: "+temporalBitIndex);
 				
 			}
 		}

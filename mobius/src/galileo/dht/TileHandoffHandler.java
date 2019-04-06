@@ -432,7 +432,7 @@ public class TileHandoffHandler implements MessageListener {
 				
 				NetworkDestination nodeToSendTo = nodeStringToNodeMap.get(nodeKey);
 				
-				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend, nodeKey, eventTime);
+				HeartbeatRequest hr = new HeartbeatRequest(cliquesToSend, currentNode.getNodeString(), eventTime);
 				
 				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
 				

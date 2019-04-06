@@ -694,7 +694,7 @@ public class GeospatialFileSystem extends FileSystem {
 		/* Name of the block to be saved */
 		String name = String.format("%s-%s", time, geohash);
 		
-		logger.info("RIKI: NAME OF NEW BLOCK: "+name);
+		//logger.info("RIKI: NAME OF NEW BLOCK: "+name);
 		
 		if (meta.getName() != null && !meta.getName().isEmpty())
 			name = meta.getName();
@@ -753,10 +753,10 @@ public class GeospatialFileSystem extends FileSystem {
 			throw new FileSystemException("Error storing block: " + e.getClass().getCanonicalName(), e);
 		}
 		
-		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN S BLOCK
+		// POPULATING SUB-BLOCK BITMAPS TO NOTE WHICH CELLS EXIST IN A BLOCK
 		if(needSublevelBitmaps) {
 			// RIKI-REMOVE
-			logger.info("RIKI: THIS FILE SYSTEM NEEDS BITMAP");
+			//logger.info("RIKI: THIS FILE SYSTEM NEEDS BITMAP");
 			SubBlockLevelBitmaps bitmaps = blockBitmaps.get(blockPath);
 			if(bitmaps == null) {
 				bitmaps = new SubBlockLevelBitmaps(spatialSubLevels, temporalSubLevels, geohashPrecision, TemporalType.getLevel(temporalType));
@@ -808,7 +808,7 @@ public class GeospatialFileSystem extends FileSystem {
 		long startTimeStamp = GeoHash.getStartTimeStamp(timeTokens[0], timeTokens[1], timeTokens[2], timeTokens[3], temporalType);
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: FILE TIMESTAMP IS "+startTimeStamp+" TIME STRING IS "+fileTime);
+		//logger.info("RIKI: FILE TIMESTAMP IS "+startTimeStamp+" TIME STRING IS "+fileTime);
 		DateTime startDate = new DateTime(startTimeStamp, DateTimeZone.UTC);
 		
 		String blockString = new String(data);
@@ -818,7 +818,7 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		// Creates a temporary bitmap using the records and then append to the old bitmap
 		// RIKI-REMOVE
-		logger.info("RIKI: ABOUT TO POPULATE BITMAP");
+		//logger.info("RIKI: ABOUT TO POPULATE BITMAP");
 		bitmaps.populateTemporaryBitmapUsingRecords(records, spatialPosn1, spatialPosn2, temporalPosn, removeLength, startDate);
 		
 	}
@@ -3626,7 +3626,7 @@ public class GeospatialFileSystem extends FileSystem {
 	public void handleRoutingTableCleaning() {
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: ROUTING TABLE CLEANUP STARTED");
+		//logger.info("RIKI: ROUTING TABLE CLEANUP STARTED");
 		
 		//ExecutorService executor = Executors.newFixedThreadPool(1);
 		//GuestCacheCleaner c = new GuestCacheCleaner(cleanUpInitiated, guestPeList, guestCache, 0, HELPER_TIMEOUT);
@@ -3668,7 +3668,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 		}
 		
-		logger.info("RIKI: ROUTING TABLE CLEANUP ENDED");
+		//logger.info("RIKI: ROUTING TABLE CLEANUP ENDED");
 		
 	}
 	
@@ -3999,22 +3999,30 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		synchronized(guestCache) {
 			
+			//logger.info("RIKI: CURRENT GUEST CACHE: " + guestCache+" REQUESTING NODE: "+requestingNode);
+			
 			SpatiotemporalHierarchicalCache guestEntries = guestCache.get(requestingNode);
 			
 			if(guestEntries != null) {
 				
 				int cacheLevel = guestEntries.getCacheLevel(request.getSpatialResolution(), request.getTemporalResolution());
 				
+				//logger.info("RIKI: CACHE LEVEL: "+cacheLevel+" "+request.getSpatialResolution()+" "+ request.getTemporalResolution());
 				SparseSpatiotemporalMatrix specificCache = guestEntries.getSpecificCache(cacheLevel);
 				
 				if(specificCache != null) {
 					
+					
 					HashMap<String, CacheCell> cells = specificCache.getCells();
+					
+					//logger.info("RIKI: HERE FOR LEVEL: "+cacheLevel+" CELLS: "+ cells);
 					
 					for(String key: cells.keySet()) {
 						
 						CacheCell cell = cells.get(key);
-						boolean intersection = cell.checkIntersection(request.getPolygon(), request.getTimeString());
+						
+						//logger.info("RIKI: INTERSECTION CHECK: "+ cell.getSpatialInfo()+" "+cell.getTemporalInfo()+" "+request.getPolygon()+" "+ request.getTime());
+						boolean intersection = cell.checkIntersection(request.getPolygon(), request.getTime());
 						
 						if(intersection) {
 							SummaryWrapper sw = new SummaryWrapper(false, cell.getStats());
@@ -4033,12 +4041,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		try {
 			
-			logger.info("RIKI: GUEST TREE SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
-			
 			context.sendReply(response);
 			
-			// RIKI-REMOVE
-			logger.info("RIKI: VISUALIZATION RESPONSE SENT OUT.");
+			logger.info("RIKI: GUEST TREE SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
 			
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);

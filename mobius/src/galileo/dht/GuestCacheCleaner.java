@@ -40,7 +40,7 @@ public class GuestCacheCleaner{
 
 	public void clean() {
 		
-		logger.info("RIKI: GUEST CACHE CLEANUP STARTED");
+		//logger.info("RIKI: GUEST CACHE CLEANUP STARTED");
 		
 		if(!(fs.guestCleanUpInitiated.get())) {
 			
@@ -56,7 +56,7 @@ public class GuestCacheCleaner{
 			
 		}
 		
-		logger.info("RIKI: GUEST CACHE CLEANUP ENDED");
+		//logger.info("GC END");
 		
 		
 	}

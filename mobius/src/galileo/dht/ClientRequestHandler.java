@@ -21,7 +21,9 @@ import galileo.comm.DataIntegrationResponse;
 import galileo.comm.GalileoEventMap;
 import galileo.comm.MetadataResponse;
 import galileo.comm.QueryResponse;
+import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationEventResponse;
+import galileo.comm.VisualizationRequest;
 import galileo.comm.VisualizationResponse;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
@@ -55,10 +57,24 @@ public class ClientRequestHandler implements MessageListener {
 	private Event response;
 	private long elapsedTime;
 	private long reqId;
+	
+	//private Map<String, NetworkDestination> nodeStringToNodeMap;
+	
+	private VisualizationEvent initialReq;
 
 	public ClientRequestHandler(Collection<NetworkDestination> nodes, EventContext clientContext,
 			RequestListener listener) throws IOException {
 		this.nodes = nodes;
+		
+		/*nodeStringToNodeMap = new HashMap<String, NetworkDestination>();
+		
+		for(NetworkDestination nd : this.nodes) {
+			
+			nodeStringToNodeMap.put(nd.stringRepresentation(), nd);
+			
+		}*/
+		
+		
 		this.clientContext = clientContext;
 		this.requestListener = listener;
 
@@ -73,55 +89,16 @@ public class ClientRequestHandler implements MessageListener {
 	}
 
 	public void closeRequest() {
-		silentClose(); // closing the router to make sure that no new responses
-						// are added.
-		class LocalFeature implements Comparable<LocalFeature> {
-			String name;
-			String type;
-			int order;
-
-			LocalFeature(String name, String type, int order) {
-				this.name = name;
-				this.type = type;
-				this.order = order;
-			}
-
-			@Override
-			public boolean equals(Object obj) {
-				if (obj == null || !(obj instanceof LocalFeature))
-					return false;
-				LocalFeature other = (LocalFeature) obj;
-				if (this.name.equalsIgnoreCase(other.name) && this.type.equalsIgnoreCase(other.type)
-						&& this.order == other.order)
-					return true;
-				return false;
-			}
-
-			@Override
-			public int hashCode() {
-				return name.hashCode() + type.hashCode() + String.valueOf(this.order).hashCode();
-			}
-
-			@Override
-			public int compareTo(LocalFeature o) {
-				return this.order - o.order;
-			}
-		}
-		Map<String, Set<LocalFeature>> resultMap = new HashMap<String, Set<LocalFeature>>();
-		int responseCount = 0;
+		
+		silentClose(); // closing the router to make sure that no new responses are added.
 		
 		Map<String, SummaryWrapper> accumulatedSummaries = new HashMap<String, SummaryWrapper>();
 
 		for (GalileoMessage gresponse : this.responses) {
-			responseCount++;
 			Event event;
 			try {
 				
 				event = this.eventWrapper.unwrap(gresponse);
-				
-				//logger.info("RIKI: CLASS INFO: "+ event.getClass().getCanonicalName() + response.getClass().getCanonicalName());
-				
-				//logger.info("RIKI: CLASS CHECK: "+ (event instanceof VisualizationEventResponse) +" "+ ( this.response instanceof VisualizationResponse));
 				
 				
 				if (event instanceof VisualizationEventResponse && this.response instanceof VisualizationResponse) {
@@ -235,124 +212,7 @@ public class ClientRequestHandler implements MessageListener {
 							}
 						}
 					}
-				} else if (event instanceof MetadataResponse && this.response instanceof MetadataResponse) {
-					MetadataResponse emr = (MetadataResponse) event;
-					JSONArray emrResults = emr.getResponse().getJSONArray("result");
-					JSONObject emrJSON = emr.getResponse();
-					if ("galileo#features".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						for (int i = 0; i < emrResults.length(); i++) {
-							JSONObject fsJSON = emrResults.getJSONObject(i);
-							for (String fsName : fsJSON.keySet()) {
-								Set<LocalFeature> featureSet = resultMap.get(fsName);
-								if (featureSet == null) {
-									featureSet = new HashSet<LocalFeature>();
-									resultMap.put(fsName, featureSet);
-								}
-								JSONArray features = fsJSON.getJSONArray(fsName);
-								for (int j = 0; j < features.length(); j++) {
-									JSONObject jsonFeature = features.getJSONObject(j);
-									featureSet.add(new LocalFeature(jsonFeature.getString("name"),
-											jsonFeature.getString("type"), jsonFeature.getInt("order")));
-								}
-							}
-						}
-						if (this.responses.size() == responseCount) {
-							JSONObject jsonResponse = new JSONObject();
-							jsonResponse.put("kind", "galileo#features");
-							JSONArray fsArray = new JSONArray();
-							for (String fsName : resultMap.keySet()) {
-								JSONObject fsJSON = new JSONObject();
-								JSONArray features = new JSONArray();
-								for (LocalFeature feature : new TreeSet<>(resultMap.get(fsName)))
-									features.put(new JSONObject().put("name", feature.name).put("type", feature.type)
-											.put("order", feature.order));
-								fsJSON.put(fsName, features);
-								fsArray.put(fsJSON);
-							}
-							jsonResponse.put("result", fsArray);
-							this.response = new MetadataResponse(jsonResponse);
-						}
-					} else if ("galileo#filesystem".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						MetadataResponse amr = (MetadataResponse) this.response;
-						JSONObject amrJSON = amr.getResponse();
-						if (amrJSON.getJSONArray("result").length() == 0)
-							amrJSON.put("result", emrResults);
-						else {
-							JSONArray amrResults = amrJSON.getJSONArray("result");
-							for (int i = 0; i < emrResults.length(); i++) {
-								JSONObject emrFilesystem = emrResults.getJSONObject(i);
-								for (int j = 0; j < amrResults.length(); j++) {
-									JSONObject amrFilesystem = amrResults.getJSONObject(j);
-									if (amrFilesystem.getString("name")
-											.equalsIgnoreCase(emrFilesystem.getString("name"))) {
-										long latestTime = amrFilesystem.getLong("latestTime");
-										long earliestTime = amrFilesystem.getLong("earliestTime");
-										if (latestTime == 0 || latestTime < emrFilesystem.getLong("latestTime")) {
-											amrFilesystem.put("latestTime", emrFilesystem.getLong("latestTime"));
-											amrFilesystem.put("latestSpace", emrFilesystem.getString("latestSpace"));
-										}
-										if (earliestTime == 0 || (earliestTime > emrFilesystem.getLong("earliestTime")
-												&& emrFilesystem.getLong("earliestTime") != 0)) {
-											amrFilesystem.put("earliestTime", emrFilesystem.getLong("earliestTime"));
-											amrFilesystem.put("earliestSpace",
-													emrFilesystem.getString("earliestSpace"));
-										}
-										break;
-									}
-								}
-							}
-						}
-					} else if ("galileo#overview".equalsIgnoreCase(emrJSON.getString("kind"))) {
-						logger.info(emrJSON.getString("kind") + ": emr results length = " + emrResults.length());
-						MetadataResponse amr = (MetadataResponse) this.response;
-						JSONObject amrJSON = amr.getResponse();
-						if (amrJSON.getJSONArray("result").length() == 0)
-							amrJSON.put("result", emrResults);
-						else {
-							JSONArray amrResults = amrJSON.getJSONArray("result");
-							for (int i = 0; i < emrResults.length(); i++) {
-								JSONObject efsJSON = emrResults.getJSONObject(i);
-								String efsName = efsJSON.keys().next();
-								JSONObject afsJSON = null;
-								for (int j = 0; j < amrResults.length(); j++) {
-									if (amrResults.getJSONObject(j).has(efsName)) {
-										afsJSON = amrResults.getJSONObject(j);
-										break;
-									}
-								}
-								if (afsJSON == null)
-									amrResults.put(efsJSON);
-								else {
-									JSONArray eGeohashes = efsJSON.getJSONArray(efsName);
-									JSONArray aGeohashes = afsJSON.getJSONArray(efsName);
-									for (int j = 0; j < eGeohashes.length(); j++) {
-										JSONObject eGeohash = eGeohashes.getJSONObject(j);
-										JSONObject aGeohash = null;
-										for (int k = 0; k < aGeohashes.length(); k++) {
-											if (aGeohashes.getJSONObject(k).getString("region")
-													.equalsIgnoreCase(eGeohash.getString("region"))) {
-												aGeohash = aGeohashes.getJSONObject(k);
-												break;
-											}
-										}
-										if (aGeohash == null)
-											aGeohashes.put(eGeohash);
-										else {
-											long eTimestamp = eGeohash.getLong("latestTimestamp");
-											int blockCount = aGeohash.getInt("blockCount")
-													+ eGeohash.getInt("blockCount");
-											long fileSize = aGeohash.getInt("fileSize") + eGeohash.getInt("fileSize");
-											aGeohash.put("blockCount", blockCount);
-											aGeohash.put("fileSize", fileSize);
-											if (eTimestamp > aGeohash.getLong("latestTimestamp"))
-												aGeohash.put("latestTimestamp", eTimestamp);
-										}
-									}
-								}
-							}
-						}
-					} 
-				}
+				} 
 			} catch (IOException | SerializationException e) {
 				logger.log(Level.SEVERE, "An exception occurred while processing the response message. Details follow:"
 						+ e.getMessage(), e);
@@ -368,35 +228,18 @@ public class ClientRequestHandler implements MessageListener {
 			
 			VisualizationResponse finalResponse = (VisualizationResponse) this.response;
 			
-			JSONArray summaryJSONs = new JSONArray();
+			List<SummaryWrapper> summaries = new ArrayList<SummaryWrapper>();
+			List<String> keys = new ArrayList<String>();
 			
 			for(String key: accumulatedSummaries.keySet()) {
 				
-				JSONObject obj = new JSONObject();
-				obj.put("key", key);
-				String summaryString = "";
-				
-				int i=0;
-				
-				for(SummaryStatistics ss : accumulatedSummaries.get(key).getStats()) {
-					if(i==0)
-						summaryString = ss.toString();
-					else 
-						summaryString += ","+ss.toString();
-					i++;
-				}
-				
-				obj.put("summary", summaryString);
-				
-				logger.info(key+":::"+summaryString);
-				
-				summaryJSONs.put(obj);
+				keys.add(key);
+				summaries.add(accumulatedSummaries.get(key));
 			}
 			
-			JSONObject response = new JSONObject();
-			response.put("summaries", summaryJSONs);
 			
-			finalResponse.setSummariesJSON(response.toString());
+			finalResponse.setSummaries(summaries);
+			finalResponse.setKeys(keys);
 			
 			
 		}
@@ -409,11 +252,44 @@ public class ClientRequestHandler implements MessageListener {
 
 	@Override
 	public void onMessage(GalileoMessage message) {
-		/*Event event;
+		
+		logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
+		
+		boolean summaryFound = true;
+		
 		try {
-			event = this.eventWrapper.unwrap(message);
-			DataIntegrationResponse eventResponse = (DataIntegrationResponse) event;
-			//logger.log(Level.INFO, "RIKI: ONE DATA INTEGRATION RESPONSE RECEIVED FROM "+ eventResponse.getNodeName()+" "+eventResponse.getResultPaths());
+			VisualizationEventResponse eventResponse = (VisualizationEventResponse)this.eventWrapper.unwrap(message);
+			
+			logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+			
+			if(eventResponse.isNeedsRedirection()) {
+				
+				summaryFound = false;
+				
+				logger.info("RIKI: THIS IS A REDIRECTION RESPONSE FOR THE FOLLOWING NODES "+ eventResponse.getHelperNodes());
+				
+				// SEND GUEST CACHE REQUEST TO THESE NODES
+				
+				// helperNode are nodes to redirect response to
+				for(String helperNode : eventResponse.getHelperNodes()) {
+					
+					String[] tokens = helperNode.split(":");
+					
+					NetworkDestination nd = new NetworkDestination(tokens[0], Integer.valueOf(tokens[1]));
+					
+					logger.info("RIKI: ABOUT TO REDIRECT TO "+nd+" FOR KEY: "+helperNode);
+					
+					VisualizationRequest vreq = new VisualizationRequest(eventResponse.getHostName()+":"+eventResponse.getHostPort(), initialReq);
+					
+					this.expectedResponses.incrementAndGet();
+						
+					GalileoMessage mrequest = this.eventWrapper.wrap(vreq);
+						
+					this.router.sendMessage(nd, mrequest);
+					
+				}
+			}
+			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -421,13 +297,14 @@ public class ClientRequestHandler implements MessageListener {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+			
 		
-		*/
-		logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
-		
-		if (null != message)
+		if (null != message && summaryFound)
 			this.responses.add(message);
+		
 		int awaitedResponses = this.expectedResponses.decrementAndGet();
+		
+		
 		logger.log(Level.INFO, "Awaiting " + awaitedResponses + " more message(s)");
 		if (awaitedResponses <= 0) {
 			this.elapsedTime = System.currentTimeMillis() - this.elapsedTime;
@@ -452,6 +329,9 @@ public class ClientRequestHandler implements MessageListener {
 	public void handleRequest(Event request, Event response) {
 		try {
 			reqId = System.currentTimeMillis();
+			
+			initialReq = (VisualizationEvent)request;
+			
 			logger.info("RIKI: VISUALIZATION REQUEST RECEIVED AT TIME: "+System.currentTimeMillis());
 			this.response = response;
 			GalileoMessage mrequest = this.eventWrapper.wrap(request);

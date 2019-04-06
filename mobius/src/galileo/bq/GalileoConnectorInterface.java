@@ -76,9 +76,9 @@ abstract class GalileoConnectorInterface {
 		int maxTemporalResolution = 4;
 		
 		FilesystemRequest fsRequest = new FilesystemRequest(name, FilesystemAction.CREATE, featureList, sh, maxSpatialResolution, maxTemporalResolution,  false, temporalHint);
-		fsRequest.setSpatialPartitioningType(2);
+		fsRequest.setSpatialPartitioningType(1);
 		fsRequest.setNodesPerGroup(30);
-		fsRequest.setPrecision(4);
+		fsRequest.setPrecision(2);
 		fsRequest.setTemporalType(TemporalType.DAY_OF_MONTH);
 		fsRequest.setSummaryHints(summaryHints);
 		

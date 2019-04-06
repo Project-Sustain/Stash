@@ -174,7 +174,7 @@ public class StorageNode implements RequestListener {
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
-	private static final int MESSAGE_QUEUE_THRESHOLD = 1;
+	private static final int MESSAGE_QUEUE_THRESHOLD = 200;
 	
 	
 	/* GUEST TREE MAINTAINENCE*/
@@ -520,7 +520,7 @@ public class StorageNode implements RequestListener {
 				Partitioner<Metadata> partitioner = gfs.getPartitioner();
 				NodeInfo node = partitioner.locateData(metadata);
 				
-				logger.info("DATA BEING STORED IN "+node.getHostname());
+				//logger.info("DATA BEING STORED IN "+node.getHostname());
 				/*if(System.currentTimeMillis() % 3 == 0)
 					logger.log(Level.INFO, file.getMetadata().getName());*/
 				
@@ -1105,65 +1105,103 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
-		long eventTime = System.currentTimeMillis();
-		
-		// HOTSPOT CHECK
-		boolean needsRedirection = checkAndHandleHotspot(eventTime);
-		
-		// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
-		
-		int freshnessMultiplier = 1;
-		
-		logger.info("\nRIKI: NEEDS REDIRECTION: "+needsRedirection);
-		
-		if(needsRedirection) {
-			
-			if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
-				
-				VisualizationEventResponse rsp = new VisualizationEventResponse();
-				
-				// ARE THE NECESSARY STUFF REPLICATED ON SOME OTHER NODE? 
-				boolean possible = createRedirectionInfoIfPossible(event, rsp);
-				
-				logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
-				
-				
-				if(possible) {
-					try {
-						
-						logger.info("RIKI: THIS BETTER BE HANDLED BY A HELPER NODE....SENDING BACK HELPER NODE INFO " + rsp.getHostName());
-						context.sendReply(rsp);
-						
-						return;
-						
-					} catch (IOException ioe) {
-						logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
-					}
-				}
-				
-				
-			} 
-			
-			freshnessMultiplier = HOTSPOT_REDIRECTION_CHANCE;
-			
-		}
-		
-		logger.info("\nRIKI: NOT REDIRECTING");
-		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
-		
-		Random r = new Random();
-		int eventId = r.nextInt();
-		
-		String eventString = eventTime+"$$"+eventId;
-		event.setEventId(eventString);
 		
 		try {
 			
 			//logger.info(event.getFeatureQueryString());
 			String fsName = event.getFilesystemName();
 			GeospatialFileSystem fs = fsMap.get(fsName);
+			
+			
 			if (fs != null) {
+				
+				
+				
+				/* Feature Query is not needed to list blocks */
+				
+				// KEY Format : year-month-day-hour$$geohash
+				
+				// RIKI-REMOVE
+				logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
+				
+				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+						event.getSpatialResolution(), event.getTemporalResolution());
+				
+				
+				/******************REDIRECTION START********************/
+				
+				
+				long eventTime = System.currentTimeMillis();
+				
+				// HOTSPOT CHECK
+				boolean needsRedirection = checkAndHandleHotspot(eventTime);
+				
+				// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
+				
+				int freshnessMultiplier = 1;
+				
+				logger.info("\nRIKI: NEEDS REDIRECTION: "+needsRedirection);
+				
+				if(needsRedirection) {
+					
+					if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
+						
+						VisualizationEventResponse rsp = new VisualizationEventResponse();
+						
+						// ARE THE NECESSARY STUFF REPLICATED ON SOME OTHER NODE? 
+						boolean possible = createRedirectionInfoIfPossible(event, rsp, blockMap);
+						
+						logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
+						
+						
+						if(possible) {
+							try {
+								
+								logger.info("RIKI: THIS BETTER BE HANDLED BY A HELPER NODE....SENDING BACK HELPER NODE INFO " + rsp.getHostName());
+								context.sendReply(rsp);
+								
+								return;
+								
+							} catch (IOException ioe) {
+								logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
+							}
+						}
+						
+						
+					} 
+					
+					freshnessMultiplier = HOTSPOT_REDIRECTION_CHANCE;
+					
+				}
+				
+				logger.info("\nRIKI: NOT REDIRECTING");
+				
+				
+				Random r = new Random();
+				int eventId = r.nextInt();
+				
+				String eventString = eventTime+"$$"+eventId;
+				event.setEventId(eventString);
+				
+				
+				
+				
+				
+				/******************REDIRECTION END********************/
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
 				
 				TemporalType temporalType = fs.getTemporalType();
 				
@@ -1194,17 +1232,6 @@ public class StorageNode implements RequestListener {
 				fs.addEvent(eventString);
 				/****************************************************/
 				
-				
-				
-				/* Feature Query is not needed to list blocks */
-				
-				// KEY Format : year-month-day-hour$$geohash
-				
-				// RIKI-REMOVE
-				logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
-				
-				Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
-						event.getSpatialResolution(), event.getTemporalResolution());
 				
 				// RIKI-REMOVE
 				logger.info("RIKI: MATCHING BLOCKS: "+blockMap);
@@ -1286,9 +1313,10 @@ public class StorageNode implements RequestListener {
 	 * @author sapmitra
 	 * @param event
 	 * @param rsp
+	 * @param blockMap2 
 	 * @return
 	 */
-	private boolean createRedirectionInfoIfPossible(VisualizationEvent event, VisualizationEventResponse rsp) {
+	private boolean createRedirectionInfoIfPossible(VisualizationEvent event, VisualizationEventResponse rsp, Map<String, List<String>> blockMap) {
 		
 		boolean isPossible = true;
 		
@@ -1311,8 +1339,8 @@ public class StorageNode implements RequestListener {
 		logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
 		
 		try {
-			Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
-					event.getSpatialResolution(), event.getTemporalResolution());
+			/*Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),
+					event.getSpatialResolution(), event.getTemporalResolution());*/
 			
 			CorrectedBitmap ultimateBlockBitmap = new CorrectedBitmap();
 			
@@ -1350,7 +1378,10 @@ public class StorageNode implements RequestListener {
 				
 				if(isPossible) {
 					
-					rsp = new VisualizationEventResponse(nodeStrings, hostname, port);
+					rsp.setNeedsRedirection(true);
+					rsp.setHelperNodes(nodeStrings);
+					rsp.setHostName(hostname);
+					rsp.setHostPort(port);
 					
 				}
 				
@@ -1358,25 +1389,26 @@ public class StorageNode implements RequestListener {
 				
 				
 			} else {
-				// SUPER BLOCK LEVEL
 				
+				// SUPER BLOCK LEVEL
 				List<String> nodeStrings = new ArrayList<>();
 				
+				// FOR EACH BLOCK KEY, SEE IF IT EXISTS IN THE CACHE AT THAT LEVEL
 				for(String blockKey : blockMap.keySet()) {
-					
-					boolean matchFound = false;
 					
 					String tokens[] = blockKey.split("\\$\\$");
 					
-					String geohash = tokens[0];
-					String timeString = tokens[1];
+					String geohash = tokens[1];
+					String timeString = tokens[0];
 					
-					
+					/*
 					String partialGeohash = geohash.substring(0,event.getSpatialResolution());
 					String partialTimeString = GeoHash.getTimeStringForLevel(timeString, TemporalType.getTypeFromLevel(event.getTemporalResolution()));
+					*/
 					
 					String partitionGeohash = geohash.substring(0, fs.getSpatialPartitioningType());
 					
+					// GETTING ROUTING ENTRY FOR THIS GEOHASH
 					List<RoutingEntry> entries = fs.getRoutingTable().get(partitionGeohash);
 						
 					if(entries == null) {
@@ -1386,6 +1418,7 @@ public class StorageNode implements RequestListener {
 						
 					} else {
 						
+						// RANDOMLY SELECTING A ROUTING ENTRY
 						int rIndex = 0;
 						
 						rIndex = GeoHash.getRandom(entries.size());
@@ -1394,9 +1427,14 @@ public class StorageNode implements RequestListener {
 						
 						List<CacheCell> cells = selectedRE.getClique().getCacheCellsAtLevel(cacheLevel);
 						
+						// THIS BLOCK KEY EXIST IN SOME GUEST CACHE
+						boolean allFound = false;
+						
 						for(CacheCell cell : cells) {
-							if(cell.getSpatialInfo().equals(partialGeohash) && cell.getTemporalInfo().equals(partialTimeString)) {
-								matchFound = true;
+							
+							if(cell.getSpatialInfo().equals(geohash) && cell.getTemporalInfo().equals(timeString)) {
+								
+								allFound = true;
 								
 								nodeStrings.add(selectedRE.getHelperNode().stringRepresentation());
 								break;
@@ -1404,7 +1442,9 @@ public class StorageNode implements RequestListener {
 							
 						}
 						
-						if(!matchFound) {
+						// IF ANY ONE CELL IS MISSING, DO NOT REDIRECT
+						
+						if(!allFound) {
 							return false;
 						}
 						
@@ -1414,7 +1454,11 @@ public class StorageNode implements RequestListener {
 					
 				}
 					
-				rsp = new VisualizationEventResponse(nodeStrings, hostname , port);
+				rsp.setNeedsRedirection(true);
+				rsp.setHelperNodes(nodeStrings);
+				rsp.setHostName(hostname);
+				rsp.setHostPort(port);
+				
 				return true;
 				
 				
@@ -1422,7 +1466,7 @@ public class StorageNode implements RequestListener {
 			
 			
 			
-		} catch (InterruptedException|ParseException e) {
+		} catch (ParseException e) {
 			// TODO Auto-generated catch block
 			logger.severe("RIKI: SOMETHING WENT WRONG WITH REDIRECTION");
 		}
@@ -2611,5 +2655,7 @@ public class StorageNode implements RequestListener {
 		this.hotspotBeingHandled = hotspotBeingHandled;
 	}
 	
-
+	public String getNodeString() {
+		return hostname+":"+port;
+	}
 }

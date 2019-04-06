@@ -210,5 +210,25 @@ public class VisualizationRequest implements Event {
 	public void setGuestTreeOnly(String guestTreeOnly) {
 		this.guestTreeOnly = guestTreeOnly;
 	}
+	
+	
+	/**
+	 * Cloning Visualization Request
+	 * @param queryId
+	 * @param request
+	 */
+	public VisualizationRequest(String guestTree, VisualizationEvent request) {
+		
+		fsName = request.getFsName();
+		featureQuery = request.getFeatureQuery();
+		polygon = request.getPolygon();
+		timeString = request.getTime();
+		spatialResolution = request.getSpatialResolution();
+		temporalResolution = request.getTemporalResolution();
+		reqFeatures = request.getReqFeatures();
+		
+		guestTreeOnly = guestTree;
+		
+	}
 
 }

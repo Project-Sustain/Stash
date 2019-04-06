@@ -164,11 +164,10 @@ public class CliqueContainer implements ByteSerializable{
 			
 			String tokens[] = cell.getCellKey().split("\\$\\$");
 			
-			logger.info("RIKI: CACHE CELL KEY: "+cell.getCellKey());
-			
+			//logger.info("RIKI: CACHE CELL KEY: "+cell.getCellKey());
 			
 			int fsSpatialResolution = fs.getGeohashPrecision();
-			int fsTemporalResolution = fs.getTemporalType().getType();
+			//int fsTemporalResolution = fs.getTemporalType().getType();
 			
 			String choppedGeohash = tokens[1].substring(fsSpatialResolution);
 			
@@ -185,8 +184,10 @@ public class CliqueContainer implements ByteSerializable{
 			
 			// returns a number between 0 and 31 for single character
 			
-			if()
-			long spatialIndex = GeoHash.hashToLong(choppedGeohash);
+			long spatialIndex = 0;
+			
+			if(choppedGeohash.length() > 0)
+				 spatialIndex = GeoHash.hashToLong(choppedGeohash);
 			
 			DateTime startDate = new DateTime(cliqueStartTimeStamp, DateTimeZone.UTC);
 			

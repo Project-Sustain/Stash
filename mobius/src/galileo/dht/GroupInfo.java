@@ -68,4 +68,10 @@ public class GroupInfo {
         }
         return str;
     }
+    
+    public static void main(String arg[]) {
+    	
+    	for(int i=0; i < 30; i++)
+    		System.out.println("lattice-" + (i+120));
+    }
 }

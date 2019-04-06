@@ -41,5 +41,17 @@ NOAA data is on lattice-64. Run from lattice-64
 java -cp ~/git/lassofinal/galileo-spacetime/lib/galileo-spacetime-1.0.jar galileo.bq.MyInsertNoaaData lattice-12.cs.colostate.edu true 13001 14418
 
 
+DATA INSERTION
+======================
+
+java -cp ~/git/mobius/mobius/lib/galileo-spacetime-1.0.jar galileo.bq.VisualizationNAMInsertTest lattice-1.cs.colostate.edu /s/lattice-99/a/nobackup/galileo/sapmitra/NAM_DATA/2013Updated/ 0 1
+
+
+1) CREATE A NEW LATTICE CLUSTER OF 90 NODES
+
+2) CREATE FS
+
+3) STORE DATA FROM LATTICE-99
+
 
 
