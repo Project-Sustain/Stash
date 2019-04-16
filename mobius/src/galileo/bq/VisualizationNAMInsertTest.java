@@ -89,8 +89,8 @@ public class VisualizationNAMInsertTest {
 		
 		for(File f : files) {
 			
-			
-			System.out.println("=========COUNT:========= "+count+" "+f.getAbsolutePath());
+			if(count % 20 == 0)
+				System.out.println("=========COUNT:========= "+count+" "+f.getAbsolutePath());
 			
 			if(count < frm) {
 				count++;
@@ -99,7 +99,7 @@ public class VisualizationNAMInsertTest {
 			
 			if(count > till) {
 				count++;
-				continue;
+				break;
 			}
 			
 			
@@ -126,6 +126,8 @@ public class VisualizationNAMInsertTest {
 			
 			while (sc.hasNextLine()) {
 				String line = sc.nextLine();
+				
+				line = line.replaceAll("null", "0");
 				
 				if(line.trim().length() > 0) {
 					readLines(line, keyToLines, dateString);
@@ -159,10 +161,11 @@ public class VisualizationNAMInsertTest {
 				
 				
 			}
-			
 			//System.out.println("HELLO");
 			Thread.sleep(10);
 		}
+		System.out.println("EXITING...");
+		gc.disconnect();
 		
 		
 	}

@@ -116,30 +116,56 @@ public class VisualizationSummaryProcessor implements Runnable{
 				else
 					index++;
 			}
-			logger.log(Level.INFO, "RIKI: Local PATHS "+featurePaths);
+			//logger.log(Level.INFO, "RIKI: Local PATHS "+featurePaths);
 			if (queryBitmap != null) {
-				logger.log(Level.INFO, "RIKI: Local PATHS1 "+featurePaths);
-				
+				//logger.log(Level.INFO, "RIKI: Local PATHS1 "+featurePaths);
+				//logger.info("RIKI: WE ARE HERE!!!");
 
 				GeoavailabilityMap<String[]> geoMap = new GeoavailabilityMap<String[]>(grid);
 				Iterator<String[]> pathIterator = this.featurePaths.iterator();
 				while (pathIterator.hasNext()) {
+					//logger.info("RIKI: WE ARE HERE2!!!");
 					String[] features = pathIterator.next();
 					float lat = Float.valueOf(features[latOrder]);
 					float lon = Float.valueOf(features[lngOrder]);
+					
+					//String gh = GeoHash.encode(lat, lon, 5);
+					
+					/*if(gh.equals("9xf6q")) {
+						logger.info("RIKI: WE FOUND THIS!!!");
+					}*/
+					
 					if (!Float.isNaN(lat) && !Float.isNaN(lon))
 						geoMap.addPoint(new Coordinates(lat, lon), features);
 					pathIterator.remove();
 				}
+				
 				/*each string[] is a line of record*/
 				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS2 "+featurePaths);
-				for (List<String[]> paths : geoMap.query(queryBitmap).values()) 
+				
+				for (List<String[]> paths : geoMap.query(queryBitmap).values()) {
+					
+					/*for(String[] ft: paths) {
+						float lat = Float.valueOf(ft[latOrder]);
+						float lon = Float.valueOf(ft[lngOrder]);
+						
+						String gh = GeoHash.encode(lat, lon, 5);
+						
+						if(gh.equals("9xf6q")) {
+							logger.info("RIKI: WE FOUND THIS AFTER BITMAP QUERY!!!");
+						}
+					}*/
 					this.featurePaths.addAll(paths);
+				}
+				
+				
+				
+				
 				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS3 "+featurePaths);
 				
 			}
 			if (this.featurePaths.size() > 0) {
-				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS4 "+featurePaths);
+				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS4 "+Arrays.asList(featurePaths.get(0)));
 				MetadataGraph temporaryGraph = new MetadataGraph();
 				Iterator<String[]> pathIterator = this.featurePaths.iterator();
 				while (pathIterator.hasNext()) {
@@ -164,7 +190,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 						Path<Feature, String> featurePath = createPath("/nopath", metadata);
 						temporaryGraph.addPath(featurePath);
 					} catch (Exception e) {
-						logger.warning(e.getMessage());
+						logger.warning("RIKI: WRRRONG: "+e.getMessage());
 					}
 					pathIterator.remove();
 				}
@@ -183,7 +209,7 @@ public class VisualizationSummaryProcessor implements Runnable{
 				// CREATE A MAP OF KEY TO SUMMARY[]
 				if(evaluatedPaths.size() > 0) {
 					
-					logger.info("RIKI: DO I NEED MORE GROUPING? "+needMoreGrouping);
+					//logger.info("RIKI: DO I NEED MORE GROUPING? "+needMoreGrouping);
 					if(!needMoreGrouping) {
 						getSummariesNoGroupingNeeded(evaluatedPaths);
 					} else {

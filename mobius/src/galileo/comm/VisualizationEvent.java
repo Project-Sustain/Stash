@@ -27,6 +27,8 @@ public class VisualizationEvent implements Event{
 	private int spatialResolution;
 	private int temporalResolution;
 	private List<String> reqFeatures;
+	
+	private boolean cachingOn = true;
 
 	private void validate(String fsName) {
 		if (fsName == null || fsName.trim().length() == 0 || !fsName.matches("[a-z0-9-]{5,50}"))
@@ -123,6 +125,8 @@ public class VisualizationEvent implements Event{
 		reqFeatures = new ArrayList<String>();
 		in.readStringCollection(reqFeatures);
 		
+		this.cachingOn = in.readBoolean();
+		
 	}
 
 	@Override
@@ -142,6 +146,8 @@ public class VisualizationEvent implements Event{
 
 		//this cannot be null
 		out.writeStringCollection(reqFeatures);
+		
+		out.writeBoolean(cachingOn);
 		
 	}
 
@@ -196,6 +202,7 @@ public class VisualizationEvent implements Event{
 		spatialResolution = request.getSpatialResolution();
 		temporalResolution = request.getTemporalResolution();
 		reqFeatures = request.getReqFeatures();
+		cachingOn = request.isCachingOn();
 		
 	}
 
@@ -233,6 +240,14 @@ public class VisualizationEvent implements Event{
 
 	public void setEventId(String eventId) {
 		this.eventId = eventId;
+	}
+
+	public boolean isCachingOn() {
+		return cachingOn;
+	}
+
+	public void setCachingOn(boolean cachingOn) {
+		this.cachingOn = cachingOn;
 	}
 
 

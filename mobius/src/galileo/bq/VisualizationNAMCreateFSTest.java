@@ -127,7 +127,7 @@ public class VisualizationNAMCreateFSTest {
 	
 	public static void main(String[] args1) {
 		String args[] = new String[2];
-		args[0] = "lattice-1.cs.colostate.edu";
+		args[0] = "lattice-121.cs.colostate.edu";
 		args[1] = "5634";
 		
 		System.out.println(args.length);

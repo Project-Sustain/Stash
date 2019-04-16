@@ -180,7 +180,7 @@ public class SpatiotemporalHierarchicalCache {
 		
 		boolean newEntry = false;
 		if(cacheLevel < totalSpatialLevels*totalTemporalLevels && cacheLevels[cacheLevel] != null) {
-			logger.info("RIKI: REACHED INSIDE");
+			//logger.info("RIKI: REACHED INSIDE");
 			newEntry = cacheLevels[cacheLevel].addCell(summ, key, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 		}
 		

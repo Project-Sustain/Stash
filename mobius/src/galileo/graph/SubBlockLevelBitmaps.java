@@ -301,15 +301,15 @@ public class SubBlockLevelBitmaps {
 		
 		int spatialSize = (int)java.lang.Math.pow(32, sresolution - sFSLevel);
 		
-		int spatialIndex = bitmapIndex/spatialSize;
+		int spatialIndex = bitmapIndex%spatialSize;
 		
-		int temporalIndex = bitmapIndex%spatialSize;
+		int temporalIndex = bitmapIndex/spatialSize;
 		
 		//GeoHash.hashToLong(hash);
 		
 		String geohashString = blockGeohash;
 		if(sresolution > sFSLevel)
-			geohashString += GeoHash.fromLongToString(spatialIndex, sresolution);
+			geohashString += GeoHash.fromLongToString(spatialIndex, sresolution-sFSLevel);
 		
 		long newTimestamp = TemporalType.addTime(startTimestamp, temporalIndex, tresolution);
 		String temporalString = getTemporalString(newTimestamp, tresolution);

@@ -72,8 +72,10 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 
 		spatialpartitioningType = spatialHashType;
 		String[] geohashes = null;
-		String[] geohashes_2char = {"b","c","f","g","u","v","y","z","8","9","d","e","s","t","w","x",
-				"2","3","6","7","k","m","q","r","0","1","4","5","h","j","n","p"};
+		/*String[] geohashes_2char = {"b","c","f","g","u","v","y","z","8","9","d","e","s","t","w","x",
+				"2","3","6","7","k","m","q","r","0","1","4","5","h","j","n","p"};*/
+		
+		String[] geohashes_2char = {"8","9","b","c","d","f"};
 
 		Arrays.sort(geohashes_2char);
 		

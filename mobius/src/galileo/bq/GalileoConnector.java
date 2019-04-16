@@ -487,10 +487,16 @@ public class GalileoConnector extends GalileoConnectorInterface {
 		TemporalProperties temporalProperties = new TemporalProperties(reformatDatetime(values[timePosn]));
 		SpatialProperties spatialProperties = new SpatialProperties(parseFloat(values[latPosn]), parseFloat(values[lonPosn]));
 		
+		for(int i=0; i< values.length; i++) {
+			if(values[i].equals("null")) {
+				values[i] = "0";
+			}
+			
+		}
 		FeatureSet features = getFeaturesNAM(values);
 		
 		Metadata metadata = new Metadata();
-		metadata.setName(GeoHash.encode(parseFloat(values[latPosn]), parseFloat(values[lonPosn]), 4));
+		metadata.setName(GeoHash.encode(parseFloat(values[latPosn]), parseFloat(values[lonPosn]), GalileoConnectorInterface.vizprecision));
 		metadata.setTemporalProperties(temporalProperties);
 		metadata.setSpatialProperties(spatialProperties);
 		metadata.setAttributes(features);

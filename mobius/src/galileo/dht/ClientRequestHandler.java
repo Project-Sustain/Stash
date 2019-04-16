@@ -105,7 +105,7 @@ public class ClientRequestHandler implements MessageListener {
 					
 					VisualizationEventResponse eventResponse = (VisualizationEventResponse) event;
 					
-					logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+					//logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
 					
 					if(eventResponse.isNeedsRedirection()) {
 						
@@ -246,14 +246,14 @@ public class ClientRequestHandler implements MessageListener {
 		
 		
 		long diff = System.currentTimeMillis() - reqId;
-		logger.info("RIKI: ENTIRE THING FINISHED IN: "+ diff);
+		logger.info("\n===============================================\nRIKI: ENTIRE THING FINISHED IN: "+ diff);
 		this.requestListener.onRequestCompleted(this.response, clientContext, this);
 	}
 
 	@Override
 	public void onMessage(GalileoMessage message) {
 		
-		logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
+		//logger.info("RIKI: SOMETHING RECEIVED HERE....LET'S SEE....");
 		
 		boolean summaryFound = true;
 		

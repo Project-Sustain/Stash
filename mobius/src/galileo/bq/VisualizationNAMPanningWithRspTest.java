@@ -29,7 +29,7 @@ import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
 
-public class VisualizationNAMQueryWithRspTest implements MessageListener {
+public class VisualizationNAMPanningWithRspTest implements MessageListener {
 	
 	private static boolean cachingOn = true;
 	private static boolean randomOn = true;
@@ -104,27 +104,33 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 		try {
 			
 			ClientMessageRouter messageRouter = new ClientMessageRouter();
-			VisualizationNAMQueryWithRspTest vqt = new VisualizationNAMQueryWithRspTest();
+			VisualizationNAMPanningWithRspTest vqt = new VisualizationNAMPanningWithRspTest();
 			
 			messageRouter.addListener(vqt);
 			
 			
+			List<VisualizationRequest> reqs = new ArrayList<VisualizationRequest>();
 			
-			for(int j=0; j< 1; j++) {
+			if(randomOn)
+				//reqs = createRandomVisualizationRequest(querySize,sl,tl);
+				reqs = null;
+			else 
+				reqs = createVisualizationRequest(querySize, sl, tl);
+			
+			//Thread.sleep(10*1000);
+			for(int j = 0; j < 5; j++) {
 				VisualizationRequest randomVizReq = null;
-				if(randomOn)
-					randomVizReq = createRandomVisualizationRequest(querySize,sl,tl);
-				else 
-					randomVizReq = createVisualizationRequest(querySize, sl, tl);
 				
+				randomVizReq = reqs.get(4-j);
+				System.out.println("REQUEST: "+randomVizReq.getPolygon());
 				if(!cachingOn)
 					randomVizReq.setCachingOn(cachingOn);
 				
-				for(int i=0 ;i < 3; i++) {
+				for(int i=0 ;i < 1; i++) {
 					//gc.visualize(vr);
 					//messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(createRandomVisualizationRequest(querySize, sl, tl)));
 					messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(randomVizReq));
-					Thread.sleep(8*1000);
+					Thread.sleep(6*1000);
 				}
 			}
 			
@@ -289,24 +295,23 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	
 	
 	
-	public static VisualizationRequest createVisualizationRequest(String polygonSize, int sl, int tl) {
+	public static List<VisualizationRequest> createVisualizationRequest(String polygonSize, int sl, int tl) {
 		
-		VisualizationRequest vr = new VisualizationRequest(); 
-		vr.setFsName("namfs");
+		
+		List<VisualizationRequest> reqs = new ArrayList<VisualizationRequest>();
 		
 		float lat1 = 24.03f;
 		
 		float lon1 = -110.06f;
 		
 		
-		List<Coordinates> cl = new ArrayList<Coordinates>();
 		// Country Wide
-		float latLength = 15f;
-		float longLength = 30f;
+		float latLength = 16f;
+		float longLength = 32f;
 		
 		if(polygonSize.equalsIgnoreCase("country")) {
-			latLength = 18f;
-			longLength = 34f;
+			latLength = 15f;
+			longLength = 30f;
 			
 		} else if(polygonSize.equalsIgnoreCase("state")) {
 			latLength = 4f;
@@ -320,28 +325,7 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 			latLength = 0.2f;
 			longLength = 0.4f;
 		}
-		float lat2 = lat1+latLength;
-		float lon2 = lon1+longLength;
 		
-		Coordinates c1 = new Coordinates(lat2, lon1);
-		Coordinates c2 = new Coordinates(lat2, lon2);
-		Coordinates c3 = new Coordinates(lat1, lon2);
-		Coordinates c4 = new Coordinates(lat1, lon1);
-		//Coordinates c5 = new Coordinates(36.78f, -107.64f);
-		
-		cl.add(c1); cl.add(c2); cl.add(c3); cl.add(c4);
-		
-		System.out.println("COORDINATES: "+cl);
-		
-		vr.setPolygon(cl);
-		vr.setTime("2013-02-02-xx");
-		
-		/*vr.setSpatialResolution(2);
-		vr.setTemporalResolution(2);*/
-		
-		
-		vr.setSpatialResolution(sl);
-		vr.setTemporalResolution(tl);
 		
 		// THE SUMMARIES WE ARE REQUESTING
 		List<String> sumHints = new ArrayList<String>();
@@ -351,9 +335,58 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 		sumHints.add("v-component_of_wind_tropopause");
 		sumHints.add("downward_short_wave_rad_flux_surface");
 		sumHints.add("u-component_of_wind_maximum_wind");
-		vr.setReqFeatures(sumHints);
 		
-		return vr;
+		
+		for(int i=0; i< 5; i++) {
+			
+			List<Coordinates> cl = new ArrayList<Coordinates>();
+			float lat2 = lat1+latLength;
+			float lon2 = lon1+longLength;
+			
+			VisualizationRequest vr = new VisualizationRequest(); 
+			vr.setFsName("namfs");
+			
+			Coordinates c1 = new Coordinates(lat2, lon1);
+			Coordinates c2 = new Coordinates(lat2, lon2);
+			Coordinates c3 = new Coordinates(lat1, lon2);
+			Coordinates c4 = new Coordinates(lat1, lon1);
+			//Coordinates c5 = new Coordinates(36.78f, -107.64f);
+			
+			cl.add(c1); cl.add(c2); cl.add(c3); cl.add(c4);
+			
+			System.out.println("COORDINATES: "+cl);
+			
+			vr.setPolygon(cl);
+			vr.setTime("2013-02-02-xx");
+			
+			vr.setSpatialResolution(sl);
+			vr.setTemporalResolution(tl);
+			
+			
+			vr.setReqFeatures(sumHints);
+			
+			reqs.add(vr);
+			
+			
+			// 25% Shrink
+			lat1 = 0.1f*latLength + lat1;
+			lon1 = 0.1f*longLength + lon1;
+			
+			latLength = latLength*0.8f;
+			longLength = longLength*0.8f;
+			
+		}
+		
+		
+		
+		/*System.out.println("COORDINATES: "+cl);*/
+		
+		
+		/*vr.setSpatialResolution(2);
+		vr.setTemporalResolution(2);*/
+		
+		
+		return reqs;
 	}
 	
 	
@@ -385,7 +418,7 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 		String parameters[] = new String[3];
 		parameters[0] = "lattice-121.cs.colostate.edu";
 		parameters[1] = "5634";
-		parameters[2] = "city";
+		parameters[2] = "country";
 		
 		int spRes = 6;
 		int tRes = 3;

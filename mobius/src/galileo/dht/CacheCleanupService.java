@@ -60,7 +60,7 @@ public class CacheCleanupService implements Runnable{
 			
 		}
 		
-		logger.info("RIKI: CACHE CLEANUP ENDED");
+		logger.info("RIKI: CACHE CLEANUP ENDED. ROOMS LEFT AFTER CLEANING: "+ stCache.getTotalRooms());
 		
 		
 	}
@@ -116,6 +116,8 @@ public class CacheCleanupService implements Runnable{
 			}
 			
 			Map<Integer, List<String>> elementsToTrim = getElementsToTrim(keyValues, total_allowed);
+			
+			logger.info("RIKI: TOTAL ROOMS: "+stCache.getTotalRooms()+" TO REMOVE: "+ elementsToTrim.size());
 			
 			// REMOVING UNWANTED STALE ENTRIES
 			for(int i=0; i< cacheLevels.length; i++) {

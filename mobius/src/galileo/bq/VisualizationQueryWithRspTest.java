@@ -19,6 +19,7 @@ import galileo.comm.VisualizationResponse;
 import galileo.dataset.Coordinates;
 import galileo.event.BasicEventWrapper;
 import galileo.event.EventWrapper;
+import galileo.graph.SummaryWrapper;
 import galileo.net.ClientMessageRouter;
 import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
@@ -42,7 +43,14 @@ public class VisualizationQueryWithRspTest implements MessageListener {
 		try {
 			VisualizationResponse response = (VisualizationResponse) wrapper.unwrap(message);
 			
-			System.out.println(response.getSummariesJSON());
+			List<String> keys = response.getKeys();
+			List<SummaryWrapper> summaries = response.getSummaries();
+			
+			for(int i=0; i < summaries.size(); i++) {
+				System.out.println(keys.get(i));
+				System.out.println(summaries.get(i));
+				System.out.println("=================");
+			}
 			
 		} catch (Exception e) {
 			e.printStackTrace();

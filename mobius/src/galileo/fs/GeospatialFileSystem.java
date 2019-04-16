@@ -153,8 +153,8 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final int DEFAULT_GEOHASH_PRECISION = 4;
 	private static final int MIN_GRID_POINTS = 5000;
 	private int numCores;
-	private int total_cache_entry_allowed = 200;
-	private int total_reduced_entries = 100;
+	private int total_cache_entry_allowed = 20000;
+	private int total_reduced_entries = 10000;
 	private static final String pathStore = "metadata.paths";
 
 	private NetworkInfo network;
@@ -199,6 +199,7 @@ public class GeospatialFileSystem extends FileSystem {
 	
 	private Map<String,SpatiotemporalHierarchicalCache> guestCache;
 	
+	// TRACKING WHAT CELLS ARE STORED IN THE BLOCK
 	private Map<String, SubBlockLevelBitmaps> blockBitmaps;
 
 	private boolean needSublevelBitmaps;
@@ -493,6 +494,7 @@ public class GeospatialFileSystem extends FileSystem {
 		state.put("spatialPartitioningType", this.spatialPartitioningType);
 		state.put("summaryHints", this.summaryHints);
 		
+		
 		// PERSISTING SUB-BLOCK BITMAPS
 		if(needSublevelBitmaps) {
 			
@@ -568,6 +570,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// REGENERATING SUBBLOCK LEVEL BITMAP FROM JSON
 		if (state.has("subBlockBitmaps")) {
 			
+			gfs.needSublevelBitmaps = true;
 			JSONArray sbMaps = state.getJSONArray("subBlockBitmaps");
 			
 			if (sbMaps != null && sbMaps.length() > 0) {
@@ -1066,9 +1069,10 @@ public class GeospatialFileSystem extends FileSystem {
 	 */
 	private String getBlockGroupKey(Path<Feature, String> path, String space, int spatialResolution, int temporalResolution) {
 		if (null != path && path.hasPayload()) {
+			
 			List<Feature> labels = path.getLabels();
 			String year = "xxxx", month = "xx", day = "xx", hour = "xx";
-			int allset = (space == null) ? 0 : 1;
+			int allset = 0 ;
 			for (Feature label : labels) {
 				switch (label.getName().toLowerCase()) {
 				case TEMPORAL_YEAR_FEATURE:
@@ -1088,10 +1092,9 @@ public class GeospatialFileSystem extends FileSystem {
 					allset++;
 					break;
 				case SPATIAL_FEATURE:
-					if (space == null) {
-						space = label.getString();
-						allset++;
-					}
+					space = label.getString();
+					allset++;
+				
 					break;
 				}
 				if (allset == 5)
@@ -1100,11 +1103,9 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			space = space.substring(0,spatialResolution);
 			
-			// RIKI-REMOVE
-			logger.info("RIKI: WHILE CREATING TEMPORAL STRING: "+year+"$"+month+"$"+day+"$"+hour);
 			String temporalTag = getTemporalString(year, month, day, hour, temporalResolution);
 			
-			
+			//logger.info("RIKI: BLOCK PATH ATTRIBUTES "+path + " GROUP KEY: "+ (temporalTag+"$$"+space));
 			return temporalTag+"$$"+space;
 		}
 		return null;
@@ -1214,6 +1215,39 @@ public class GeospatialFileSystem extends FileSystem {
 		return paths;
 	}
 	
+	
+	public Map<String, PathRequirements> listForNoCaching(Map<String, List<String>> blockMap) {
+		
+		Map<String, PathRequirements> requirementMap = new HashMap<String, PathRequirements>();
+		
+		//logger.info("RIKI: CACHE KEYS FOR EXISTING TILES IS: "+cache.getCells().keySet());
+		
+		for(String blockKey : blockMap.keySet()) {
+			
+			PathRequirements required = new PathRequirements();
+			requirementMap.put(blockKey, required);
+			
+			List<String> blocks = blockMap.get(blockKey);
+			
+			for(String block : blocks) {
+				
+				// CACHE EMPTY
+				// REQUIREMENT MODE 3
+				CellRequirements cr = new CellRequirements(block, 3);
+				
+				required.setEntireBlockCached(false);
+				// RIKI-REMOVE
+				//logger.info("BLOCK " + blockKey+ " "+block+" NEEDS FULL PROCESSING");
+				required.addCellrequirements(cr);
+			}
+		}
+		
+		
+		return requirementMap;
+		
+		
+	}
+	
 	/**
 	 * THIS IS IN CASE WE HAVE TO LOOK AT A SUB BLOCK LEVEL
 	 * RETURN AN EQUIVALENT TO BLOCKMAP, WHERE, INSTEAD OF BLOCKPATHS, A CELLREQUIREMENT OBJECT IS REQUIRED FOR A BLOCK
@@ -1266,6 +1300,9 @@ public class GeospatialFileSystem extends FileSystem {
 		
 		Map<String, PathRequirements> requirementMap = new HashMap<String, PathRequirements>();
 		
+		
+		//logger.info("RIKI: CACHE KEYS FOR EXISTING TILES IS: "+cache.getCells().keySet());
+		
 		for(String blockKey : blockMap.keySet()) {
 			
 			PathRequirements required = new PathRequirements();
@@ -1277,8 +1314,6 @@ public class GeospatialFileSystem extends FileSystem {
 			long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
 			DateTime blockTime = new DateTime(blockTimeStamp);
 			
-			
-			logger.info("RIKI: CACHE KEYS FOR EXISTING TILES IS: "+cache.getCells().keySet());
 			
 			CorrectedBitmap cacheBitmap = null;
 			
@@ -1292,8 +1327,8 @@ public class GeospatialFileSystem extends FileSystem {
 						reqTemporalType, temporalType, blockBitmapResolutionTemporal, polygon, qt1, qt2, cachekeysFound);
 			}
 			
-			
-			logger.info("RIKI: CACHE BITMAP FOR EXISTING TILES IS: "+cacheBitmap);
+			//logger.info("RIKI: POINT1");
+			//logger.info("RIKI: CACHE BITMAP FOR EXISTING TILES IS: "+cacheBitmap);
 			
 			boolean cacheIsEmpty = false;
 			
@@ -1303,10 +1338,10 @@ public class GeospatialFileSystem extends FileSystem {
 				cacheIsEmpty = true;
 				
 				// RIKI-REMOVE
-				logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE IS EMPTY");
+				//logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE IS EMPTY");
 			}
 			
-			logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
+			//logger.info("RIKI: FOR BLOCK " + blockKey+ " CACHE KEYS FOUND ARE: "+cachekeysFound);
 			
 			/*if(!cacheIsEmpty) {
 				
@@ -1332,11 +1367,11 @@ public class GeospatialFileSystem extends FileSystem {
 					
 					// WHAT CELLS ARE IN THE ACTUAL BLOCK
 					CorrectedBitmap blockRequirement = checkForAvailableBlockCells(blockKey, block, blockBitmapResolutionSpatial, blockBitmapResolutionTemporal, 
-							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, dateString);
+							blockBitmapTemporalType, geohashPrecision, temporalLevel, polygon, dateString, blockTimeStamp);
 					
 					// WHAT PART OF THE REQUIREMENT IS NOT IN MEMORY
 					
-					logger.info("RIKI: BLOCK AND GUEST CACHE CELL BITMAPS ARE: "+ blockRequirement +" "+cacheBitmap);
+					//logger.info("RIKI: BLOCK AND CACHE CELL BITMAPS ARE: "+ blockRequirement +" "+cacheBitmap);
 					
 					CorrectedBitmap andNot = new CorrectedBitmap(blockRequirement.andNot(cacheBitmap));
 					
@@ -1351,7 +1386,7 @@ public class GeospatialFileSystem extends FileSystem {
 						required.addCellrequirements(cr);
 						
 						// RIKI-REMOVE
-						logger.info("BLOCK " + blockKey+ " "+block+" IS FULLY CONTAINED IN CACHE");
+						//logger.info("BLOCK " + blockKey+ " "+block+" IS FULLY CONTAINED IN CACHE");
 						
 					} else {
 						
@@ -1362,21 +1397,22 @@ public class GeospatialFileSystem extends FileSystem {
 						int[] requiredIndices = andNot.toArray();
 						// convert these indices to cell keys. These need to be queried for
 						
-						List<String> keysToBeFetchedFromCache = new ArrayList<String>();
+						List<String> missingCells = new ArrayList<String>();
 						
 						for(int i: requiredIndices) {
 							
-							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, tokens[1], blockBitmapResolutionSpatial, blockBitmapResolutionTemporal,
-									geohashPrecision, temporalLevel);
+							String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, tokens[1], reqSpatialResolution, reqTemporalResolution,
+									geohashPrecision, blockTimeStamp);
 							
-							keysToBeFetchedFromCache.add(cellKey);
+							missingCells.add(cellKey);
 						}
 						
 						// RIKI-REMOVE
-						logger.info("BLOCK " + blockKey+ " "+block+" IS PARTIALLY CONTAINED AND NEEDS "+keysToBeFetchedFromCache);
+						//logger.info("BLOCK " + blockKey+ " "+block+" IS PARTIALLY CONTAINED AND NEEDS:"+missingCells);
 						
+						required.setEntireBlockCached(false);
 						
-						CellRequirements cr = new CellRequirements(block, 2, keysToBeFetchedFromCache);
+						CellRequirements cr = new CellRequirements(block, 2, missingCells);
 						required.addCellrequirements(cr);
 					}
 				} else {
@@ -1384,14 +1420,16 @@ public class GeospatialFileSystem extends FileSystem {
 					// REQUIREMENT MODE 3
 					CellRequirements cr = new CellRequirements(block, 3);
 					
+					required.setEntireBlockCached(false);
 					// RIKI-REMOVE
-					logger.info("BLOCK " + blockKey+ " "+block+" NEEDS FULL PROCESSING");
+					//logger.info("BLOCK " + blockKey+ " "+block+" NEEDS FULL PROCESSING");
 					required.addCellrequirements(cr);
 				}
 				
 			}
 			
 		}
+		//logger.info("RIKI: POINT2");
 		
 		return requirementMap;
 	}
@@ -1405,13 +1443,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param fsSpatialPrecision
 	 * @param fsTemporalPrecision
 	 * @param queryTimeString - two timestamps
+	 * @param blockTimeStamp 
 	 * @param level - The current level of cache we are looking at
 	 * @return -1 means nothing found 0 means full intersection 1 means partial found
 	 * @throws ParseException 
 	 */
 	public CorrectedBitmap checkForAvailableBlockCells(String blockKey, String blockPath, int reqSpatialPrecision, int reqTemporalPrecision,
 			TemporalType reqTemporalType, int fsSpatialPrecision, int fsTemporalPrecision,
-			List<Coordinates> polygon, String queryTimeString) throws ParseException {
+			List<Coordinates> polygon, String queryTimeString, long blockTimeStamp) throws ParseException {
 		
 		String[] timeTokens = queryTimeString.split("-");
 		long qt1 = Long.valueOf(timeTokens[0]);
@@ -1458,7 +1497,7 @@ public class GeospatialFileSystem extends FileSystem {
 		} else {
 			// Create the extra bitmap for the query region
 			requirement = refineBlockBitmapUsingQueryArea(polygon, qt1, qt2, block_cell_bitmap.toArray(), reqSpatialPrecision, reqTemporalPrecision,
-					reqTemporalType, tokens[1]);
+					reqTemporalType, tokens[1], blockTimeStamp);
 		}
 		
 		return requirement;
@@ -1477,17 +1516,18 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param geohashPrecision2 
 	 * @param reqTemporalPrecision 
 	 * @param reqSpatialPrecision 
+	 * @param blockTimeStamp 
 	 * @return
 	 * @throws ParseException 
 	 */
 	private CorrectedBitmap refineBlockBitmapUsingQueryArea (List<Coordinates> polygon, long qt1, long qt2, int[] indices, 
-			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType,  String blockGeohash) throws ParseException {
+			int reqSpatialPrecision, int reqTemporalPrecision, TemporalType reqTemporalType,  String blockGeohash, long blockTimeStamp) throws ParseException {
 		
 		CorrectedBitmap refinedBitmap = new CorrectedBitmap();
 		
 		for(int i : indices) {
 			
-			String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, blockGeohash, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, temporalLevel);
+			String cellKey = SubBlockLevelBitmaps.getKeyFromBitmapIndex(i, blockGeohash, reqSpatialPrecision, reqTemporalPrecision, geohashPrecision, blockTimeStamp);
 			
 			String[] cellKeyTokens = cellKey.split("\\$\\$");
 			
@@ -1532,7 +1572,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// In this loop, for each cache key, we find which block bitmap bits it covers, if any
 		for(String key : cacheCells) {
 			
-			logger.info("RIKI: DEALING WITH BLOCK: "+key);
+			//logger.info("RIKI: DEALING WITH BLOCK: "+key);
 			String[] cellTokens = key.split("\\$\\$");
 			
 			String cellTimeString = cellTokens[0];
@@ -1548,11 +1588,11 @@ public class GeospatialFileSystem extends FileSystem {
 			// full-st means block extent encloses cache extent
 			// full-rev means cache extent encloses block extent
 			
-			logger.info("RIKI: THESE ARE THE GEOHASHES FOR BLOCK AND CELL"+ blockGeoHash+" "+cellGeohashString);
+			//logger.info("RIKI: THESE ARE THE GEOHASHES FOR BLOCK AND CELL"+ blockGeoHash+" "+cellGeohashString);
 			
 			String spatialOrientation = GeoHash.getSpatialOrientationSimplified(blockGeoHash, cellGeohashString);
 			
-			logger.info("RIKI: BLOCK INFO "+ blockTime+" "+ cellTimeString+" "+ blockType+" "+ cellType);
+			//logger.info("RIKI: BLOCK INFO "+ blockTime+" "+ cellTimeString+" "+ blockType+" "+ cellType);
 			String temporalOrientation = GeoHash.getTemporalOrientationSimplified(blockTime, cellTimeString, blockType, cellType);
 			
 			
@@ -1571,7 +1611,7 @@ public class GeospatialFileSystem extends FileSystem {
 				// Cache cell dimension is lesser than block extent
 				if(spatialOrientation.equals("full-st") && temporalOrientation.equals("full-st")) {
 					
-					logger.info("RIKI: HEREEEEE1");
+					//logger.info("RIKI: HEREEEEE1");
 					// START CREATING THE BITMAP
 					
 					// GET BLOCK BITMAP FOR THE GIVEN GEOHASH AND TIMESTRING
@@ -1582,7 +1622,7 @@ public class GeospatialFileSystem extends FileSystem {
 					if(partialGeohash.length() > 0)
 						spatialIndex = (int)GeoHash.hashToLong(partialGeohash);
 					
-					logger.info("RIKI: <<<<PARTIAL GEOHASH: "+partialGeohash + " "+spatialIndex);
+					//logger.info("RIKI: <<<<PARTIAL GEOHASH: "+partialGeohash + " "+spatialIndex);
 					
 					int spatialSize = (int)java.lang.Math.pow(32, partialGeohash.length());
 					
@@ -1600,7 +1640,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 				} else if(spatialOrientation.equals("full") || spatialOrientation.equals("full-st")) {
 					
-					logger.info("RIKI: HEREEEEE2 "+spatialOrientation);
+					//logger.info("RIKI: HEREEEEE2 "+spatialOrientation);
 					
 					// Spatially the cache cell is smaller or equal to a block, but temporally, it is below block level
 					// The block bitmap in this case would only consider temporal level, since spatial level is the entire block
@@ -1625,7 +1665,7 @@ public class GeospatialFileSystem extends FileSystem {
 					
 				} else if(temporalOrientation.equals("full") || temporalOrientation.equals("full-st")) {
 					
-					logger.info("RIKI: HEREEEEE3");
+					//logger.info("RIKI: HEREEEEE3");
 					
 					// Temporally the cache cell is smaller or equal to a block, but spatially, it is below block level
 					// The block bitmap in this case would only consider spatial level, since temporal level is the entire block
@@ -1725,7 +1765,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws ParseException
 	 */
-	private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
+	/*private Map<String, SummaryStatistics[]> fetchCacheEntriesUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
 			HashMap<String, CacheCell> cells, String blockGeoHash, long startTimestamp) throws ParseException {
 		
 		Map<String, SummaryStatistics[]> summariesFound = new HashMap<String, SummaryStatistics[]>();
@@ -1741,7 +1781,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		return summariesFound;
-	}
+	}*/
 	
 	
 	/**
@@ -1758,7 +1798,7 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @return
 	 * @throws ParseException
 	 */
-	private List<String> fetchCacheKeysUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
+	/*private List<String> fetchCacheKeysUsingBitmap(CorrectedBitmap bmap, int fsSpatialLevel, int bitmapSpatialLevel, int fsTemporalLevel, int bitmapTemporalLevel,
 			String blockGeoHash, long startTimestamp) throws ParseException {
 		
 		List<String> keysFound = new ArrayList<String>();
@@ -1771,7 +1811,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		return keysFound;
-	}
+	}*/
 	
 	/**
 	 * FETCHING FROM ACTUAL CACHE THE CELLS THAT ARE ALREADY RESIDENT IN MEMORY
@@ -1951,7 +1991,7 @@ public class GeospatialFileSystem extends FileSystem {
 				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
 				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
 						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
-				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				//logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
 				for (GeoHash gh : intersections) {
 					String[] hashRange = gh.getValues(this.geohashPrecision);
 					if (hashRange != null) {
@@ -1993,7 +2033,7 @@ public class GeospatialFileSystem extends FileSystem {
 				String binaryHash = String.format(pattern, Long.toBinaryString(GeoHash.hashToLong(geohash)));
 				GeoHash.getGeohashPrefixes(polygon, new GeoHash(binaryHash.replace(" ", "0")),
 						this.geohashPrecision * GeoHash.BITS_PER_CHAR, intersections);
-				logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
+				//logger.info("baseHash: " + geohash + ", intersections: " + intersections.size());
 				for (GeoHash gh : intersections) {
 					String[] hashRange = gh.getValues(this.geohashPrecision);
 					if (hashRange != null) {
@@ -3153,7 +3193,7 @@ public class GeospatialFileSystem extends FileSystem {
 			Bitmap queryBitmap, int spatialResolution, int temporalResolution, List<Integer> summaryPosns, boolean needMoreGrouping, String blocksKey) 
 			throws IOException, InterruptedException {
 		
-		logger.info("RIKI: LOOKING FOR SUMMARIES IN FS. BLOCK KEY: "+blocksKey);
+		//logger.info("RIKI: LOOKING FOR SUMMARIES IN FS. BLOCK KEY: "+blocksKey);
 		
 		Map<String,SummaryStatistics[]> allSummaries = new HashMap<String,SummaryStatistics[]>();
 		
@@ -3226,17 +3266,22 @@ public class GeospatialFileSystem extends FileSystem {
 				//logger.log(Level.INFO, "RIKI: LocalParallelQueryProcessor PATHS6"+nqp.getFeaturePaths());
 				if(vqp.getLocalSummary().size() > 0) {
 					
+					//logger.info("RIKI: SOMETHING FOUND!!!!");
 					Map<String, SummaryStatistics[]> localSummary = vqp.getLocalSummary();
 					
+					//logger.info("RIKI: FS SUMMARIES EXTRACTED: "+localSummary.keySet());
 					for(String key: localSummary.keySet()) {
-						
+						/*if(key.equals("2013-2-2-xx$$9xf6q")) {
+							logger.info("RIKI: FOUND MISSING SUMMARY HERE!!!");
+						}*/
 						if(!allSummaries.containsKey(key)) {
 							allSummaries.put(key, localSummary.get(key));
 						} else {
 							SummaryStatistics[] oldStats = allSummaries.get(key);
 							SummaryStatistics[] statsUpdate = localSummary.get(key);
 							
-							SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+							//SummaryStatistics[] mergedSummaries = SummaryStatistics.mergeSummaries(oldStats, statsUpdate);
+							SummaryStatistics[] mergedSummaries = statsUpdate;
 							allSummaries.put(key, mergedSummaries);
 						}
 						
@@ -3247,7 +3292,7 @@ public class GeospatialFileSystem extends FileSystem {
 			}
 			
 		} 
-		logger.info("RIKI: SUMMARIES : "+allSummaries);
+		//logger.info("RIKI: SUMMARIES : "+allSummaries.keySet());
 		
 		return allSummaries;
 	}
@@ -3399,13 +3444,17 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param temporalResolution
 	 * @param existingCacheKeys 
 	 * @param freshnessMultiplier 
+	 * @param port 
+	 * @param hostname 
+	 * @param context 
 	 * @param string 
 	 * @param string 
 	 * @param string 
 	 * @param list 
 	 */
 	public boolean fetchFromAndPopulateCacheTree(Map<String, SummaryWrapper> finalisedSummaries, int spatialResolution, int temporalResolution, 
-			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys, int freshnessMultiplier) {
+			List<Coordinates> polygon, String timeString, String eventId, List<String> existingCacheKeys, 
+			int freshnessMultiplier, String hostname, int port, EventContext context) {
 		
 		synchronized(stCache) {
 			
@@ -3432,6 +3481,40 @@ public class GeospatialFileSystem extends FileSystem {
 				
 			}
 			
+			
+			
+			/*======BEFORE WE BEGIN UPDATING THE CACHE, WE CAN SEND BACK THE RESPONSE GATHERED============*/
+			
+			
+			
+			
+			VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalisedSummaries.values()), 
+					new ArrayList<String>(finalisedSummaries.keySet()),hostname, port);
+			
+			try {
+				
+				logger.info("RIKI: SUMMARY STATS BEING SENT BACK COUNT: "+ finalisedSummaries.size());
+				
+				context.sendReply(response);
+				
+				// RIKI-REMOVE
+				logger.info(">>>>>>>>>>>>>>>>VISUALIZATION FINISHED: "+System.currentTimeMillis());
+				
+			} catch (IOException ioe) {
+				logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
+			}
+			
+			
+			
+			
+			
+			/*======FINISHED SENDING BACK THE RESPONSE GATHERED============*/
+			
+			// UPDATE THE CACHE NOW
+			
+			long cacheMaintainanceStart = System.currentTimeMillis();
+			
+			
 			int totalInserted = 0;
 			
 			// SUMMARYWRAPPER CONTAIN INFO ON WHETHER INFO IS NEW OR EXTRACTED FROM THE CACHE
@@ -3448,17 +3531,18 @@ public class GeospatialFileSystem extends FileSystem {
 					boolean newEntry = stCache.addCell(sw.getStats(), key, cacheResolution, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 					
 					// RIKI-REMOVE
-					logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution+" "+newEntry);
+					//logger.info("RIKI: CELL " + key+ " INSERTED INTO CACHE AT LEVEL: "+cacheResolution+" "+newEntry);
 					if(newEntry)
 						totalInserted++;
 				} else {
-					logger.info("RIKI: CELL " + key+ " HAS BEEN VISITED ONCE ");
+					//logger.info("RIKI: CELL " + key+ " HAS BEEN VISITED ONCE ");
 					// THIS IS A PRE-EXISTING CELL. ONLY ITS FRESHNESS VALUE(s) NEEDS UPDATE.
 					stCache.incrementCell(key, cacheResolution, polygon, qt1, qt2, eventId, eventTime, freshnessMultiplier);
 				}
 				
 			}
 			
+			logger.info(">>>>>>>>>>>>RIKI: CACHE MAINTAINANCE FINISHED IN "+ (System.currentTimeMillis() - cacheMaintainanceStart));
 			logger.info("RIKI: CACHE INFO: COUNT: "+ stCache.getTotalRooms());
 			
 			//int i=0;
@@ -3505,10 +3589,14 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @author sapmitra
 	 * @param event 
 	 * @param freshnessMultiplier 
+	 * @param context 
+	 * @param port 
+	 * @param hostname 
 	 * @param fetchedSummaries 
 	 * @throws InterruptedException 
 	 */
-	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, VisualizationEvent event, int freshnessMultiplier) throws InterruptedException {
+	public Map<String, SummaryWrapper> fetchRemainingSUPERCellsFromFilesystem(Map<String, List<String>> blockMap, List<String> existingCacheKeys, 
+			VisualizationEvent event, int freshnessMultiplier, String hostname, int port, EventContext context) throws InterruptedException {
 		
 		//int level = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
 		Map<String, SummaryWrapper> finalisedSummaries = new HashMap<String, SummaryWrapper>();
@@ -3577,7 +3665,7 @@ public class GeospatialFileSystem extends FileSystem {
 		// POPULATE THE CACHE TREE
 		// ALSO POPULATE FILE BITMAPS
 		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries,event.getSpatialResolution(), event.getTemporalResolution(), event.getPolygon(), 
-				event.getTimeString(), event.getEventId(), existingCacheKeys, freshnessMultiplier);
+				event.getTimeString(), event.getEventId(), existingCacheKeys, freshnessMultiplier,hostname, port, context);
 		
 		if(cleanUpNeeded)
 			handleCacheCleaning();
@@ -3679,10 +3767,15 @@ public class GeospatialFileSystem extends FileSystem {
 	 * @param blockRequirements
 	 * @param event
 	 * @param freshnessMultiplier 
+	 * @param port 
+	 * @param hostname 
+	 * @param context 
 	 * @return
 	 */
 	public Map<String, SummaryWrapper> fetchRemainingSUBCellsFromFilesystem(
-			Map<String, PathRequirements> blockRequirements, VisualizationEvent event, int freshnessMultiplier) throws InterruptedException {
+			Map<String, PathRequirements> blockRequirements, VisualizationEvent event, int freshnessMultiplier, String hostname, int port, EventContext context) throws InterruptedException {
+		
+		boolean isCachingOn = event.isCachingOn();
 		// TODO Auto-generated method stub
 
 		// int reqSTLevel = stCache.getCacheLevel(event.getSpatialResolution(), event.getTemporalResolution());
@@ -3711,15 +3804,19 @@ public class GeospatialFileSystem extends FileSystem {
 					GeoavailabilityGrid blockGrid = new GeoavailabilityGrid(tokens[1], GeoHash.MAX_PRECISION * 2 / 3);
 
 					Bitmap queryBitmap = null;
+					
+					PathRequirements pathReqs = blockRequirements.get(blockKey);
+					
+					if(pathReqs.getCacheCellKeys() != null)
+						availableCacheKeys.addAll(pathReqs.getCacheCellKeys());
+					
+					if(pathReqs.isEntireBlockCached())
+						continue;
 
 					if (geoQuery.getPolygon() != null)
 						queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
 
-					PathRequirements pathReqs = blockRequirements.get(blockKey);
-					
-					availableCacheKeys.addAll(pathReqs.getCacheCellKeys());
-					
-					logger.info("RIKI: GEOQUERY POLYGON: "+geoQuery.getPolygon());
+					//logger.info("RIKI: GEOQUERY POLYGON: "+geoQuery.getPolygon());
 					// ACTUAL FILE SYSTEM READING FOR REQUIRED CELLS
 					VisualizationQueryProcessor qp = new VisualizationQueryProcessor(this, pathReqs, geoQuery, blockGrid, queryBitmap, event.getSpatialResolution(),
 							event.getTemporalResolution(), getSummaryPosns(), true, blockKey);
@@ -3739,11 +3836,11 @@ public class GeospatialFileSystem extends FileSystem {
 				
 				// OUTPUTS FROM FILE PROCESSING ARE ROUNDED UP HERE, CACHE IS NOT TOUCHED
 				for (VisualizationQueryProcessor qp : queryProcessors) {
-					logger.info("RIKI: LOOKING FOR STATS...");
+					//logger.info("RIKI: LOOKING FOR STATS...");
 					if (qp.getResultSummaries().size() > 0) {
 						Map<String, SummaryStatistics[]> localSummary = qp.getResultSummaries();
 
-						logger.info("RIKI: SUMMARY STATS FOUND: "+ localSummary);
+						//logger.info("RIKI: SUMMARY STATS FOUND: "+ localSummary.keySet());
 						for (String key : localSummary.keySet()) {
 
 							SummaryWrapper sw = new SummaryWrapper(true, localSummary.get(key));
@@ -3761,16 +3858,37 @@ public class GeospatialFileSystem extends FileSystem {
 		 ***/
 
 		// POPULATE THE CACHE TREE
-		// ALSO POPULATE FILE BITMAPS
+		// ALSO SENDS BACK RESPONSE BEFORE UPDATING CACHE FRESHNESS
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: CACHE POPULATION STARTED ");
-		boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
-				event.getPolygon(), event.getTimeString(), event.getEventId(), availableCacheKeys, freshnessMultiplier);
+		long currentTime = System.currentTimeMillis();
 		
-		if(cleanUpNeeded) 
-			handleCacheCleaning();
-
+		if(isCachingOn) {
+			logger.info("RIKI: CACHE POPULATION STARTED ");
+			boolean cleanUpNeeded = fetchFromAndPopulateCacheTree(finalisedSummaries, event.getSpatialResolution(), event.getTemporalResolution(),
+					event.getPolygon(), event.getTimeString(), event.getEventId(), availableCacheKeys, freshnessMultiplier, hostname, port, context);
+			
+			if(cleanUpNeeded) 
+				handleCacheCleaning();
+			logger.info("RIKI: CACHE POPULATION TOOK: "+(System.currentTimeMillis()-currentTime));
+		} else {
+			// NO CACHE TREE RELATED ACTIVITIES, JUST SEND BACK WHAT YOUR FOUND
+			VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalisedSummaries.values()), 
+					new ArrayList<String>(finalisedSummaries.keySet()),hostname, port);
+			
+			try {
+				
+				logger.info("RIKI: SUMMARY STATS BEING SENT BACK COUNT: "+ finalisedSummaries.size());
+				
+				context.sendReply(response);
+				
+				// RIKI-REMOVE
+				logger.info(">>>>>>>>>>>>>>>>VISUALIZATION FINISHED: "+System.currentTimeMillis());
+				
+			} catch (IOException ioe) {
+				logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
+			}
+		}
 		return finalisedSummaries;
 	}
 	
@@ -4070,6 +4188,17 @@ public class GeospatialFileSystem extends FileSystem {
 		}
 		
 		return subBlockLevel;
+	}
+
+	public void wipeCache() {
+		
+		int spatialResolution = stCache.getTotalSpatialLevels();
+		int temporalResolution = stCache.getTotalTemporalLevels();
+		this.stCache = new SpatiotemporalHierarchicalCache(spatialResolution, temporalResolution);
+		
+		this.guestCache = new HashMap<String, SpatiotemporalHierarchicalCache>();
+		
+		logger.info("RIKI: TOTAL ROOMS IN CACHE: "+stCache.getTotalRooms());
 	}
 	
 	

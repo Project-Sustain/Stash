@@ -18,6 +18,8 @@ import galileo.net.NetworkDestination;
 import galileo.util.Pair;
 
 abstract class GalileoConnectorInterface {
+	
+	public static int vizprecision = 2;
 	private ClientMessageRouter messageRouter;
 	private EventPublisher publisher;
 	public NetworkDestination server;
@@ -76,9 +78,12 @@ abstract class GalileoConnectorInterface {
 		int maxTemporalResolution = 4;
 		
 		FilesystemRequest fsRequest = new FilesystemRequest(name, FilesystemAction.CREATE, featureList, sh, maxSpatialResolution, maxTemporalResolution,  false, temporalHint);
-		fsRequest.setSpatialPartitioningType(1);
+		// HOW NODES ARE PARTITIONED
+		fsRequest.setSpatialPartitioningType(2);
 		fsRequest.setNodesPerGroup(30);
-		fsRequest.setPrecision(2);
+		
+		// HOW FILES ARE GROUPED INSIDE EACH NODE
+		fsRequest.setPrecision(vizprecision);
 		fsRequest.setTemporalType(TemporalType.DAY_OF_MONTH);
 		fsRequest.setSummaryHints(summaryHints);
 		

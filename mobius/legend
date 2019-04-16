@@ -44,7 +44,7 @@ java -cp ~/git/lassofinal/galileo-spacetime/lib/galileo-spacetime-1.0.jar galile
 DATA INSERTION
 ======================
 
-java -cp ~/git/mobius/mobius/lib/galileo-spacetime-1.0.jar galileo.bq.VisualizationNAMInsertTest lattice-1.cs.colostate.edu /s/lattice-99/a/nobackup/galileo/sapmitra/NAM_DATA/2013Updated/ 0 1
+java -cp ~/git/mobius/mobius/lib/galileo-spacetime-1.0.jar galileo.bq.VisualizationNAMInsertTest lattice-101.cs.colostate.edu /s/lattice-99/a/nobackup/galileo/sapmitra/NAM_DATA/2013/ 0 1
 
 
 1) CREATE A NEW LATTICE CLUSTER OF 90 NODES

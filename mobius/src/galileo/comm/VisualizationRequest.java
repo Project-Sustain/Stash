@@ -22,6 +22,7 @@ public class VisualizationRequest implements Event {
 	private String timeString;
 	private int spatialResolution;
 	private int temporalResolution;
+	private boolean cachingOn = true;
 	
 	// NAME OF THE NODE FOR WHICH A GUEST TREE IS STORED ON THIS HELPER NODE
 	private String guestTreeOnly = "";
@@ -127,6 +128,8 @@ public class VisualizationRequest implements Event {
 		
 		this.guestTreeOnly = in.readString();
 		
+		this.cachingOn = in.readBoolean();
+		
 	}
 
 	@Override
@@ -148,6 +151,8 @@ public class VisualizationRequest implements Event {
 		out.writeStringCollection(reqFeatures);
 		
 		out.writeString(guestTreeOnly);
+		
+		out.writeBoolean(cachingOn);
 		
 	}
 
@@ -229,6 +234,14 @@ public class VisualizationRequest implements Event {
 		
 		guestTreeOnly = guestTree;
 		
+	}
+
+	public boolean isCachingOn() {
+		return cachingOn;
+	}
+
+	public void setCachingOn(boolean cachingOn) {
+		this.cachingOn = cachingOn;
 	}
 
 }

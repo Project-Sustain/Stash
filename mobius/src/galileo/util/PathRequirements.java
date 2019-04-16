@@ -15,6 +15,8 @@ import galileo.graph.SummaryStatistics;
  *
  */
 public class PathRequirements {
+	
+	private boolean entireBlockCached = true;
 	// List of all the cache cells needed
 	private List<String> cacheCellKeys;
 	// The contents of "cacheCells" once fetched
@@ -48,6 +50,12 @@ public class PathRequirements {
 	}
 	public void setPerBlockRequirementInfo(List<CellRequirements> perBlockRequirementInfo) {
 		this.perBlockRequirementInfo = perBlockRequirementInfo;
+	}
+	public boolean isEntireBlockCached() {
+		return entireBlockCached;
+	}
+	public void setEntireBlockCached(boolean entireBlockCached) {
+		this.entireBlockCached = entireBlockCached;
 	}
 
 }

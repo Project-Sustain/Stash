@@ -92,7 +92,7 @@ public class SummaryStatistics implements ByteSerializable{
 	 */
 	public static SummaryStatistics[] mergeSummaries(SummaryStatistics[] oldStats, SummaryStatistics[] statsUpdate) {
 		
-		logger.info("RIKI: MERGE SUMMARY CALLED HERE");
+		//logger.info("RIKI: MERGE SUMMARY CALLED HERE");
 		
 		SummaryStatistics[] newStats = new SummaryStatistics[oldStats.length];
 		for(int i=0; i< oldStats.length; i++) {

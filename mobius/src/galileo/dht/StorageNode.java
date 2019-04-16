@@ -96,6 +96,8 @@ import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
 import galileo.comm.VisualizationResponse;
+import galileo.comm.WipeCacheEvent;
+import galileo.comm.WipeCacheRequest;
 import galileo.config.SystemConfig;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
@@ -119,6 +121,7 @@ import galileo.graph.HotspotTileHandOffCoordinator;
 import galileo.graph.Path;
 import galileo.graph.SummaryWrapper;
 import galileo.net.ClientConnectionPool;
+import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
 import galileo.net.PortTester;
@@ -910,6 +913,33 @@ public class StorageNode implements RequestListener {
 		
 	}
 	
+	@EventHandler
+	public void handleWipeCacheRequest(WipeCacheRequest request, EventContext context) {
+		
+		WipeCacheEvent we = new WipeCacheEvent(request.getFsName());
+		
+		logger.info("RIKI: ATTEMPTING TO WIPE ALL CACHE");
+		for (NodeInfo node : network.getAllNodes()) {
+			try {
+				sendEvent(node, we);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+	}
+	
+	@EventHandler
+	public void handleWipeCacheEvent(WipeCacheEvent request, EventContext context) {
+		logger.info("RIKI: ABOUT TO WIPE CACHE");
+		GeospatialFileSystem fs = fsMap.get(request.getFsName());
+		
+		fs.wipeCache();
+		
+		logger.info("RIKI: WIPED CACHE");
+	}
+	
 	/**
 	 * The request will contain a query area in terms of a polygon and a timestring
 	 * @author sapmitra
@@ -993,6 +1023,7 @@ public class StorageNode implements RequestListener {
 			}
 		} else {
 			try {
+				logger.info("RIKI: NO MATCHING FILESYSTEM FOUND");
 				QueryResponse response = new QueryResponse(queryId, new JSONArray(), new JSONObject());
 				context.sendReply(response);
 			} catch (IOException ioe) {
@@ -1105,7 +1136,13 @@ public class StorageNode implements RequestListener {
 	@EventHandler
 	public void handleVisualization(VisualizationEvent event, EventContext context) {
 		
+		boolean isCachingOn = event.isCachingOn();
+		
+		logger.info("RIKI: CACHING MODE ON: "+isCachingOn);
+		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
+		
+		logger.info(">>>>>>>>>>>>>>>>VISUALIZATION STARTED: "+System.currentTimeMillis());
 		
 		try {
 			
@@ -1115,8 +1152,6 @@ public class StorageNode implements RequestListener {
 			
 			
 			if (fs != null) {
-				
-				
 				
 				/* Feature Query is not needed to list blocks */
 				
@@ -1135,7 +1170,11 @@ public class StorageNode implements RequestListener {
 				long eventTime = System.currentTimeMillis();
 				
 				// HOTSPOT CHECK
-				boolean needsRedirection = checkAndHandleHotspot(eventTime);
+				
+				boolean needsRedirection = false;
+				
+				if(isCachingOn)
+					needsRedirection = checkAndHandleHotspot(eventTime);
 				
 				// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
 				
@@ -1223,6 +1262,7 @@ public class StorageNode implements RequestListener {
 					subBlockLevel = false;
 				}
 				
+				//logger.info("RIKI: BEFORE BLOCKING");
 				/*************** NO ENTRY WHILE CACHE CLEANING IN PROGRESS *****************/
 				blockEntryIfCleaningInitiated(fs);
 				/*************** ENTRY ALLOWED *****************/
@@ -1231,11 +1271,11 @@ public class StorageNode implements RequestListener {
 				/*************** EVENT ADDED TO ENRY LIST************/
 				fs.addEvent(eventString);
 				/****************************************************/
-				
+				//logger.info("RIKI: AFTER BLOCKING");
 				
 				// RIKI-REMOVE
-				logger.info("RIKI: MATCHING BLOCKS: "+blockMap);
-				
+				//logger.info("RIKI: MATCHING BLOCKS: "+blockMap);
+				//logger.info("RIKI: EVENT INFO: "+ event.getSpatialResolution()+" "+event.getTemporalResolution());
 				// FIGURING OUT WHAT DATA IS ALREADY IN THE CACHES
 				// FETCH CACHED DATA AND REMOVE THEM FROM THE LIST OF CANDIDATE BLOCKS TO BE SEARCHED
 				if(subBlockLevel) {
@@ -1244,14 +1284,22 @@ public class StorageNode implements RequestListener {
 					logger.info("RIKI: GOING SUB LEVEL");
 					
 					// VISUALIZATION BEING DONE AT A SUB BLOCK LEVEL
-					Map<String, PathRequirements> blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
-							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), event.getTime());
+					Map<String, PathRequirements> blockRequirements = null;
+					
+					if(isCachingOn) {
+						blockRequirements = fs.listMatchingCellsForSUBBlockResolution(blockMap, event.getSpatialResolution(), 
+								event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), event.getTime());
+					} else {
+						blockRequirements = fs.listForNoCaching(blockMap);
+					}
 					
 					// ONCE SUMMARIES HAVE BEEN FETCHED FROM FS,
 					// TIME TO LOAD THOSE FETCHED SUMMARIES INTO CACHE AND
 					// LOAD EXISTING CACHE CELLS USING CELL KEY
 					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
-					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event, freshnessMultiplier);
+					//logger.info("RIKI: POINT2.5");
+					finalSummaries = fs.fetchRemainingSUBCellsFromFilesystem(blockRequirements, event, freshnessMultiplier,hostname, port, context);
+					//logger.info("RIKI: POINT3");
 					
 				} else {
 					
@@ -1265,8 +1313,8 @@ public class StorageNode implements RequestListener {
 							event.getTemporalResolution(), event.getTimeString(), event.getPolygon(), refinedBlockMap);
 					
 					// RIKI-REMOVE
-					logger.info("RIKI: REFINED BLOCK MAP: "+refinedBlockMap);
-					logger.info("RIKI: OLD BLOCK MAP: "+blockMap);
+					//logger.info("RIKI: REFINED BLOCK MAP: "+refinedBlockMap);
+					//logger.info("RIKI: OLD BLOCK MAP: "+blockMap);
 					
 					// THE FINALISED SUMMARIES HAVE BEEN EXTRACTED
 					// THIS CONTAINS BOTH IN-MEMORY AND FETCHED SUMMARIES
@@ -1274,7 +1322,7 @@ public class StorageNode implements RequestListener {
 					// HERE THE CACHE WILL BE POPULATED AND 
 					// A FINAL MERGE OF STATISTICS WILL BE EXECUTED AT THE CLIENT NODE
 					// ALSO, THIS IS WHERE CACHE PRUNING TAKES PLACE
-					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event, freshnessMultiplier);
+					finalSummaries = fs.fetchRemainingSUPERCellsFromFilesystem(refinedBlockMap, existingCacheKeys, event, freshnessMultiplier,hostname, port, context);
 					
 				}
 				
@@ -1291,12 +1339,12 @@ public class StorageNode implements RequestListener {
 					e);
 		}
 
-		VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
+		/*VisualizationEventResponse response = new VisualizationEventResponse(new ArrayList<SummaryWrapper>(finalSummaries.values()), new ArrayList<String>(finalSummaries.keySet())
 				,hostname, port);
 		
 		try {
 			
-			logger.info("RIKI: SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
+			logger.info("RIKI: SUMMARY STATS BEING SENT BACK COUNT: "+ finalSummaries.size());
 			
 			context.sendReply(response);
 			
@@ -1305,7 +1353,7 @@ public class StorageNode implements RequestListener {
 			
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
-		}
+		}*/
 	}
 	
 	/**
@@ -1355,11 +1403,16 @@ public class StorageNode implements RequestListener {
 					
 					List<String> blocks = blockMap.get(blockKey);
 					
+					String[] tokens = blockKey.split("\\$\\$");
+					String blockTimeTokens[] = tokens[0].split("-");
+					
+					long blockTimeStamp = GeoHash.getStartTimeStamp(blockTimeTokens[0], blockTimeTokens[1], blockTimeTokens[2], blockTimeTokens[3], temporalType);
+					
 					for(String blockPath : blocks) {
 						
 						CorrectedBitmap bm = fs.checkForAvailableBlockCells(blockKey, blockPath, event.getSpatialResolution(), event.getTemporalResolution(),
 								TemporalType.getTypeFromLevel(event.getTemporalResolution()), fsSpatialResolution, fsTemporalResolution, event.getPolygon(), 
-								event.getTime());
+								event.getTime(), blockTimeStamp);
 						
 						if(c == 0 && ultimateBlockBitmap != null) {
 							ultimateBlockBitmap = bm;
@@ -1807,6 +1860,8 @@ public class StorageNode implements RequestListener {
 	}
 
 	public void persistFilesystems() {
+		
+		logger.info("RIKI: ABOUT TO PERSIST FS");
 		try (BufferedWriter bw = new BufferedWriter(new FileWriter(fsFile))) {
 			JSONObject fsJSON = new JSONObject();
 			for (String fsName : fsMap.keySet()) {
@@ -1830,7 +1885,12 @@ public class StorageNode implements RequestListener {
 			 * stdout for our final messages
 			 */
 			System.out.println("Initiated shutdown.");
-
+			
+			// SAVING FS STATE
+			persistFilesystems();
+			guestTreeClearer.cancel();
+			routingTableClearer.cancel();
+			
 			try {
 				connectionPool.forceShutdown();
 				messageRouter.shutdown();
@@ -1843,8 +1903,6 @@ public class StorageNode implements RequestListener {
 			if (pidFile != null && pidFile.exists()) {
 				pidFile.delete();
 			}
-
-			persistFilesystems();
 
 			for (GeospatialFileSystem fs : fsMap.values())
 				fs.shutdown();
