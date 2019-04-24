@@ -122,6 +122,10 @@ public class CliqueContainer implements ByteSerializable{
 			
 			int[] levels = fs.getStCache().getSpatioTemporalResolutionsFromLevel(currentLevel);
 			
+			if(count == 0) {
+				logger.info("RIKI: TESTING: "+currentLevel + " : BROKEN: "+levels[0]+" "+levels[1]+" :KEY:"+cellRow.get(0).getCellKey());
+			}
+			
 			if(fs.isSubBlockLevel(levels[0], levels[1])) {
 				
 				// CREATE A SET OF TEMPORARY BITMAPS
@@ -141,7 +145,7 @@ public class CliqueContainer implements ByteSerializable{
 		
 		this.bitmaps = bitmaps;
 		
-		logger.info("RIKI: BITMAP CALCULATED: "+bitmaps);
+		//logger.info("RIKI: BITMAP CALCULATED: "+bitmaps);
 	}
 	
 	
@@ -159,6 +163,8 @@ public class CliqueContainer implements ByteSerializable{
 	public CorrectedBitmap createBitmapForClique(GeospatialFileSystem fs, int spatialLevel, int temporalLevel, List<CacheCell> cellsInThisLevel) {
 		
 		CorrectedBitmap temporaryBitmap = new CorrectedBitmap();
+		
+		int i = 0;
 		
 		for(CacheCell cell : cellsInThisLevel) {
 			
@@ -196,6 +202,13 @@ public class CliqueContainer implements ByteSerializable{
 			int bitIndex = (int)(temporalIndex*spatialSize + spatialIndex);
 			
 			temporaryBitmap.set(bitIndex);
+			
+			if(i == 0) {
+				logger.info("RIKI: CHECKING: LEVELS: "+spatialLevel+" "+temporalLevel+" :::INFO:"+cell.getCellKey()+" "+spatialIndex+" "+spatialSize + " "+ temporalIndex);
+			}
+			
+			i++;
+				
 				
 			
 		}

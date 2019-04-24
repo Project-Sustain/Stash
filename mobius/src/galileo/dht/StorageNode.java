@@ -177,7 +177,7 @@ public class StorageNode implements RequestListener {
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
-	private static final int MESSAGE_QUEUE_THRESHOLD = 200;
+	private static final int MESSAGE_QUEUE_THRESHOLD = 5;
 	
 	
 	/* GUEST TREE MAINTAINENCE*/
@@ -1173,14 +1173,20 @@ public class StorageNode implements RequestListener {
 				
 				boolean needsRedirection = false;
 				
-				if(isCachingOn)
+				if(isCachingOn) {
+					// CHECKS IF HOTSPOTTED
+					// HANDOFF TILES IF SO
 					needsRedirection = checkAndHandleHotspot(eventTime);
+				}
 				
 				// REDIRECT THE REQUEST IF THIS HAS BEEN HANDLED
 				
 				int freshnessMultiplier = 1;
 				
 				logger.info("\nRIKI: NEEDS REDIRECTION: "+needsRedirection);
+				
+				// RIKI-REMOVE THIS
+				//needsRedirection = false;
 				
 				if(needsRedirection) {
 					

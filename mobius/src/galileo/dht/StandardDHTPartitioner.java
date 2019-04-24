@@ -64,6 +64,10 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 	private Map<BigInteger, BalancedHashRing<byte[]>> nodeHashRings = new HashMap<>();
 	private Map<BigInteger, NodeInfo> nodePositions = new HashMap<>();
 	private int spatialpartitioningType;
+	
+	public static double[] latlons;
+	
+	//public static String[] geohashes_2char = {"8","9","b","c","d","f"};
 
 	public StandardDHTPartitioner(StorageNode storageNode, NetworkInfo network, int spatialHashType)
 			throws PartitionException, HashException, HashTopologyException {
@@ -106,6 +110,8 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 			placeNode(node);
 		}
 		
+		latlons = getCentralLatLons();
+		
 		
 		// THIS IS FOR LOGGING, COMMENT OTHERWISE
 		/*Map<BigInteger, List<String>> geohashMap = new HashMap<BigInteger, List<String>>();
@@ -129,6 +135,29 @@ public class StandardDHTPartitioner extends Partitioner<Metadata> {
 		for(BigInteger b: geohashMap.keySet()) {
 			logger.info(b + "::" + geohashMap.get(b));
 		}*/
+	}
+	
+	
+	public static double[] getCentralLatLons() {
+		
+		SpatialRange decodeHashNW = GeoHash.decodeHash("b");
+		SpatialRange decodeHashSE = GeoHash.decodeHash("d");
+		
+		double upperLat = decodeHashNW.getUpperBoundForLatitude();
+		double lowerLon = decodeHashNW.getLowerBoundForLongitude();
+		
+		double upperLon = decodeHashSE.getUpperBoundForLongitude();
+		double lowerLat = decodeHashSE.getLowerBoundForLatitude();
+		
+		double centralLat = (upperLat + lowerLat) / 2d;
+		double centralLon = (upperLon + lowerLon) / 2d;
+		
+		
+		
+		double[] latlons = {upperLat, lowerLat, upperLon, lowerLon, centralLat, centralLon};
+		
+		
+		return latlons;
 	}
 	
 	private static String[] generateGeohashes(String[] geohashes_2char, int spatialHashType) {

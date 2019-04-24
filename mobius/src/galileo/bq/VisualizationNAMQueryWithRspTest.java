@@ -33,6 +33,7 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	
 	private static boolean cachingOn = true;
 	private static boolean randomOn = true;
+	private static boolean followWipeout = true;
 	
 	//private static boolean cacheInitialized = false;
 	
@@ -120,22 +121,24 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 				if(!cachingOn)
 					randomVizReq.setCachingOn(cachingOn);
 				
-				for(int i=0 ;i < 3; i++) {
+				for(int i=0 ;i < 10; i++) {
 					//gc.visualize(vr);
 					//messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(createRandomVisualizationRequest(querySize, sl, tl)));
 					messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(randomVizReq));
-					Thread.sleep(8*1000);
+					//Thread.sleep(8*1000);
 				}
 			}
 			
-			WipeCacheRequest wr = new WipeCacheRequest("namfs");
-			messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(wr));
-			Thread.sleep(1*1000);
-			System.out.println("CACHE WIPED OUT.");
+			if(followWipeout) {
+				WipeCacheRequest wr = new WipeCacheRequest("namfs");
+				messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(wr));
+				Thread.sleep(1 * 1000);
+				System.out.println("CACHE WIPED OUT.");
+			}
 			
 		} finally {
 			
-			Thread.sleep(1*1000);
+			Thread.sleep(10*1000);
 			gc.disconnect();
 		}
 	}
@@ -382,10 +385,13 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 		randomOn = false;
 		
 		cachingOn = true;
+		
+		followWipeout = false;
+		
 		String parameters[] = new String[3];
 		parameters[0] = "lattice-121.cs.colostate.edu";
 		parameters[1] = "5634";
-		parameters[2] = "city";
+		parameters[2] = "county";
 		
 		int spRes = 6;
 		int tRes = 3;

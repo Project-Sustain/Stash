@@ -153,8 +153,8 @@ public class GeospatialFileSystem extends FileSystem {
 	private static final int DEFAULT_GEOHASH_PRECISION = 4;
 	private static final int MIN_GRID_POINTS = 5000;
 	private int numCores;
-	private int total_cache_entry_allowed = 20000;
-	private int total_reduced_entries = 10000;
+	private int total_cache_entry_allowed = 200*1000;
+	private int total_reduced_entries = 100*1000;
 	private static final String pathStore = "metadata.paths";
 
 	private NetworkInfo network;
@@ -4031,6 +4031,8 @@ public class GeospatialFileSystem extends FileSystem {
 				
 			}
 		}
+		
+		logger.info("RIKI: CURRENT ROUTING TABLE: "+routingTable);
 		
 	}
 

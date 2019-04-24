@@ -260,7 +260,7 @@ public class ClientRequestHandler implements MessageListener {
 		try {
 			VisualizationEventResponse eventResponse = (VisualizationEventResponse)this.eventWrapper.unwrap(message);
 			
-			logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
+			//logger.info("RIKI: VISUALIZATION RESPONSE RECEIVED....FROM "+eventResponse.getHostName()+":"+eventResponse.getHostPort());
 			
 			if(eventResponse.isNeedsRedirection()) {
 				

@@ -56,6 +56,7 @@ import galileo.dataset.Point;
 import galileo.dataset.SpatialRange;
 import galileo.dataset.TemporalProperties;
 import galileo.dht.Partitioner;
+import galileo.dht.StandardDHTPartitioner;
 import galileo.dht.hash.TemporalHash;
 import galileo.fs.GeospatialFileSystem;
 //import math.geom2d.Point2D;
@@ -3318,7 +3319,7 @@ public class GeoHash {
 	 * @author sapmitra
 	 * @param geoHash
 	 */
-	public static String getAntipodeGeohash(String geoHash) {
+	public static String getAntipodeGeohash_Old(String geoHash) {
 		
 		SpatialRange decodeHash = decodeHash(geoHash);
 		
@@ -3339,12 +3340,43 @@ public class GeoHash {
 	}
 	
 	
-	
+	/**
+	 * GIVEN A GEOHASH, FIND THE GEOHASH DIAGONALLY OPPOSITE TO IT.
+	 * @author sapmitra
+	 * @param geoHash
+	 */
+	public static String getAntipodeGeohash(String geoHash) {
+		
+		//{upperLat, lowerLat, upperLon, lowerLon, centralLat, centralLon};
+		double[] partitionLatLons = StandardDHTPartitioner.getCentralLatLons();
+		
+		SpatialRange decodeHash = decodeHash(geoHash);
+		
+		// CENTRAL LAT LON OF THE GIVEN GEOHASH
+		double geohashCentralLat = (decodeHash.getLowerBoundForLatitude() + decodeHash.getUpperBoundForLatitude()) / 2d;
+		double geohashCentralLon = (decodeHash.getLowerBoundForLongitude() + decodeHash.getUpperBoundForLongitude()) / 2d;
+		
+		double diffLat = geohashCentralLat - partitionLatLons[4];
+		
+		double newLat = partitionLatLons[4] - diffLat;
+		
+		
+		double diffLon = geohashCentralLon - partitionLatLons[5];
+		
+		double newLon = partitionLatLons[5] - diffLon;
+		
+		String newGeoHash = encode((float)newLat, (float)newLon, geoHash.length());
+		
+		//System.out.println(newGeoHash);
+		
+		return newGeoHash;
+		
+	}
 	
 	
 	public static void main(String arg[]) {
 		
-		GeoHash.getAntipodeGeohash("u");
+		System.out.println(GeoHash.getAntipodeGeohash("c7"));
 	}
 	
 	

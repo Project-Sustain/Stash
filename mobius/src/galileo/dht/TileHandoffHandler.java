@@ -98,7 +98,7 @@ public class TileHandoffHandler implements MessageListener {
 		// CLIQUE IS THE UNIT OF DATA TRANSFER IN THIS SYSTEM
 		topKCliques = TopCliqueFinder.getTopKCliques(fs.getStCache(), fs.getSpatialPartitioningType());
 		
-		logger.info("TOP CLIQUES: "+ topKCliques);
+		logger.info("TOP CLIQUES: "+ topKCliques.keySet()+" SIZE: "+topKCliques.values().size());
 		
 		// CALCULATING THE BITMAP COVERED BY THE TILES IN EACH PARTICULAR CLIQUE
 		for(String k : topKCliques.keySet()) {
@@ -166,6 +166,7 @@ public class TileHandoffHandler implements MessageListener {
 							// KEEP THIS ENTRY IN TOP CLIQUES
 							// CALCULATE THE NEXT ANTIPODE GEOHASH
 							
+							// THIS WILL NOT BE CALLED IF THERE WAS A FAILURE
 							
 						}
 						
@@ -198,7 +199,7 @@ public class TileHandoffHandler implements MessageListener {
 			
 		} else {
 			
-			logger.info("RIKI: DISTRESS RESPONSESD GETTING LOADED IN ROUTING TABLE");
+			logger.info("RIKI: DISTRESS RESPONSES GETTING LOADED IN ROUTING TABLE....");
 			silentClose(); // closing the router to make sure that no new responses are added.
 			
 			// POPULATE ROUTING TABLE WITH CLIQUES THAT GOT REPLICATED
@@ -318,7 +319,7 @@ public class TileHandoffHandler implements MessageListener {
 				while(keepLooping) {
 					
 					// EAST OR WEST
-					int randDirection = ThreadLocalRandom.current().nextInt(3,5);
+					int randDirection = ThreadLocalRandom.current().nextInt(0,8);
 					
 					String geohashKey = entry.getKey();
 					CliqueContainer clique = entry.getValue();
@@ -331,6 +332,7 @@ public class TileHandoffHandler implements MessageListener {
 					
 					NodeInfo targetNode = null;
 					
+					// IF THIS IS A RETRY TO ANOTHER NODE
 					if(!firstTry) {
 						
 						// GET THE GEOHASH ANTIPODE
@@ -349,27 +351,43 @@ public class TileHandoffHandler implements MessageListener {
 						
 						String newNode = oldNode;
 						
+						// LOOKING FOR THE NEXT ALTERNATE ANTIPODE
 						while(newNode.equals(oldNode)) {
 							// KEEP SHIFTING TILL A NEW CANDIDATE NODE HAS BEEN FOUND
 							newGeohashAntipode = GeoHash.getNeighbours(newGeohashAntipode)[randDirection];
 							
 							tempTargetNode = getNodeForGeoHash(newGeohashAntipode);
+							
+							// IN CASE WE HIT THE EDGE OF THE WORLD, RESET DIRECTION
+							if(tempTargetNode == null) {
+								
+								// RESETTING THE SEARCH FOR ANTIPODE
+								newGeohashAntipode = geoHashAntipode;
+								randDirection = ThreadLocalRandom.current().nextInt(0,8);
+								
+								clique.setDirection(randDirection);
+								newNode = oldNode;
+								continue;
+							}
+							
 							newNode = tempTargetNode.stringRepresentation();
 						}
 						
 						targetNode = tempTargetNode;
+						geoHashAntipode = newGeohashAntipode;
 						
 					} else {
 						
 						// TILL A SUITABLE NODE HAS BEEN FOUND
 						
-						
+						logger.info("RIKI: GEOHASH ANTIPODE: "+geoHashAntipode);
 						// FINDING THE NODE THAT HOUSES THE ANTIPODE GEOHASH
 						SpatialRange spatialRange = GeoHash.decodeHash(geoHashAntipode);
 						
 						SpatialProperties spatialProperties = new SpatialProperties(spatialRange);
 						Metadata metadata = new Metadata();
 						metadata.setName(geoHashAntipode);
+						
 						metadata.setSpatialProperties(spatialProperties);
 						
 						try {
@@ -377,17 +395,18 @@ public class TileHandoffHandler implements MessageListener {
 						} catch (HashException | PartitionException e) {
 							logger.severe("RIKI: CANNOT FIND ANTIPODE DESTINATION");
 						}
-						
+						clique.setDirection(randDirection);
 					}
 					
 					nodeString = targetNode.stringRepresentation();
 					
 					// KEEPS TRACK OF WHICH ANTIPODE IS CURRENTLY BEING DEALT WITH
 					clique.setGeohashAntipode(geoHashAntipode);
-					clique.setDirection(randDirection);
+					
 					
 					logger.info("RIKI: CLIQUE: "+geohashKey +" HAS AN ANTIPODE "+geoHashAntipode+" AND CORRESPONDING HELPER NODE IS "+ nodeString);
 					
+					// IF THIS NODE IS ALREADY GOT A COPY OF THIS GEOHASH
 					keepLooping = checkIfEntryExistsInRoutingTable(routingTable, nodeString, geohashKey);
 					
 					if(keepLooping) {
@@ -419,6 +438,8 @@ public class TileHandoffHandler implements MessageListener {
 			
 			
 			firstTry = false;
+			
+			
 			// USE nodeToCliquesMap TO DIRECT CLIQUES TO RESPECTIVE NODES
 			// IF THE NODES DONT SEND BACK POSITIVE ACK, TAKE THE REMAINING CLIQUES AND PERFORM THIS SAME SEQUENCE AGAIN
 			
@@ -437,7 +458,7 @@ public class TileHandoffHandler implements MessageListener {
 				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
 				
 				this.router.sendMessage(nodeToSendTo, mrequest);
-				logger.info("RIKI: HEARTBEAT REQUEST SENT TO " + nodeToSendTo.toString());
+				logger.info("RIKI: DISTRESS REQUEST SENT TO " + nodeToSendTo.toString()+" CLIQUES TO REPLICATE: "+cliquesToSend);
 				
 				
 				
