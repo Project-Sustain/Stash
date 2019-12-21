@@ -177,6 +177,7 @@ public class StorageNode implements RequestListener {
 	
 	
 	/*HOTSPOT HANDLING RELATED*/
+	// THE NUMBER OF MESSAGES IN THE QUEUE THAT MAKES THE NODE THINK IT IS HOTSPOTTED
 	private static final int MESSAGE_QUEUE_THRESHOLD = 5;
 	
 	
@@ -189,15 +190,15 @@ public class StorageNode implements RequestListener {
 	// GUEST TREE RELATED VARIABLES - ALSO CHANGE IN STORAGE NODE
 	
 	// TIME AFTER WHICH DISTRESSED NODE CHECKS AND PURGES ITS ROUTING TABLE
-	private static final long ROUTING_TABLE_CHECKUP = 15*1000l;		// 15 secs
+	private static final long ROUTING_TABLE_CHECKUP = 60*60*1000l;		// 15 secs
 	
 	// TIME AFTER WHICH HELPER NODE PURGES ITS OLD TILES
-	private static final long HELPER_TIMEOUT = 15*1000l;			// 15 secs
+	private static final long HELPER_TIMEOUT = 60*60*1000l;			// 15 secs
 	
 	// TIME AFTER WHICH NODE HANDLED HOTSPOT AGAIN AFTER A PREVIOUS HANDLE
-	private static final long HOTSPOT_COOLDOWN_TIME = 10*1000l; 	// 10 secs
+	private static final long HOTSPOT_COOLDOWN_TIME = 60*60*1000l; 	// 10 secs
 	
-	private static final int HOTSPOT_REDIRECTION_CHANCE = 5;
+	private static final int HOTSPOT_REDIRECTION_CHANCE = 2;
 	
 	// THE LAST TIME THE HOTSPOT WAS HANDLED
 	private long hotspotHasBeenHandledTime = 0l;
@@ -915,17 +916,17 @@ public class StorageNode implements RequestListener {
 	
 	@EventHandler
 	public void handleWipeCacheRequest(WipeCacheRequest request, EventContext context) {
-		
-		WipeCacheEvent we = new WipeCacheEvent(request.getFsName());
-		
-		logger.info("RIKI: ATTEMPTING TO WIPE ALL CACHE");
-		for (NodeInfo node : network.getAllNodes()) {
-			try {
+		try {
+			WipeCacheEvent we = new WipeCacheEvent(request);
+
+			logger.info("RIKI: ATTEMPTING TO WIPE ALL CACHE");
+			for (NodeInfo node : network.getAllNodes()) {
+
 				sendEvent(node, we);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 		
 	}
@@ -935,7 +936,11 @@ public class StorageNode implements RequestListener {
 		logger.info("RIKI: ABOUT TO WIPE CACHE");
 		GeospatialFileSystem fs = fsMap.get(request.getFsName());
 		
-		fs.wipeCache();
+		if(request.getTimeString() == null || request.getTimeString().trim().length() <= 0) 
+			fs.wipeCache();
+		else {
+			fs.wipeCache(request);
+		}
 		
 		logger.info("RIKI: WIPED CACHE");
 	}
@@ -1138,7 +1143,7 @@ public class StorageNode implements RequestListener {
 		
 		boolean isCachingOn = event.isCachingOn();
 		
-		logger.info("RIKI: CACHING MODE ON: "+isCachingOn);
+		logger.info("RIKI: CACHING MODE ON: " + isCachingOn);
 		
 		Map<String, SummaryWrapper> finalSummaries = new HashMap<String, SummaryWrapper>();
 		
@@ -1185,20 +1190,20 @@ public class StorageNode implements RequestListener {
 				
 				logger.info("\nRIKI: NEEDS REDIRECTION: "+needsRedirection);
 				
-				// RIKI-REMOVE THIS
-				//needsRedirection = false;
+				// RIKI-REMOVE THIS TO ENABLE REDIRECTION AND HOTSPOT HANDLING
+				// needsRedirection = false;
 				
 				if(needsRedirection) {
 					
 					if(!GeoHash.getChance(HOTSPOT_REDIRECTION_CHANCE)) {
 						
+						logger.info("RIKI: DECIDED TO REDIRECT...CHECKING POSSIBILITY");
 						VisualizationEventResponse rsp = new VisualizationEventResponse();
 						
 						// ARE THE NECESSARY STUFF REPLICATED ON SOME OTHER NODE? 
 						boolean possible = createRedirectionInfoIfPossible(event, rsp, blockMap);
 						
-						logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: ");
-						
+						logger.info("RIKI: REDIRECTION INFO BEING SENT BACK: "+possible);
 						
 						if(possible) {
 							try {
@@ -1211,6 +1216,8 @@ public class StorageNode implements RequestListener {
 							} catch (IOException ioe) {
 								logger.log(Level.SEVERE, "RIKI: REDIRECTION CALCULATION FAILED ", ioe);
 							}
+						} else {
+							needsRedirection = false;
 						}
 						
 						
@@ -1219,8 +1226,8 @@ public class StorageNode implements RequestListener {
 					freshnessMultiplier = HOTSPOT_REDIRECTION_CHANCE;
 					
 				}
-				
-				logger.info("\nRIKI: NOT REDIRECTING");
+				if(!needsRedirection)
+					logger.info("\nRIKI: NOT REDIRECTING");
 				
 				
 				Random r = new Random();
@@ -1390,7 +1397,7 @@ public class StorageNode implements RequestListener {
 		
 		
 		// RIKI-REMOVE
-		logger.info("RIKI: LOOKING FOR MATCHING BLOCKS");
+		logger.info("RIKI: REDIRECTION ...LOOKING FOR MATCHING BLOCKS");
 		
 		try {
 			/*Map<String, List<String>> blockMap = fs.listBlocksForVisualization(event.getTime(), event.getPolygon(),

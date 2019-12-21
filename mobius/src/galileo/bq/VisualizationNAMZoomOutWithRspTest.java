@@ -8,8 +8,13 @@ package galileo.bq;
  * This program read a csv-formatted file and send each line to the galileo server
  */
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.Map.Entry;
 import java.util.concurrent.ThreadLocalRandom;
 
 import galileo.client.EventPublisher;
@@ -22,6 +27,7 @@ import galileo.dataset.Coordinates;
 import galileo.event.BasicEventWrapper;
 import galileo.event.Event;
 import galileo.event.EventWrapper;
+import galileo.fs.GeospatialFileSystem;
 import galileo.graph.SpatiotemporalHierarchicalCache;
 import galileo.graph.SummaryWrapper;
 import galileo.net.ClientMessageRouter;
@@ -29,16 +35,28 @@ import galileo.net.GalileoMessage;
 import galileo.net.MessageListener;
 import galileo.net.NetworkDestination;
 
-public class VisualizationNAMQueryWithRspTest implements MessageListener {
+public class VisualizationNAMZoomOutWithRspTest implements MessageListener {
 	
 	private static boolean cachingOn = true;
 	private static boolean randomOn = true;
 	private static boolean followWipeout = true;
+	private static boolean fullWipeout = true;
 	
+	private static long startTime = 0l;
+	private static int lastReqNum = 0;
+	private static int rspCount = 0;
+	
+	private static int removalFrac = 0;
+	private static String queryTimeString ;
+	
+	private static int totalIterations = 1;
 	//private static boolean cacheInitialized = false;
 	
 	private static GalileoEventMap eventMap = new GalileoEventMap();
 	private static EventWrapper wrapper = new BasicEventWrapper(eventMap);
+	
+	
+	private static Timer checkerThroughput = new Timer();
 	
 	
 	//public static SpatiotemporalHierarchicalCache localCache;
@@ -55,24 +73,25 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	public void onMessage(GalileoMessage message) {
 		try {
 			Event unwrap = wrapper.unwrap(message);
+			
+			long rcvTime = System.currentTimeMillis();
 			if(unwrap instanceof VisualizationResponse) {
+				
+				rspCount++;
 				VisualizationResponse response = (VisualizationResponse) wrapper.unwrap(message);
 				
-				List<String> keys = response.getKeys();
+				//List<String> keys = response.getKeys();
 				List<SummaryWrapper> summaries = response.getSummaries();
+				System.out.println("TIME TAKEN: " + (rcvTime-startTime)+" "+summaries.size());
 				
-				System.out.println(summaries.size()+"================");
-				System.out.println(keys);
-				/*for(int i=0; i < summaries.size(); i++) {
-					System.out.println(keys.get(i));
-					System.out.println(summaries.get(i));
-					System.out.println("=================");
-				}*/
+				
 			} else if(unwrap instanceof QueryResponse) {
 				QueryResponse rsp = (QueryResponse) unwrap;
 				
 				System.out.println("SOMETHING WENT WRONG " + rsp.getJSONResults());
 			}
+			
+			//startTime = rcvTime;
 			
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -93,53 +112,87 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	 * @throws Exception
 	 */
 	
-	private static void processRequest(GalileoConnector gc, int sl, int tl, String querySize) throws Exception {
-		
-		/*if(cachingOn) {
-			if(!cacheInitialized) {
-				initializeCache(sl, tl);
-				cacheInitialized = true;
-			}
-		}*/
+	private static void processRequest(List<GalileoConnector> gcs, int sl, int tl, String querySize) throws Exception {
 		
 		try {
 			
 			ClientMessageRouter messageRouter = new ClientMessageRouter();
-			VisualizationNAMQueryWithRspTest vqt = new VisualizationNAMQueryWithRspTest();
+			VisualizationNAMZoomOutWithRspTest vqt = new VisualizationNAMZoomOutWithRspTest();
 			
 			messageRouter.addListener(vqt);
+			List<String> nodesQ = new ArrayList<String>();
 			
-			
-			
-			for(int j=0; j< 1; j++) {
-				VisualizationRequest randomVizReq = null;
-				if(randomOn)
-					randomVizReq = createRandomVisualizationRequest(querySize,sl,tl);
-				else 
-					randomVizReq = createVisualizationRequest(querySize, sl, tl);
-				
-				if(!cachingOn)
-					randomVizReq.setCachingOn(cachingOn);
-				
-				for(int i=0 ;i < 10; i++) {
-					//gc.visualize(vr);
-					//messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(createRandomVisualizationRequest(querySize, sl, tl)));
-					messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(randomVizReq));
-					//Thread.sleep(8*1000);
+			if(!fullWipeout && !followWipeout) {
+				for(int j=0; j < 6; j++) {
+					
+					if(sl-j < 2)
+						break;
+					
+					VisualizationRequest randomVizReq = null;
+					
+					randomVizReq = createVisualizationRequest(querySize, sl-j, tl);
+					
+					if(!cachingOn)
+						randomVizReq.setCachingOn(cachingOn);
+					
+					for(int i=0 ;i < totalIterations; i++) {
+						
+						int indx = ThreadLocalRandom.current().nextInt(0,100);
+						GalileoConnector gg = gcs.get(indx);
+						
+						if(nodesQ.contains(gg.server.getHostname())) {
+							gg = gcs.get( ThreadLocalRandom.current().nextInt(0,100));
+						}
+						
+						System.out.println("REQUESTING: "+ gg.server +" WITH POLYGON :" + randomVizReq.getPolygon()+" RESOLUTION: "+(sl-j));
+						
+						nodesQ.add(gg.server.getHostname());
+						//gc.visualize(vr);
+						//messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(createRandomVisualizationRequest(querySize, sl, tl)));
+						messageRouter.sendMessage(gg.server, EventPublisher.wrapEvent(randomVizReq));
+						Thread.sleep(3*1000);
+						
+						if(i==0)
+							startTime = System.currentTimeMillis();
+					}
 				}
 			}
 			
+			System.out.println("================");
+			for(String s: nodesQ)
+				System.out.println(s);
+			System.out.println("================");
+			
+			System.out.println("DONE SENDING REQUESTS");
 			if(followWipeout) {
+				
+				int indx = ThreadLocalRandom.current().nextInt(0,100);
+				GalileoConnector gg = gcs.get(indx);
 				WipeCacheRequest wr = new WipeCacheRequest("namfs");
-				messageRouter.sendMessage(gc.server, EventPublisher.wrapEvent(wr));
+				wr.setStartLevel(sl);
+				wr.setFrac(removalFrac);
+				wr.setTimeString(queryTimeString);
+				
+				messageRouter.sendMessage(gg.server, EventPublisher.wrapEvent(wr));
 				Thread.sleep(1 * 1000);
 				System.out.println("CACHE WIPED OUT.");
+				
+			} else if(fullWipeout) {
+				int indx = ThreadLocalRandom.current().nextInt(0,100);
+				GalileoConnector gg = gcs.get(indx);
+				WipeCacheRequest wr = new WipeCacheRequest("namfs");
+				
+				messageRouter.sendMessage(gg.server, EventPublisher.wrapEvent(wr));
+				Thread.sleep(1 * 1000);
+				System.out.println("CACHE FULL WIPED OUT.");
 			}
 			
 		} finally {
 			
-			Thread.sleep(10*1000);
-			gc.disconnect();
+			Thread.sleep(1000*1000);
+			for(GalileoConnector gc : gcs) {
+				gc.disconnect();
+			}
 		}
 	}
 	
@@ -360,6 +413,36 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	}
 	
 	
+	class CheckThroughput implements Runnable{
+
+		@Override
+		public void run() {
+			System.out.println(">>>>>STARTING THROUGHPUT CHECK.....");
+			
+			try {
+				while(true) {
+					Thread.sleep(1000);
+					
+					int diff = rspCount - lastReqNum;
+					
+					System.out.println("RIKI: THIS: "+diff);
+					
+					lastReqNum = rspCount;
+				}
+				
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			
+			
+		}
+		
+		
+		
+	}
+	
 	/*public static void main1(String arg[]) {
 		
 		for (int i = 101; i <= 220; i++) {
@@ -379,20 +462,34 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 	 * at galileo server
 	 * 
 	 * @param args
+	 * @throws IOException 
+	 * @throws NumberFormatException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws NumberFormatException, IOException {
 		
+		List<GalileoConnector> gcs = new ArrayList<GalileoConnector>();
+		
+		queryTimeString = "2013-02-02-xx";
+		
+		removalFrac = 2;
+			
 		randomOn = false;
 		
 		cachingOn = true;
 		
 		followWipeout = false;
 		
+		fullWipeout = false;
+		
+		// IF YOU JUST WANT TO WIPE CACHE, AND NOT SEND REQUESTS, SET THIS TO 1 & FOLLOW_WIPEOUT TO true
+		totalIterations = 1;
+		
 		String parameters[] = new String[3];
 		parameters[0] = "lattice-121.cs.colostate.edu";
 		parameters[1] = "5634";
-		parameters[2] = "county";
+		parameters[2] = "state";
 		
+		// STARTING SPATIAL RES
 		int spRes = 6;
 		int tRes = 3;
 		
@@ -405,7 +502,12 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 			tRes = Integer.valueOf(args[4]);
 		}
 		
-		
+		for(int i=0; i<100; i++) {
+			String host = "lattice-"+(i+121);
+			GalileoConnector gc = new GalileoConnector(host, Integer.parseInt(parameters[1]));
+			
+			gcs.add(gc);
+		}
 		
 		if (parameters.length == 0) {
 			System.out.println("Usage: VisualizationQueryTest [galileo-hostname] [galileo-port-number] [query-size] [spatial-Resolution] [temporal-resolution]");
@@ -415,7 +517,7 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 				GalileoConnector gc = new GalileoConnector(parameters[0], Integer.parseInt(parameters[1]));
 				System.out.println(parameters[0] + "," + Integer.parseInt(parameters[1]));
 				
-				processRequest(gc, spRes, tRes, parameters[2]);
+				processRequest(gcs, spRes, tRes, parameters[2]);
 				
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -424,5 +526,8 @@ public class VisualizationNAMQueryWithRspTest implements MessageListener {
 		System.out.println("Visualization Finished");
 		System.exit(0);
 	}
-	// [END Main]
+	
+	
+	
+	
 }

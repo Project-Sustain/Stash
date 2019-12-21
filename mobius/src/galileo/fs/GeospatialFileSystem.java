@@ -76,6 +76,7 @@ import galileo.comm.TemporalType;
 import galileo.comm.VisualizationEvent;
 import galileo.comm.VisualizationEventResponse;
 import galileo.comm.VisualizationRequest;
+import galileo.comm.WipeCacheEvent;
 import galileo.dataset.Block;
 import galileo.dataset.Coordinates;
 import galileo.dataset.Metadata;
@@ -1274,6 +1275,8 @@ public class GeospatialFileSystem extends FileSystem {
 		// ************** LOOK INTO THE CACHE FOR ALL THE BLOCK CELLS ALREADY IN MEMORY****************
 		
 		// The level of stcache we need to look at
+		
+		logger.info("riki: REQ: "+reqSpatialResolution+" "+reqTemporalResolution);
 		int level = stCache.getCacheLevel(reqSpatialResolution, reqTemporalResolution);
 		
 		// USE AT THE CACHE LEVEL TO CREATE A BITMAP OF ALL EXISTING CELLS THAT FALL UNDER THE BLOCK.
@@ -1477,11 +1480,12 @@ public class GeospatialFileSystem extends FileSystem {
 		// ***************QUERY BITMAP***************
 		boolean spatialEnclosure = GeoHash.checkEnclosure(polygon, tokens[1]);
 		
-		logger.info("RIKI: QUERY TIME STRING: " + queryTimeString);
+		//logger.info("RIKI: QUERY TIME STRING: " + queryTimeString);
 		
 		String temporalEnclosure = GeoHash.getTemporalOrientationSimplified(queryTimeString, tokens[0], temporalType, reqTemporalType);
 		
 		if(spatialEnclosure && (temporalEnclosure.equals("full")||temporalEnclosure.equals("full-st"))) {
+			logger.info("RIKI: FULL CONTAINMENT OF BLOCK IN QUERY");
 			blockContainment = true;
 		} else {
 			blockContainment = false;
@@ -1542,7 +1546,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			if(spatialIntersection && temporalIntersection) {
 				refinedBitmap.set(i);
-			}
+			} 
 		}
 		
 		refinedBitmap.applyUpdates();
@@ -3096,7 +3100,7 @@ public class GeospatialFileSystem extends FileSystem {
 			featurePaths = getFeaturePathsLocal(blocks);
 		} 
 		
-		logger.log(Level.INFO, "RIKI: FS LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
+		//logger.log(Level.INFO, "RIKI: FS LOCAL RECORDS FOUND: "+Arrays.asList(featurePaths));
 		int size = featurePaths.size();
 		int partition = java.lang.Math.max(size / numCores, MIN_GRID_POINTS);
 		int parallelism = java.lang.Math.min(size / partition, numCores);
@@ -3714,7 +3718,7 @@ public class GeospatialFileSystem extends FileSystem {
 	public void handleRoutingTableCleaning() {
 		
 		// RIKI-REMOVE
-		//logger.info("RIKI: ROUTING TABLE CLEANUP STARTED");
+		logger.info("RIKI: ROUTING TABLE CLEANUP STARTED");
 		
 		//ExecutorService executor = Executors.newFixedThreadPool(1);
 		//GuestCacheCleaner c = new GuestCacheCleaner(cleanUpInitiated, guestPeList, guestCache, 0, HELPER_TIMEOUT);
@@ -3810,8 +3814,10 @@ public class GeospatialFileSystem extends FileSystem {
 					if(pathReqs.getCacheCellKeys() != null)
 						availableCacheKeys.addAll(pathReqs.getCacheCellKeys());
 					
-					if(pathReqs.isEntireBlockCached())
+					if(pathReqs.isEntireBlockCached()) {
+						logger.info("RIKI: FULLY CACHED");
 						continue;
+					}
 
 					if (geoQuery.getPolygon() != null)
 						queryBitmap = QueryTransform.queryToGridBitmap(geoQuery, blockGrid);
@@ -4091,8 +4097,12 @@ public class GeospatialFileSystem extends FileSystem {
 			
 		}
 		
-		logger.info("RIKI: BLOCK LEVEL BITMAP AND GUEST CACHE BITMAPS ARE: "+ultimateBlockBitmap+" "+guestBitmap+" "+cacheLevel);
+		
 		CorrectedBitmap andNot = new CorrectedBitmap(ultimateBlockBitmap.andNot(guestBitmap));
+		
+		
+		//logger.info("RIKI: BLOCK LEVEL BITMAP AND GUEST CACHE BITMAPS ARE: "+ultimateBlockBitmap+" \n"+guestBitmap+" MISSING: "+andNot);
+		logger.info("RIKI: MISSING STUFF: "+ andNot);
 		
 		if(andNot.toArray().length == 0) {
 			logger.info("RIKI: WE ARE ALLOWED TO REDIRECT THIS REQUEST TO A HELPER NODE");
@@ -4163,7 +4173,7 @@ public class GeospatialFileSystem extends FileSystem {
 			
 			context.sendReply(response);
 			
-			logger.info("RIKI: GUEST TREE SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
+			//logger.info("RIKI: GUEST TREE SUMMARY STATS BEING SENT BACK: "+ finalSummaries);
 			
 		} catch (IOException ioe) {
 			logger.log(Level.SEVERE, "Failed to send response back to ClientRequestHandler", ioe);
@@ -4204,7 +4214,104 @@ public class GeospatialFileSystem extends FileSystem {
 	}
 	
 	
-	
+
+	public void wipeCache(WipeCacheEvent req) {
+		
+		logger.info("RIKI: ABOUT TO SELECTIVELY WIPE CACHE "+req.getFrac());
+		String timeString = req.getTimeString();
+		// THE LEVEL TO START FROM
+		int spatialLevel = req.getStartLevel();
+		
+		int totalSpatialLevels = stCache.getTotalTemporalLevels();
+		
+		int temporalLevel = 3;
+		
+		for(int i = spatialLevel; i < totalSpatialLevels ; i = i+2) {
+			
+			int currentLevel = stCache.getCacheLevel(i, temporalLevel);
+			
+			SparseSpatiotemporalMatrix specificCache = stCache.getSpecificCache(currentLevel);
+			
+			logger.info("RIKI: TOTAL ROOMS IN CACHE: "+stCache.getTotalRooms());
+			
+			List<String> elementsToTrim = new ArrayList<String> ();
+			
+			HashMap<String, CacheCell> cells = specificCache.getCells();
+			
+			for(String cacheCell : cells.keySet()) {
+				
+				String[] cellTokens = cacheCell.split("\\$\\$");
+				
+				String cellTimeString = cellTokens[0];
+				//String geoHash = cellTokens[1];
+				
+				if(timeString.equals(cellTimeString)) {
+					boolean toKeep = GeoHash.getProb(req.getFrac());
+					
+					if(!toKeep) {
+						elementsToTrim.add(cacheCell);
+					}
+				}
+				
+			}
+			
+			// For these elements, we have to now remove their children 1 spatial level down
+			for(String cKey : elementsToTrim) {
+				logger.info("RIKI: REMOVING: "+cKey+" AND CHILDREN");
+				if(i+1 <= totalSpatialLevels) {
+					
+					String[] cellTokens = cKey.split("\\$\\$");
+					String geoHash = cellTokens[1];
+					
+					int spatialChildLevel = i+1;
+					
+					List<String> sChildren = GeoHash.getInternalGeohashes(geoHash);
+					int childLevel = stCache.getCacheLevel(spatialChildLevel, temporalLevel);
+					
+					SparseSpatiotemporalMatrix childCache = stCache.getSpecificCache(childLevel);
+					HashMap<String, CacheCell> childCells = childCache.getCells();
+					
+					for(String g : sChildren) {
+						
+						String cellKey = timeString+"$$"+g;
+						childCells.remove(cellKey);
+						
+					}
+				}
+				
+				
+				cells.remove(cKey);
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+		}
+		
+	}
 	
 	
 	

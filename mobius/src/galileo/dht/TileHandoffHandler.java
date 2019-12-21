@@ -458,7 +458,7 @@ public class TileHandoffHandler implements MessageListener {
 				GalileoMessage mrequest = this.eventWrapper.wrap(hr);
 				
 				this.router.sendMessage(nodeToSendTo, mrequest);
-				logger.info("RIKI: DISTRESS REQUEST SENT TO " + nodeToSendTo.toString()+" CLIQUES TO REPLICATE: "+cliquesToSend);
+				logger.info("RIKI: DISTRESS REQUEST SENT TO " + nodeToSendTo.toString());
 				
 				
 				

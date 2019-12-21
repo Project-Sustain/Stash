@@ -30,6 +30,15 @@ import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.geom.Area;
 import java.awt.geom.Rectangle2D;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,6 +57,8 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import galileo.bmp.Bitmap;
 import galileo.comm.TemporalType;
@@ -2637,6 +2648,68 @@ public class GeoHash {
 		
 	}
 	
+	
+	private static int getGeohashIDWithOffset(String geohash, int offset) {
+		
+		List<Character> evens = Arrays.asList('b','c','f','g','u','v','y','z','8','9','d','e','s','t','w','x','2','3','6','7','k','m','q','r','0','1','4','5','h','j','n','p');
+		List<Character> odds = Arrays.asList('p','r','x','z','n','q','w','y','j','m','t','v','h','k','s','u','5','7','e','g','4','6','d','f','1','3','9','c','0','2','8','b');
+		
+		//odd 8x4
+		//even 4x8
+		
+		int resolution = geohash.length();
+		char[] gArray = geohash.toCharArray();
+		
+		int rowMultiplier = 1;
+		int colMultiplier = 1;
+		
+		int row_prev = 0;
+		int col_prev = 0;
+		
+		for(int i = offset; i < resolution ; i++) {
+			
+			char cr = gArray[i];
+			
+			if(i%2 == 0) {
+				
+				int indx = evens.indexOf(cr);
+				
+				int r = indx / 8 ; //1
+				int c = indx % 8 ; //2
+				
+				row_prev = row_prev*4 + r;
+				col_prev = col_prev*8 + c;
+				
+				//if(i != resolution-1) {
+				rowMultiplier *= 8;
+				colMultiplier *= 4;
+				//}
+				
+			} else {
+				
+				int indx = odds.indexOf(cr);
+				
+				int r = indx / 4;
+				int c = indx % 4;
+				
+				row_prev = row_prev*8 + r;
+				col_prev = col_prev*4 + c;
+				
+				//if(i != resolution-1) {
+				rowMultiplier *= 4;
+				colMultiplier *= 8;
+				//}
+				
+			}
+			
+		}
+		int finalIndex = row_prev*rowMultiplier + col_prev;
+		
+		//System.out.println(finalIndex);
+		return finalIndex;
+		
+	}
+	
 	/**
 	 * Get the geohashes that lie outside a geohash's border in a particular direction
 	 * 
@@ -3374,9 +3447,33 @@ public class GeoHash {
 	}
 	
 	
-	public static void main(String arg[]) {
+	public static void main4(String arg[]) {
 		
-		System.out.println(GeoHash.getAntipodeGeohash("c7"));
+		//System.out.println(GeoHash.getAntipodeGeohash("c7"));
+		 
+		 
+		
+		float upLat = 40.6532236764f;
+		float lowLat = 40.6500305066f;
+
+		float upLon = -104.99372356f;
+		float lowLon = -104.995688942f;
+		
+		Coordinates c1 = new Coordinates(lowLat, lowLon);
+		Coordinates c2 = new Coordinates(upLat, lowLon);
+		Coordinates c3 = new Coordinates(upLat, upLon);
+		Coordinates c4 = new Coordinates(lowLat, upLon);
+		
+		ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
+		cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+		
+		for(String s :getIntersectingGeohashesForConvexBoundingPolygon(cs1, 8)) {
+			
+			System.out.print("\""+s+"\",");
+			
+		}
+		
+		
 	}
 	
 	
@@ -3398,6 +3495,27 @@ public class GeoHash {
 		
 	}
 	
+	/**
+	 * 'CHANCE' IN 10 CHANCE OF RETURNING TRUE
+	 * @author sapmitra
+	 * @param chance
+	 * @return
+	 */
+	public static boolean getProb(int chance) {
+		
+		int random = 0;
+		
+		// Get a number between 1 and 10;
+		random = ThreadLocalRandom.current().nextInt(1, 11);
+		
+		if(random <= chance) {
+			return true;
+		}
+		
+		return false;
+		
+	}
+	
 	public static int getRandom(int trials) {
 		
 		int random = ThreadLocalRandom.current().nextInt(0, trials);
@@ -3405,6 +3523,293 @@ public class GeoHash {
 		return random;
 		
 	}
+	
+	public static List<String> getInternalGeohashes(String geohash) {
+		
+		List<String> childrenGeohashes = new ArrayList<>();
+		
+		for(char c : charMap) {
+			childrenGeohashes.add(geohash+c);
+		}
+		
+		return childrenGeohashes;
+	}
+	
+	public static List<String> getInternalGeohashes_test(String geohash, int precision) {
+		
+		List<String> allGeoHashes = new ArrayList<String>();
+		allGeoHashes.add(geohash);
+		
+		for(int i = geohash.length(); i < precision; i++) {
+			
+			List<String> currentGeohashes = new ArrayList<String>();
+			
+			for(String geoHash : allGeoHashes) {
+				
+				
+				SpatialRange range1 = GeoHash.decodeHash(geoHash);
+				
+				Coordinates c1 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getLowerBoundForLongitude());
+				Coordinates c2 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getLowerBoundForLongitude());
+				Coordinates c3 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getUpperBoundForLongitude());
+				Coordinates c4 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getUpperBoundForLongitude());
+				
+				ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
+				cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+				
+				currentGeohashes.addAll(GeoHash.getInternalGeohashes(geoHash));
+				
+			}
+			allGeoHashes = currentGeohashes;
+			
+		}
+		//Collections.sort(allGeoHashes);
+		//String[] returnArray = allGeoHashes.toArray(new String[allGeoHashes.size()]);
+		return allGeoHashes;
+	}
+	
+	
+	public static List<String> getInternalGeohashes(String geohash, int precision) {
+		
+		List<String> allGeoHashes = new ArrayList<String>();
+		allGeoHashes.add(geohash);
+		
+		for(int i = geohash.length(); i < precision; i++) {
+			
+			List<String> currentGeohashes = new ArrayList<String>();
+			
+			for(String geoHash : allGeoHashes) {
+				
+				
+				SpatialRange range1 = GeoHash.decodeHash(geoHash);
+				
+				Coordinates c1 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getLowerBoundForLongitude());
+				Coordinates c2 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getLowerBoundForLongitude());
+				Coordinates c3 = new Coordinates(range1.getUpperBoundForLatitude(), range1.getUpperBoundForLongitude());
+				Coordinates c4 = new Coordinates(range1.getLowerBoundForLatitude(), range1.getUpperBoundForLongitude());
+				
+				ArrayList<Coordinates> cs1 = new ArrayList<Coordinates>();
+				cs1.add(c1);cs1.add(c2);cs1.add(c3);cs1.add(c4);
+				
+				currentGeohashes.addAll(GeoHash.getInternalGeohashes(geoHash));
+				
+			}
+			allGeoHashes = currentGeohashes;
+			
+		}
+		Collections.sort(allGeoHashes);
+		//String[] returnArray = allGeoHashes.toArray(new String[allGeoHashes.size()]);
+		return allGeoHashes;
+	}
+	
+	
+	public static String getCoordinateBounds(List<String> geohashes) throws IOException {
+		
+		String fullStr = "[";
+		String nameStr = "[";
+		
+		List<String> rectangles = new ArrayList<String>();
+		
+		int i = 0;
+		for(String s : geohashes) {
+			
+			SpatialRange range1 = GeoHash.decodeHash(s);
+			
+			String latlong = "["+range1.getLowerBoundForLongitude() + ","
+								+ range1.getLowerBoundForLatitude() + ","
+									+ range1.getUpperBoundForLongitude() + ","
+										+ range1.getUpperBoundForLatitude() + "]";
+			
+			
+			if(i==0) {
+				fullStr += latlong;
+				
+				nameStr += "\""+s+"\"";
+			} else {
+				fullStr += "," + latlong;
+				
+				nameStr += ",\""+s+"\"";
+			}
+			i++;
+		}
+		
+		//System.out.println(fullStr+"]");
+		//System.out.println(nameStr+"]");
+		
+		/*
+		FileWriter fileWriter = new FileWriter("/s/chopin/b/grad/sapmitra/Desktop/tempOutput/rikiC.txt", false);
+	    PrintWriter printWriter = new PrintWriter(fileWriter);
+	    printWriter.println(fullStr+"]");
+	    printWriter.close();
+	    
+	    
+	    fileWriter = new FileWriter("/s/chopin/b/grad/sapmitra/Desktop/tempOutput/rikiN.txt", false);
+	    printWriter = new PrintWriter(fileWriter);
+	    printWriter.println(nameStr+"]");
+	    printWriter.close();*/
+		
+	    
+	    System.out.println("COMPLETE...");
+		return fullStr+"]"+"$$"+nameStr+"]";
+		
+		
+	}
+	
+	public static void mainX(String arg[]) throws IOException {
+		
+		String allCoords = "[";
+		String allNames = "[";
+		
+		int i = 0;
+		for(String s:getInternalGeohashes("9xjqb")) {
+			String op = getCoordinateBounds(getInternalGeohashes(s,7));
+			
+			String cs = op.split("\\$\\$")[0];
+			String ns = op.split("\\$\\$")[1];
+			
+			
+			if(i==0) {
+				allCoords += cs;
+				
+				allNames += ns;
+			} else {
+				allCoords += "," + cs;
+				
+				allNames += ","+ns+"";
+			}
+			i++;
+		}
+		
+		
+		FileWriter fileWriter = new FileWriter("/s/chopin/b/grad/sapmitra/Desktop/tempOutput/rikiC.txt", false);
+	    PrintWriter printWriter = new PrintWriter(fileWriter);
+	    printWriter.println(allCoords+"]");
+	    printWriter.close();
+	    
+	    
+	    fileWriter = new FileWriter("/s/chopin/b/grad/sapmitra/Desktop/tempOutput/rikiN.txt", false);
+	    printWriter = new PrintWriter(fileWriter);
+	    printWriter.println(allNames+"]");
+	    printWriter.close();
+	}
+	
+	
+	public static int getIndexWithinGeohash(String geohash, int startLength) {
+		
+		String remainder = geohash.substring(startLength);
+		
+		//System.out.println(remainder);
+		int num = getGeohashIDWithOffset(geohash, startLength);
+		
+		return num;
+		
+	}
+	
+	public static void main(String arg[]) {
+		System.out.println(getInternalGeohashes_test("96", 3).size());
+	}
+	
+	public static void main_earthengine(String arg[]) {
+		
+		//String geohash = "9b";
+		
+		//getIndexWithinGeohash(geohash,1);
+		
+		
+		// INSERTING NEW FIELD
+		
+		List<String> result = new ArrayList<String>();
+		
+		try (Stream<Path> walk = Files.walk(Paths.get("/s/chopin/b/grad/sapmitra/Documents/SENTINEL"))) {
+
+			result = walk.map(x -> x.toString())
+					.filter(f -> f.endsWith(".csv")).collect(Collectors.toList());
+
+		
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println(result);
+		
+		int i=0;
+		for(String filePath : result) {
+			
+			if(i%10 == 0)
+				System.out.println(i+"====="+filePath);
+			
+			i++;
+			int labelIndex = 6;
+			if(filePath.contains("earthengineLS"))
+				labelIndex = 5;
+			
+			//String filePath = "/s/chopin/b/grad/sapmitra/Documents/SENTINEL/earthengine/9xjqb0.csv";
+			
+			
+			String newFilepath = filePath.replace("SENTINEL", "SENTINEL_UP");
+			
+			
+			File resultsDir1 = new File(newFilepath);
+			File resultsDir = new File(resultsDir1.getParent());
+			if (!resultsDir.exists())
+				resultsDir.mkdirs();
+			
+			
+			
+			String[] fTokens = filePath.split("/");
+			
+			String baseHash = fTokens[fTokens.length-1].split("\\.")[0];
+			
+			BufferedReader reader;
+			try {
+				
+				reader = new BufferedReader(new FileReader(filePath));
+				
+				String fileData = "";
+				
+				String line = reader.readLine();
+				while (line != null) {
+					
+					if(line.startsWith("system")) {
+						
+						fileData+=line;
+						
+					} else if(line.trim().length() > 0){
+						
+						String[] tokens = line.split(",");
+						
+						String geohash = tokens[labelIndex];
+						
+						int pixel_indx = getIndexWithinGeohash(geohash,baseHash.length());
+						
+						String newLine = tokens[0]+","+tokens[1]+","+tokens[2]+","+tokens[3]+","+tokens[4]+","+tokens[5]+","+tokens[6]+","+pixel_indx;
+						
+						if(labelIndex == 5)
+							newLine = tokens[0]+","+tokens[1]+","+tokens[2]+","+tokens[3]+","+tokens[4]+","+tokens[5]+","+pixel_indx;
+						
+						fileData+="\n"+newLine;
+					}
+					//System.out.println(line);
+					// read next line
+					line = reader.readLine();
+				}
+				reader.close();
+				
+				FileWriter fileWriter = new FileWriter(newFilepath, false);
+			    PrintWriter printWriter = new PrintWriter(fileWriter);
+			    printWriter.print(fileData);
+			    printWriter.close();
+				
+				
+				
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	
 	
 	
 	
